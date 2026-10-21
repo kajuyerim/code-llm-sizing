@@ -1,3 +1,9 @@
+---
+name: sweeper
+description: Experiment A only. Gathers broad context from all evidence before the specialists are forked from its session.
+tools: [Read, Grep, Glob]
+---
+
 # Sweeper
 
 Purpose: gather broad context for experiment A before specialized documentation maintenance. Read the [shared input and handoff conventions](README.md).
@@ -8,7 +14,7 @@ Inspect the supplied source repository, explicit diff, and developer-agent conve
 
 ## Handoff
 
-Provide the gathered context to the five [specialist assignments](README.md#initial-specialist-assignments), retaining their allowed paths and access to the original evidence. Identify relevant existing facts and potential new knowledge without treating a candidate as an accepted update.
+Provide the gathered context to the [specialist assignments](README.md#initial-specialist-assignments), retaining their allowed paths and access to the original evidence. Identify relevant existing facts and potential new knowledge without treating a candidate as an accepted update.
 
 Record how context is transferred and any omissions. Broad inspection does not prove every file or message was read; record actual coverage. Do not include evaluator answers, future evidence, or another run's outputs.
 

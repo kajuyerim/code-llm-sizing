@@ -36,6 +36,8 @@ Return a Markdown proposal for each affected fact or section with:
 
 For ADD, propose an unused ID consistent with the target document. Do not fabricate evidence locators or verification metadata. For NO_CHANGE, identify the inspected scope. For NEEDS_REVIEW, identify the missing evidence or decision.
 
+In automated runs the record is structured JSON with the fields `target`, `fact_id`, `op`, `text`, `scope`, `evidence`, and `reason`, defined in `runtime/contextops/schemas.py` and explained in the [shared rules](../agents/shared-rules.md#records). Keep that schema and this section in sync.
+
 ## Applying a core update
 
 Keep edits within the assigned core documents and preserve valid definitions, links, and evidence. Have one final writer combine proposals so specialists do not overwrite each other. That writer records semantic changes in the bundle history and updates navigation when needed.

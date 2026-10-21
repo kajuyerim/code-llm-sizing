@@ -1,3 +1,19 @@
+---
+type: Product
+title: Firebase Knowledge
+fileMatchPattern:
+  - "**/firebase.json"
+  - "**/.firebaserc"
+  - "**/firestore.rules"
+  - "**/firestore.indexes.json"
+  - "**/storage.rules"
+  - "**/database.rules.json"
+  - "**/google-services.json"
+  - "**/GoogleService-Info.plist"
+  - "**/functions/**"
+keywords: [firebase, firestore, crashlytics, remote config, cloud messaging, fcm]
+---
+
 # Firebase Knowledge
 
 Scope: Firebase-specific guidance learned from supported source application evidence and accepted developer decisions. Status: initial entry point; no application-specific facts have been imported.

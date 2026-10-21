@@ -15,10 +15,12 @@ Application code lives in separate repositories. After development, a local pre-
 
 | Folder | Contents |
 | --- | --- |
-| `core/` | Shared terminology, stack standards, and naming conventions |
+| `core/` | Shared terminology, stack standards, naming conventions, and pitfalls |
 | `maintenance/` | Instructions for maintaining core and product knowledge |
 | `products/` | Product-specific knowledge, starting with Firebase and Dataform |
-| `agents/` | Sweeper and specialist role definitions |
+| `agents/` | Sweeper, specialist, cartographer, and writer role definitions |
+| `init.md` | Run configuration read by the initializer |
+| `runtime/` | Python orchestrator and pre-push hook |
 | `skills/` | Reusable setup and GitHub issue creation procedures |
 
 ## First experiments
@@ -28,7 +30,7 @@ Application code lives in separate repositories. After development, a local pre-
 
 Both workflows only maintain documentation. Their [shared assignments and input contract](agents/README.md) keep the comparison consistent. The initial documents are ready for team review; the experiments have not been run.
 
-Version 0.1 covers the foundation and manual pilots. A maintenance runtime and automated hook integration are future work. The setup walkthrough reports those integrations as pending rather than installing a simulated hook.
+Version 0.1 covers the foundation, manual pilots, and a first [runtime](runtime/README.md) for the fresh-specialist workflow with a background pre-push hook. The runtime has been written but not yet run against an application.
 
 ## Tracking
 
