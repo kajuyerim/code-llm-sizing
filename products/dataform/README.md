@@ -1,3 +1,14 @@
+---
+type: Product
+title: Dataform Knowledge
+fileMatchPattern:
+  - "**/*.sqlx"
+  - "**/workflow_settings.yaml"
+  - "**/dataform.json"
+  - "**/includes/*.js"
+keywords: [dataform, sqlx]
+---
+
 # Dataform Knowledge
 
 Scope: Dataform-specific guidance learned from supported source application evidence and accepted developer decisions. Status: initial entry point; no application-specific facts have been imported.

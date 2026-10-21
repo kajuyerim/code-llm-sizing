@@ -25,3 +25,5 @@ When a new supported product area is needed, propose a folder and entry point ra
 Check for duplicates, inappropriate generalization, stale examples, broken links, and claims based only on an agent's completion message. Defer unsupported new claims. Flag unresolved existing claims visibly, and do not label agent-generated changes as human-verified.
 
 These procedures maintain product knowledge. Agent assignments are defined in [the agent directory](../agents/README.md); setup is described in [the root walkthrough](../setup.md).
+
+Automated product instances are selected by the product README's relevance hints. Use the supplied product ID prefix and ID-based tables for admitted entries. Existing frontmatter is protected: report relevance-hint changes for human review instead of rewriting configuration during maintenance. Focused new documents may be added within the assigned existing product folder; a new product area requires a human-reviewed structural proposal.

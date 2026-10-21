@@ -15,20 +15,21 @@ Application code lives in separate repositories. After development, a local pre-
 
 | Folder | Contents |
 | --- | --- |
-| `core/` | Shared terminology, stack standards, and naming conventions |
+| `core/` | Shared terminology, stack standards, naming conventions, and pitfalls |
 | `maintenance/` | Instructions for maintaining core and product knowledge |
 | `products/` | Product-specific knowledge, starting with Firebase and Dataform |
-| `agents/` | Sweeper and specialist role definitions |
+| `agents/` | Sweeper, specialist, cartographer, and writer definitions |
+| `init.md` | Run configuration and notes |
+| `runtime/` | Standalone sweeper-first source and documentation |
 | `skills/` | Reusable setup and GitHub issue creation procedures |
 
-## First experiments
+## Sweeper-first implementation
 
-- **Sweeper, then delegation:** one agent examines all three evidence sources, then forks into 5–6 specialists with the gathered context.
-- **Immediate delegation:** 5–6 specialists start fresh and inspect the same evidence sources themselves.
+Status: **implemented, not run or verified**. This feature branch implements Experiment A independently from foundation commit fdecc82. One sweeper inspects frozen source, diff, conversation, and memory evidence; selected specialists inherit its completed session through literal SDK forks.
 
-Both workflows only maintain documentation. Their [shared assignments and input contract](agents/README.md) keep the comparison consistent. The initial documents are ready for team review; the experiments have not been run.
+The six [assignments and input contract](agents/README.md) cover terminology, stack standards, naming, pitfalls, Firebase, and Dataform. Product roles run when configured relevance hints match. Specialists propose changes; one writer edits knowledge. Application development is outside this workflow.
 
-Version 0.1 covers the foundation and manual pilots. A maintenance runtime and automated hook integration are future work. The setup walkthrough reports those integrations as pending rather than installing a simulated hook.
+The [runtime guide](runtime/README.md) documents the manual command, background pre-push adapter, evidence collection, validation, budgets, artifacts, and PR publication code. No dependencies or hooks were installed, no agents or tests were run, and no API charges were incurred during implementation. Live behavior and pilot evaluation remain pending. Read the [static review](runtime/REVIEW.md) for limitations.
 
 ## Tracking
 
@@ -42,7 +43,7 @@ Milestone: [v0.1 - Structure & First tests](https://github.com/kajuyerim/code-ll
 | [#4](https://github.com/kajuyerim/code-llm-sizing/issues/4) | Prepare fresh-specialist maintenance |
 | [#5](https://github.com/kajuyerim/code-llm-sizing/issues/5) | Run the fresh-specialist pilot and compare results |
 
-The foundation is prepared locally. Issue #1 remains open for publication and review by Kerem and Barış; the four experiment issues remain open for later work.
+Issue #1 still records foundation review. Issue #2 tracks preparation, and issue #3 tracks future pilot execution. The issue descriptions predate this runtime work; no issue states, assignments, or review checkboxes were changed. This implementation adds no comparison infrastructure.
 
 ## Team
 

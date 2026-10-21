@@ -4,19 +4,21 @@
 
 This repository is the senior project's shared-knowledge destination, analogous to `yunus/shared-knowledge`. It stores terminology, stack standards, conventions, and reusable development guidance. The current name, `code-llm-sizing`, will be changed later; no replacement name has been selected.
 
-Application code belongs in separate repositories. Do not add an application source tree or application evaluation fixtures here. The maintenance runtime's implementation location is undecided; do not assume this repository is its source-code home.
+Application code belongs in separate repositories. Do not add an application source tree or application evaluation fixtures here. This branch contains the independently implemented sweeper-first maintenance runtime under runtime. Its status is implemented, not run or verified.
 
-Read [index.md](index.md) for navigation and [setup.md](setup.md) for onboarding. The foundation contains core knowledge, maintenance guides, product areas, agent definitions, and two repository-local skills. Team review and manual pilot runs are pending. Do not describe planned tooling or unrun experiments as existing results.
+Read [index.md](index.md) for navigation and [setup.md](setup.md) for onboarding. The foundation contains core knowledge, maintenance guides, product areas, agent definitions, run configuration, runtime source, and two repository-local skills. Team review and pilot runs are pending. Do not describe unrun tooling or experiments as verified results.
 
 ## Folder responsibilities
 
-- `core/`: shared terminology, stack standards, and naming conventions.
+- `core/`: shared terminology, stack standards, naming conventions, and pitfalls.
 - `products/`: product-specific knowledge, initially Firebase and Dataform.
 - `maintenance/`: only procedures for maintaining `core/` and `products/`.
 - `agents/`: role definitions, specialist assignments, and experiment handoff conventions.
+- `init.md`: deterministic run settings and notes appended to agent instructions.
+- `runtime/`: standalone Experiment A source and operational documentation.
 - `skills/`: reusable setup and GitHub issue creation procedures.
 
-Use the applicable maintenance guide for knowledge changes. Definitions in `agents/` and skills are instructions, not a running orchestration system. These skills can be read directly by a local agent; no automatic discovery or installation has been configured.
+Use the applicable maintenance guide for knowledge changes. The runtime reads definitions in agents, but no installation or execution is implied. Repository-local skills can be read directly; automatic discovery has not been configured.
 
 ## Maintenance experiments
 
@@ -26,9 +28,11 @@ Both experiments run locally after application development, before a push from t
 - Its Git diff across the selected revisions.
 - The conversation between the developer and the local development agent.
 
-Experiment A uses a sweeper to examine those inputs, then forks into five specialists with the gathered context. Experiment B starts five fresh specialists with equivalent documentation responsibilities; they examine those inputs themselves without inheriting a sweeper's context. The starting assignments are documented in [agents/README.md](agents/README.md).
+This branch implements Experiment A only: a sweeper examines the evidence before literal SDK session forks start selected specialists. Six assignments are configured, with product roles selected by relevance. Read [agents/README.md](agents/README.md) for boundaries and evidence handling.
 
-Neither workflow develops or modifies the application. Keep each experiment's knowledge state and agent sessions independent. Conversation export, agent runner, fork semantics, and automatic application/committing of knowledge edits are not yet selected.
+The runtime does not develop or modify the application. It reads Claude Code conversation and development-memory evidence, validates proposals, and has code to commit a knowledge branch and open a PR. It never merges automatically. There is no comparison mode or cross-experiment orchestration.
+
+The authorized implementation includes source and documentation only. Do not install dependencies or hooks, execute agents, add or run tests, perform live smoke checks, or incur API charges without a later user instruction. Current validation is static inspection only. Leave GitHub issues and review checkboxes unchanged.
 
 ## Knowledge editing
 

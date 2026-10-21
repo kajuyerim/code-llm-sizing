@@ -35,18 +35,18 @@ Ask for a missing repository path or conversation export when needed for an actu
 
 ## 5. Select roles and strategy
 
-Use the five [specialist assignments](agents/README.md#initial-specialist-assignments) in both experiments. Record the selected model configuration and resource limits before measured work.
+This branch configures six [specialist assignments](agents/README.md#initial-specialist-assignments) for sweeper-first maintenance. Four core workers always run; product workers are selected by relevance. Record model configuration and resource limits before future measured work.
 
-- **A:** invoke the sweeper on all three evidence sources, then transfer its context to the specialists. Record the actual transfer mechanism.
-- **B:** start fresh specialists with the same raw evidence and role instructions, without sweeper context or A's outputs.
+- Invoke the sweeper on original evidence, then fork its successfully completed session independently for selected specialists.
+- Record parent and child IDs, coverage, omissions, and raw plus incremental resources. Do not replace a failed fork with a fresh session or summary.
 
-Both strategies produce the same [change record](maintenance/core.md#change-record). Use independent knowledge states from the same baseline for comparison.
+Use the [change record](maintenance/core.md#change-record). This runtime implements only sweeper-first behavior and has no comparison integration.
 
 ## 6. Run manually and report integration status
 
 For a manual run, supply the frozen evidence and role instructions through the chosen local agent. Have specialists return proposals, then use one final writer to reconcile them in the appropriate knowledge checkout. Keep the source application read-only during maintenance and retain local run artifacts outside this bundle.
 
-Version 0.1 does not implement an automated maintenance command or pre-push hook. Do not install an empty hook or claim that maintenance is active merely because these documents exist. A future integration must invoke a real runner and capture the refs being pushed; that integration remains outside this walkthrough's current implementation.
+The [runtime source](runtime/README.md) implements a manual command and background pre-push adapter, but is not run or verified. Installation, hook activation, model calls, tests, and pilots were excluded from the current implementation. Operational commands in that guide are for a later authorized setup, not instructions to execute while reading this walkthrough.
 
 ## 7. Finish with a setup report
 

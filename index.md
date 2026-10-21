@@ -7,6 +7,7 @@ This bundle is the shared-knowledge destination for Context Ops. Application rep
 - [Terminology](core/terminology.md)
 - [Tech stack standards](core/tech-stack-standards.md)
 - [Naming conventions](core/naming-conventions.md)
+- [Pitfalls](core/pitfalls.md)
 
 ## Products
 
@@ -20,12 +21,22 @@ This bundle is the shared-knowledge destination for Context Ops. Application rep
 
 ## Agents
 
+- [Run configuration](init.md)
+- [Shared rules](agents/shared-rules.md)
 - [Assignments and experiment conventions](agents/README.md)
 - [Sweeper](agents/sweeper.md)
 - [Terminology maintainer](agents/terminology-maintainer.md)
 - [Stack maintainer](agents/stack-maintainer.md)
 - [Conventions maintainer](agents/conventions-maintainer.md)
 - [Product maintainer](agents/product-maintainer.md)
+- [Pitfalls maintainer](agents/pitfalls-maintainer.md)
+- [Cartographer](agents/cartographer.md)
+- [Writer](agents/writer.md)
+
+## Runtime
+
+- [Standalone sweeper-first runtime](runtime/README.md)
+- [Static review and unverified behavior](runtime/REVIEW.md)
 
 ## Skills
 
