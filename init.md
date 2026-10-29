@@ -38,8 +38,8 @@ after:
   writer: agents/writer.md
 
 budget:
-  per_agent_usd: 0.5
-  total_usd: 3.0
+  per_agent_usd: 1.5
+  total_usd: 10.0
   max_turns: 30
   max_parallel: 3
 
