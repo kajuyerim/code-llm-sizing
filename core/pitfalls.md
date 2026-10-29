@@ -1,8 +1,10 @@
 # Pitfalls
 
-Scope: supported, non-obvious failures and remedies reusable during future development. Status: initial entry point; no application findings have been admitted.
+Scope: non-obvious failures met while developing source applications, and how to avoid them. Status: initial entry point; no pitfalls have been admitted yet.
 
-| ID | Trigger | Failure | Remedy | Scope |
+Each entry names the situation in which it applies, what goes wrong, and what to do instead. Admit an entry only when both the failure and the fix are supported by evidence. Product-only pitfalls belong in the matching product folder.
+
+| ID | Trigger | What goes wrong | Do instead | Scope |
 | --- | --- | --- | --- | --- |
 
-Both the failure and remedy need evidence. Product-only pitfalls belong in their product area. Use [core maintenance guidance](../maintenance/core.md) and the [pitfalls maintainer](../agents/pitfalls-maintainer.md).
+Use [core maintenance guidance](../maintenance/core.md) for changes and [the pitfalls maintainer](../agents/pitfalls-maintainer.md) for the specialist assignment.

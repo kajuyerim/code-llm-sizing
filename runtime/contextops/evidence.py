@@ -1,96 +1,116 @@
-"""Build the immutable raw pack before any agent receives access."""
+"""Builds the frozen evidence pack that every agent in a run reads from.
+
+pack/
+  manifest.json          refs, conversation window, what was included or cut
+  diff/                  changes.patch, files.txt, commits.txt
+  conversation/          one Markdown file per session, messages tagged [msg:<uuid>]
+  memory/repo/           agent instruction files at the pushed head
+  memory/auto/           Claude Code auto memory for the repository
+"""
 
 from __future__ import annotations
 
-import hashlib
-from datetime import datetime, timezone
+import json
+import shutil
+from dataclasses import dataclass, field
 from pathlib import Path
 
-from contextops import git, transcripts
-from contextops.config import Config
-from contextops.files import dump, inside, load
-from contextops.runs import Run
+from contextops import gitutil, transcripts
+from contextops.config import InitConfig
+from contextops.run import RunContext
 
 
-def build(run: Run, config: Config) -> dict:
-    if run.pack.exists():
-        raise ValueError("refusing to overwrite an existing evidence pack")
-    diff_dir = run.pack / "diff"
-    diff_dir.mkdir(parents=True)
-    names = git.changed(run.application, run.base, run.head)
-    (diff_dir / "changes.patch").write_text(git.diff(run.application, run.base, run.head), encoding="utf-8")
-    dump(diff_dir / "files.json", names)
-    log_range = run.head if run.base == git.EMPTY_TREE else f"{run.base}..{run.head}"
-    (diff_dir / "commits.txt").write_text(git.call(run.application, "log", "--format=%H %aI %an%n%s%n%b", log_range, "--"), encoding="utf-8")
-    dump(diff_dir / "sections.json", {name: git.diff(run.application, run.base, run.head, name) for name in names})
-    sessions, selection = transcripts.read(run.application, run.since, run.cutoff, config.conversation)
-    conversation = run.pack / "conversation"
-    conversation.mkdir()
-    for session in sessions:
-        blocks = [f"# Session {session['session']}", f"Older messages omitted: {session['dropped']}", ""]
-        for message in session["messages"]:
-            blocks.append(f"[msg:{message['message']}] {message['role']} @ {message['timestamp']}\n{message['text']}\n")
-        (conversation / f"{session['session']}.md").write_text("\n".join(blocks), encoding="utf-8")
-    dump(conversation / "messages.json", sessions)
-    memory, missing_memory, notes = [], [], list(run.notes)
-    captured = datetime.now(timezone.utc).isoformat()
-    for name in config.memory["repo_files"]:
-        try:
-            source = inside(run.app_snapshot, name)
-            if source.is_file():
-                _copy(source, run.pack, f"memory/repo/{name}", memory)
-            else:
-                missing_memory.append(name)
-        except ValueError as exc:
-            notes.append(str(exc))
-    if config.memory["auto_memory"]:
-        for directory in transcripts.project_directories(run.application):
-            auto = directory / "memory"
-            if auto.is_symlink() or not auto.is_dir():
-                continue
-            for source in sorted(auto.rglob("*.md")):
-                relative = source.relative_to(auto).as_posix()
-                try:
-                    source = inside(auto, relative)
-                    _copy(source, run.pack, f"memory/auto/{directory.name}/{relative}", memory)
-                except ValueError as exc:
-                    notes.append(str(exc))
-    manifest = {
-        **run.record(), "application_snapshot": str(run.app_snapshot), "knowledge_snapshot": str(run.kb_snapshot),
-        "memory_capture_time": captured, "memory_cutoff_aligned": False,
-        "memory_note": "Repository memory is from head; auto memory is a mutable development artifact copied at collection time, not historical conversation-cutoff evidence.",
-        "changed_files": names, "sessions": [s["session"] for s in sessions],
-        "conversation_selection": selection, "memory_files": memory,
-        "optional_memory_files_absent_at_head": missing_memory, "notes": notes,
-        "complete": bool(sessions),
-    }
+@dataclass
+class Evidence:
+    root: Path
+    changed_files: list[str]
+    messages: dict[str, set[str]] = field(default_factory=dict)  # session id -> message uuids
+    memory_files: list[str] = field(default_factory=list)
+    notes: list[str] = field(default_factory=list)
+
+    def conversation_text(self) -> str:
+        files = sorted((self.root / "conversation").glob("*.md"))
+        return "\n".join(path.read_text(encoding="utf-8") for path in files)
+
+
+def build_pack(ctx: RunContext, config: InitConfig) -> Evidence:
+    evidence = Evidence(root=ctx.pack, changed_files=_write_diff(ctx, ctx.pack / "diff"))
+    _write_conversation(ctx, config, evidence)
+    _write_memory(ctx, config, evidence)
+    _write_manifest(ctx, evidence)
+    return evidence
+
+
+def _write_diff(ctx: RunContext, out: Path) -> list[str]:
+    out.mkdir(parents=True, exist_ok=True)
+    repo, base, head = ctx.app_root, ctx.base_sha, ctx.head_sha
+    (out / "changes.patch").write_text(gitutil.git(repo, "diff", "--no-color", base, head) + "\n")
+
+    names = gitutil.git(repo, "diff", "--name-status", base, head)
+    (out / "files.txt").write_text(names + "\n")
+
+    log_range = head if base == gitutil.EMPTY_TREE else f"{base}..{head}"
+    log = gitutil.git(repo, "log", "--date=iso", "--format=%H %an %ad%n%s%n%b", log_range)
+    (out / "commits.txt").write_text(log + "\n")
+
+    # Renames are listed as "R100<TAB>old<TAB>new"; the new path is the one that exists at head.
+    return [line.split("\t")[-1] for line in names.splitlines() if line]
+
+
+def _write_conversation(ctx: RunContext, config: InitConfig, evidence: Evidence) -> None:
+    out = ctx.pack / "conversation"
+    out.mkdir(parents=True, exist_ok=True)
+    settings = config.conversation
+    sessions = transcripts.load_sessions(
+        ctx.app_root, ctx.since, ctx.cutoff, settings.include_sidechains
+    )
     if not sessions:
-        notes.append("Missing retained developer-agent conversation: no model calls or publication are permitted.")
-    hashes = {}
-    for path in sorted(run.pack.rglob("*")):
-        if path.is_file():
-            hashes[path.relative_to(run.pack).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
-    manifest["sha256"] = hashes
-    dump(run.pack / "manifest.json", manifest)
-    return manifest
+        evidence.notes.append("No Claude Code conversation found for this repository in the window.")
+
+    for session in sessions:
+        text, kept = transcripts.to_markdown(session, settings.max_chars_per_session)
+        (out / f"{session.session_id}.md").write_text(text, encoding="utf-8")
+        evidence.messages[session.session_id] = kept
+        if len(kept) < len(session.messages):
+            evidence.notes.append(
+                f"Session {session.session_id}: kept the newest {len(kept)} "
+                f"of {len(session.messages)} messages."
+            )
 
 
-def _copy(source: Path, pack: Path, relative: str, records: list[dict]) -> None:
-    target = inside(pack, relative)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    content = source.read_bytes()
-    target.write_bytes(content)
-    records.append({"path": relative, "sha256": hashlib.sha256(content).hexdigest(),
-                    "captured_at": datetime.now(timezone.utc).isoformat()})
+def _write_memory(ctx: RunContext, config: InitConfig, evidence: Evidence) -> None:
+    sources = [
+        (ctx.app_snapshot / name, f"memory/repo/{name}") for name in config.memory.repo_files
+    ]
+    if config.memory.auto_memory:
+        auto = transcripts.auto_memory_dir(ctx.app_root)
+        if auto.is_dir():
+            sources += [(path, f"memory/auto/{path.name}") for path in sorted(auto.glob("*.md"))]
+
+    for source, relative in sources:
+        if source.is_file():
+            target = ctx.pack / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, target)
+            evidence.memory_files.append(relative)
 
 
-def messages(pack: Path) -> dict[tuple[str, str], dict]:
-    return {(m["session"], m["message"]): m
-            for session in load(pack / "conversation/messages.json") for m in session["messages"]}
-
-
-def check_hashes(run: Run, manifest: dict) -> None:
-    for name, digest in manifest["sha256"].items():
-        path = inside(run.pack, name)
-        if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
-            raise ValueError(f"evidence changed during the run: {name}")
+def _write_manifest(ctx: RunContext, evidence: Evidence) -> None:
+    manifest = {
+        "run_id": ctx.run_id,
+        "application": str(ctx.app_snapshot),
+        "ref": ctx.ref,
+        "base_sha": ctx.base_sha,
+        "head_sha": ctx.head_sha,
+        "knowledge_base": str(ctx.kb_snapshot),
+        "knowledge_baseline": ctx.kb_baseline,
+        "conversation_window": {
+            "since": ctx.since.isoformat() if ctx.since else None,
+            "cutoff": ctx.cutoff.isoformat(),
+        },
+        "sessions": {sid: len(uuids) for sid, uuids in evidence.messages.items()},
+        "changed_files": len(evidence.changed_files),
+        "memory_files": evidence.memory_files,
+        "notes": evidence.notes,
+    }
+    (ctx.pack / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")

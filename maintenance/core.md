@@ -36,14 +36,10 @@ Return a Markdown proposal for each affected fact or section with:
 
 For ADD, propose an unused ID consistent with the target document. Do not fabricate evidence locators or verification metadata. For NO_CHANGE, identify the inspected scope. For NEEDS_REVIEW, identify the missing evidence or decision.
 
-The automated runtime uses structured JSON fields `target`, `fact_id`, `merge_ids`, `op`, `text`, `scope`, `evidence`, and `reason`, described in the [shared rules](../agents/shared-rules.md#specialist-output). For ADD, UPDATE, and MERGE, text is one complete single-line Markdown table row with fact_id in its first cell. MERGE retains fact_id and lists the other existing IDs in merge_ids. Other operations use an empty merge_ids list. NO_CHANGE uses null fact_id. New deferred claims may also use null.
-
-Canonical paths, assignment boundaries, IDs, locator resolution, exact quotes, and possible secrets are checked in code. These checks do not establish semantic truth or authority. Conflicting operations on the same fact are deferred. Keep handoffs and unowned findings separate from applicable records.
+In automated runs the record is structured JSON with the fields `target`, `fact_id`, `op`, `text`, `scope`, `evidence`, and `reason`, defined in `runtime/contextops/schemas.py` and explained in the [shared rules](../agents/shared-rules.md#records). Keep that schema and this section in sync.
 
 ## Applying a core update
 
 Keep edits within the assigned core documents and preserve valid definitions, links, and evidence. Have one final writer combine proposals so specialists do not overwrite each other. That writer records semantic changes in the bundle history and updates navigation when needed.
 
 Check that cited evidence supports the particular claim, cross-links resolve, IDs remain stable, and generated changes are not stamped as human-verified. Use [product maintenance guidance](products.md) when a claim belongs under a product instead.
-
-The runtime writer stage preserves all existing frontmatter, checks fact-ID transitions and links, and adds Evidence citations plus generated-authorship history. These safeguards have not been run or verified. New human verification remains a separate review action.

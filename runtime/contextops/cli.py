@@ -1,4 +1,4 @@
-"""Explicit installation and foreground commands; the hook only captures and spawns."""
+"""Command line: install the hook, react to a push, or sweep a range by hand."""
 
 from __future__ import annotations
 
@@ -8,112 +8,112 @@ import subprocess
 import sys
 from pathlib import Path
 
-from contextops import git
-from contextops.config import load_config
-from contextops.runs import prepare
+from contextops import gitutil
+from contextops.run import create_run
 
-HOOK_MARKER = "# Context Ops sweeper-first pre-push adapter"
+HOOK = """#!/bin/sh
+# Installed by contextops. Sweeps the pushed work in the background; never blocks the push.
+"{python}" -m contextops hook "$@" || true
+exit 0
+"""
 
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="contextops")
     commands = parser.add_subparsers(dest="command", required=True)
-    install = commands.add_parser("install", help="explicitly install the pre-push adapter")
+
+    install = commands.add_parser("install", help="install the pre-push hook in an application repo")
+    install.add_argument("--kb", type=Path, required=True, help="path to the knowledge base checkout")
     install.add_argument("--repo", type=Path, default=Path.cwd())
-    install.add_argument("--kb", type=Path, required=True)
-    install.add_argument("--force", action="store_true")
-    hook = commands.add_parser("hook", help="read exact refs from Git's pre-push stdin")
+    install.add_argument("--force", action="store_true", help="replace an existing pre-push hook")
+
+    hook = commands.add_parser("hook", help="called by git's pre-push hook")
     hook.add_argument("remote")
     hook.add_argument("url", nargs="?")
-    run = commands.add_parser("run", help="execute a prepared, never-attempted run directory")
+
+    run = commands.add_parser("run", help="run a prepared run directory in the foreground")
     run.add_argument("run_dir", type=Path)
-    sweep = commands.add_parser("sweep", help="prepare and execute an explicit commit range")
-    sweep.add_argument("--repo", type=Path, default=Path.cwd())
-    sweep.add_argument("--kb", type=Path)
+
+    sweep = commands.add_parser("sweep", help="sweep a commit range by hand, without pushing")
     sweep.add_argument("--base", required=True)
     sweep.add_argument("--head", default="HEAD")
+    sweep.add_argument("--repo", type=Path, default=Path.cwd())
+    sweep.add_argument("--kb", type=Path, help="defaults to the repo's contextops.kb setting")
+
     args = parser.parse_args(argv)
-    try:
-        if args.command == "install":
-            _install(args)
-        elif args.command == "hook":
-            _hook(args)
-        else:
-            from contextops.orchestrator import execute
-
-            if args.command == "sweep":
-                app = git.root(args.repo)
-                configured = git.call(app, "config", "--get", "contextops.kb", check=False).strip()
-                kb = args.kb or (Path(configured) if configured else None)
-                if kb is None:
-                    raise ValueError("pass --kb or explicitly install the adapter first")
-                directory = prepare(app, kb, args.base, args.head).directory
-            else:
-                directory = args.run_dir
-            report = asyncio.run(execute(directory))
-            print(report)
-            from contextops.files import load
-            if load(report.parent / "status.json")["status"] != "complete":
-                raise SystemExit(1)
-    except Exception as exc:
-        print(f"contextops: {exc}", file=sys.stderr)
-        if args.command != "hook":
-            raise SystemExit(1) from exc
+    handlers = {"install": _install, "hook": _hook, "run": _run, "sweep": _sweep}
+    handlers[args.command](args)
 
 
-def _install(args) -> None:
-    import shlex
+def _install(args: argparse.Namespace) -> None:
+    repo = gitutil.repo_root(args.repo)
+    kb = gitutil.repo_root(args.kb.expanduser())
+    hook_path = Path(gitutil.git(repo, "rev-parse", "--git-path", "hooks/pre-push"))
+    if not hook_path.is_absolute():
+        hook_path = repo / hook_path
 
-    app, kb = git.root(args.repo), git.root(args.kb)
-    if app == kb or app in kb.parents or kb in app.parents:
-        raise ValueError("application and knowledge checkouts must be separate")
-    load_config(kb)
-    hooks = git.setting(app, "core.hooksPath")
-    if hooks:
-        raise ValueError("core.hooksPath is configured; integrate the adapter manually instead of replacing shared hooks")
-    hook = Path(git.call(app, "rev-parse", "--git-path", "hooks/pre-push").strip())
-    if not hook.is_absolute():
-        hook = app / hook
-    if hook.is_symlink():
-        raise ValueError("refusing to replace a symlink hook")
-    if hook.exists() and HOOK_MARKER not in hook.read_text(encoding="utf-8"):
-        if not args.force:
-            raise ValueError("an existing pre-push hook needs explicit --force replacement")
-        backup = hook.with_name("pre-push.contextops-backup")
-        if backup.exists():
-            raise ValueError("hook backup already exists; inspect it before replacement")
-        backup.write_bytes(hook.read_bytes())
-        backup.chmod(hook.stat().st_mode)
-    hook.parent.mkdir(parents=True, exist_ok=True)
-    hook.write_text(f'#!/bin/sh\n{HOOK_MARKER}\n{shlex.quote(sys.executable)} -m contextops hook "$@" || true\nexit 0\n', encoding="utf-8")
-    hook.chmod(0o755)
-    git.call(app, "config", "contextops.kb", str(kb))
-    print(f"Installed {hook}; runtime remains unverified until a separately authorized run.")
+    if hook_path.exists() and "contextops" not in hook_path.read_text() and not args.force:
+        sys.exit(f"{hook_path} already exists. Rerun with --force to replace it.")
+    hook_path.parent.mkdir(parents=True, exist_ok=True)
+    hook_path.write_text(HOOK.format(python=sys.executable))
+    hook_path.chmod(0o755)
+    gitutil.git(repo, "config", "contextops.kb", str(kb))
+    print(f"Installed {hook_path}\nKnowledge base: {kb}")
 
 
-def _hook(args) -> None:
-    app = git.root(Path.cwd())
-    configured = git.call(app, "config", "--get", "contextops.kb", check=False).strip()
-    if not configured:
-        return
-    kb = Path(configured).resolve()
-    if kb == app:
-        return
+def _hook(args: argparse.Namespace) -> None:
+    app = gitutil.repo_root(Path.cwd())
+    kb = gitutil.config_get(app, "contextops.kb")
+    if not kb or Path(kb).resolve() == app.resolve():
+        return  # not configured, or a push of the knowledge base itself
+
+    # git sends one line per ref: <local ref> <local sha> <remote ref> <remote sha>
     for line in sys.stdin:
         fields = line.split()
-        if len(fields) != 4 or fields[1] == git.ZERO:
-            continue
-        local_ref, head, remote_ref, base = fields
+        if len(fields) != 4 or fields[1] == gitutil.ZERO_SHA:
+            continue  # malformed, or a branch deletion
+        local_ref, local_sha, _, remote_sha = fields
         try:
-            # Preparation contains no SDK calls. Every ref gets an independent run.
-            run = prepare(app, kb, base, head, ref=local_ref, remote_ref=remote_ref, remote=args.remote)
-            environment = git.environment()
-            for key in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"):
-                environment.pop(key, None)
-            with (run.directory / "run.log").open("a", encoding="utf-8") as log:
-                subprocess.Popen([sys.executable, "-m", "contextops", "run", str(run.directory)],
-                                 stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
-                                 cwd=run.directory, env=environment, start_new_session=True)
-            print(f"contextops: background report will be {run.directory / 'report.md'}", file=sys.stderr)
-        except Exception as exc:
-            print(f"contextops: maintenance skipped for {local_ref}: {exc}", file=sys.stderr)
+            ctx = create_run(app, Path(kb), args.remote, local_ref, local_sha, remote_sha)
+        except Exception as exc:  # the push must go through whatever happens here
+            print(f"contextops: skipped ({exc})", file=sys.stderr)
+            continue
+        if ctx:
+            _spawn(ctx.run_dir)
+            print(f"contextops: sweeping in the background, report at {ctx.run_dir / 'report.md'}",
+                  file=sys.stderr)
+
+
+def _run(args: argparse.Namespace) -> None:
+    # Imported here so the hook path stays fast and does not load the Agent SDK.
+    from contextops.orchestrator import orchestrate
+
+    print(asyncio.run(orchestrate(args.run_dir.expanduser())))
+
+
+def _sweep(args: argparse.Namespace) -> None:
+    from contextops.orchestrator import orchestrate
+
+    app = gitutil.repo_root(args.repo)
+    kb = args.kb or gitutil.config_get(app, "contextops.kb")
+    if not kb:
+        sys.exit("No knowledge base: pass --kb or run `contextops install` first.")
+    ctx = create_run(
+        app, Path(kb).expanduser(), "origin", "manual",
+        gitutil.rev_parse(app, args.head), gitutil.rev_parse(app, args.base),
+    )
+    if ctx is None:
+        sys.exit("Nothing to sweep: base and head are the same commit.")
+    print(asyncio.run(orchestrate(ctx.run_dir)))
+
+
+def _spawn(run_dir: Path) -> None:
+    log = (run_dir / "run.log").open("a")
+    subprocess.Popen(
+        [sys.executable, "-m", "contextops", "run", str(run_dir)],
+        stdin=subprocess.DEVNULL,
+        stdout=log,
+        stderr=subprocess.STDOUT,
+        cwd=run_dir,
+        start_new_session=True,  # survives the end of `git push`
+    )

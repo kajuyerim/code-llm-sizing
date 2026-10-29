@@ -36,7 +36,6 @@ This bundle is the shared-knowledge destination for Context Ops. Application rep
 ## Runtime
 
 - [Standalone sweeper-first runtime](runtime/README.md)
-- [Static review and unverified behavior](runtime/REVIEW.md)
 
 ## Skills
 

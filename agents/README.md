@@ -31,7 +31,7 @@ Product instances are selected by their README's fileMatchPattern and keywords a
 
 The [sweeper](sweeper.md) examines evidence broadly and returns findings, contradictions, unresolved questions, handoffs, and actual coverage. Only successful completion with a usable session ID allows specialists to start. Each worker uses resume with that same parent ID and fork_session enabled. There is no fresh-session or summary fallback.
 
-The runtime records parent and child IDs and rejects duplicate child IDs. SDK compaction or other unmeasured history omissions are not reported as complete context coverage. Literal fork behavior remains unverified because no SDK sessions have been run.
+The runtime records parent and child IDs and records whether child IDs are independent. SDK compaction or other unmeasured history omissions are not reported as complete context coverage. Literal fork behavior remains unverified because no SDK sessions have been run.
 
 ## Outputs and final writing
 

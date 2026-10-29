@@ -1,57 +1,51 @@
-"""Retain validated unowned findings and propose structure without applying it."""
+"""Runs the cartographer over findings that no existing document owns."""
 
 from __future__ import annotations
 
-import re
+import json
 
-from contextops.agents import Ledger, run_agent
-from contextops.config import Config
-from contextops.files import dump, inside, load
-from contextops.review import Review, secrets
-from contextops.runs import Run
+from contextops.agents import Ledger, load_agent, run_agent, system_prompt
+from contextops.config import InitConfig
+from contextops.review import Review
+from contextops.run import RunContext
 from contextops.schemas import CARTOGRAPHER_OUTPUT
 
+BACKLOG = "unowned.jsonl"
+BACKLOG_WINDOW = 200  # newest findings the cartographer sees
 
-async def propose(run: Run, config: Config, review: Review, ledger: Ledger) -> dict:
-    backlog_file = run.state_dir / "unowned.json"
-    backlog = load(backlog_file) if backlog_file.exists() else []
-    known = {item["finding_id"] for item in backlog}
-    backlog += [{**item, "run_id": run.run_id, "head": run.head, "pack": str(run.pack)}
-                for item in review.unowned if item["finding_id"] not in known]
-    dump(backlog_file, backlog)
-    recent = backlog[-200:]
-    findings = run.directory / "unowned-backlog.json"
-    dump(findings, recent)
-    if config.cartographer is None:
-        return {"proposals": [], "status": "disabled", "note": "unowned findings retained locally"}
-    result = await run_agent(
-        config.cartographer, "cartographer",
-        f"Read validated unowned findings from {findings}; current evidence is {run.pack}. "
-        f"The knowledge baseline is {run.kb_snapshot}. Propose new structure only for recurring gaps. "
-        "Never apply proposals. Cite finding_id values. An empty proposals array is valid.",
-        CARTOGRAPHER_OUTPUT, config, run.directory,
-        [findings, run.pack, run.kb_snapshot], run.directory / "cartographer.json", ledger,
+
+async def run_cartographer(
+    ctx: RunContext, config: InitConfig, review: Review, ledger: Ledger
+) -> dict | None:
+    # Unowned findings pile up across runs: one stray finding is noise, a recurring one is a gap.
+    backlog = ctx.runs_dir / BACKLOG
+    with backlog.open("a", encoding="utf-8") as out:
+        for item in review.unowned:
+            out.write(json.dumps({**item, "run": ctx.run_id, "app": ctx.app_root.name}) + "\n")
+
+    recent = backlog.read_text(encoding="utf-8").splitlines()[-BACKLOG_WINDOW:]
+    (ctx.run_dir / "unowned-backlog.jsonl").write_text("\n".join(recent) + "\n", encoding="utf-8")
+
+    spec = load_agent(config.cartographer, config.default_model)
+    prompt = "\n".join([
+        f"Run: {ctx.run_id}, application {ctx.app_root.name} at {ctx.head_sha[:7]}",
+        f"Unowned findings, newest last: {ctx.run_dir / 'unowned-backlog.jsonl'}",
+        f"This run's evidence pack: {ctx.pack}",
+        f"Knowledge base at baseline: {ctx.kb_snapshot} (start with index.md and init.md)",
+        "",
+        "Decide whether any group of findings justifies a new core document or product "
+        "folder. Return an empty proposal list when none does.",
+    ])
+    run = await run_agent(
+        spec,
+        label="cartographer",
+        system=system_prompt(config, spec),
+        prompt=prompt,
+        schema=CARTOGRAPHER_OUTPUT,
+        cwd=ctx.run_dir,
+        dirs=[ctx.kb_snapshot],
+        budget_usd=config.budget.per_agent_usd,
+        max_turns=config.budget.max_turns,
     )
-    if not result.succeeded:
-        review.failures.append(f"cartographer: {result.status}")
-        return {"proposals": [], "status": result.status}
-    allowed_refs = {item["finding_id"] for item in recent}
-    accepted = []
-    for proposal in result.output["proposals"]:
-        try:
-            path = proposal["path"]
-            pattern = r"core/[a-z0-9]+(?:-[a-z0-9]+)*\.md" if proposal["kind"] == "core-file" else r"products/[a-z0-9]+(?:-[a-z0-9]+)*/"
-            if not re.fullmatch(pattern, path):
-                raise ValueError("invalid proposed structure path")
-            if inside(run.kb_snapshot, path.rstrip("/")).exists():
-                raise ValueError("proposed location already exists")
-            refs = proposal["finding_refs"]
-            if len(set(refs)) < 2 or not set(refs) <= allowed_refs:
-                raise ValueError("structure proposal needs at least two known findings")
-            text = "\n".join([proposal["rationale"], proposal["definition_draft"], proposal["index_line"], *proposal["seed_entries"]])
-            if secrets(text) or "\u2014" in text:
-                raise ValueError("structure proposal failed text checks")
-            accepted.append(proposal)
-        except (ValueError, OSError) as exc:
-            review.failures.append(f"discarded structure proposal: {exc}")
-    return {"proposals": accepted, "status": "success", "applied": False}
+    ledger.add(run)
+    return run.output

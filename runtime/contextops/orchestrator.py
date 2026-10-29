@@ -1,153 +1,100 @@
-"""Execute one prepared run, retaining artifacts on every failure path."""
+"""A full maintenance run, from frozen evidence to a knowledge-base PR.
+
+    initializer -> strategy (specialists) -> review -> cartographer -> writer -> PR
+"""
 
 from __future__ import annotations
 
+import json
 import os
-import time
 from dataclasses import asdict
 from pathlib import Path
 
-from contextops import git
-from contextops.agents import Ledger, versions
-from contextops.cartographer import propose
-from contextops.config import load_config
-from contextops.evidence import build, check_hashes
-from contextops.files import dump, lock
-from contextops.report import metrics, render
-from contextops.review import Review, review_results
-from contextops.runs import checkpoint, read_run
-from contextops.strategy import plan_workers, sweep_and_fork
-from contextops.writer import publish, write
+from contextops import gitutil
+from contextops.agents import Ledger
+from contextops.cartographer import run_cartographer
+from contextops.config import InitConfig, load_config
+from contextops.evidence import build_pack
+from contextops.initializer import plan_workers
+from contextops.report import Outcome, render_report
+from contextops.review import review_results
+from contextops.run import RunContext, load_run, record_cutoff
+from contextops.strategies import STRATEGIES
+from contextops.writer import open_pr, write_changes
 
 
-async def execute(directory: Path) -> Path:
-    run = read_run(directory)
-    # Locks and status are acquired before worktrees or SDK sessions are created.
-    with lock(run.directory / "execution.lock"):
-        if (run.directory / "status.json").exists():
-            raise ValueError("run already attempted; prepare a new run rather than overwriting frozen evidence")
-        try:
-            with lock(run.state_dir / "execution.lock"):
-                dump(run.directory / "status.json", {"status": "running"})
-                return await _execute(run)
-        except RuntimeError as exc:
-            if (run.directory / "status.json").exists():
-                raise
-            # A different push for this application is already running. Do not
-            # queue a stale conversation window or silently discard its refs.
-            failures = [str(exc)]
-            ledger = Ledger(3.0, 0.5)
-            path = run.directory / "report.md"
-            path.write_text(render(run, "incomplete", Review(), ledger, None, [], [], None, None, failures, 0, {}), encoding="utf-8")
-            dump(run.directory / "status.json", {"status": "incomplete", "failures": failures})
-            dump(run.directory / "metrics.json", metrics(run, ledger, {}, 0, "incomplete"))
-            return path
-
-
-async def _execute(run) -> Path:
-    start = time.monotonic()
-    ledger, review = Ledger(3.0, 0.5), Review()
-    manifest = proposals = publication = None
-    roster, skipped, failures, runtime_versions = [], [], [], {}
-    made_app = made_kb = committed = False
-    status = "incomplete"
-    original_auth = {key: os.environ.pop(key) for key in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN") if key in os.environ}
+async def orchestrate(run_dir: Path) -> Path:
+    """Run everything for a prepared run directory and return the report path."""
+    ctx = load_run(run_dir)
+    committed = False
     try:
-        for key in ("CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY", "ANTHROPIC_BASE_URL"):
-            if os.environ.get(key, "").lower() not in ("", "0", "false", "no"):
-                raise ValueError(f"subscription-only runtime cannot use provider override {key}")
-        git.worktree(run.knowledge, run.kb_snapshot, run.baseline, run.branch)
-        made_kb = True
-        git.worktree(run.application, run.app_snapshot, run.head)
-        made_app = True
-        config = load_config(run.kb_snapshot)
-        ledger = Ledger(config.budget["total_usd"], config.budget["per_agent_usd"])
-        dump(run.directory / "config.json", config.record())
-        manifest = build(run, config)
-        if not manifest["complete"]:
-            failures.append("conversation evidence is missing; agents and publication were not started")
-        else:
-            runtime_versions = versions()
-            conversation = "\n".join(p.read_text(encoding="utf-8") for p in sorted((run.pack / "conversation").glob("*.md")))
-            workers, skipped = plan_workers(config, manifest, conversation)
-            roster = [{"label": w.label, "owns": w.owns, "reason": w.reason, "model": w.role.model} for w in workers]
-            dump(run.directory / "workers.json", {"selected": roster, "irrelevant": skipped})
-            sweeper, results = await sweep_and_fork(run, config, workers, ledger)
-            if not sweeper.succeeded or len(results) != len(workers):
-                failures.append("sweeper/session handoff did not complete; no fresh-session fallback was attempted")
-            else:
-                check_hashes(run, manifest)
-                if git.status(run.app_snapshot):
-                    raise ValueError("application snapshot changed during agent execution")
-                review = review_results(run, manifest, results)
-                skipped += [f"{worker.label}: budget allowance unavailable" for worker, result in results if result.status == "skipped-budget"]
-                if review.unowned:
-                    proposals = await propose(run, config, review, ledger)
-                    dump(run.directory / "proposals.json", proposals)
-                if review.accepted:
-                    publication = await write(run, config, review, ledger)
-                    committed = publication["committed"]
-                check_hashes(run, manifest)
-                if git.status(run.app_snapshot):
-                    raise ValueError("application snapshot changed during final writing")
-                if not review.failures and not ledger.blocked:
-                    status = "complete"
-                if committed and config.output["open_pr"] and status == "complete":
-                    elapsed = round((time.monotonic() - start) * 1000)
-                    body = render(run, status, review, ledger, manifest, roster, skipped, proposals, publication, failures, elapsed, runtime_versions)
-                    publication.update(publish(run, body))
-                    if publication.get("error"):
-                        failures.append("publication failed; inspect publication.json before retrying to avoid duplicate PRs")
-                        status = "incomplete"
-                elif committed:
-                    publication["note"] = "committed branch retained locally; publication disabled or run incomplete"
-    except Exception as exc:
-        failures.append(f"{type(exc).__name__}: {exc}")
-        status = "incomplete"
+        # Agents read from snapshots, never from the developer's live checkouts.
+        gitutil.add_worktree(ctx.kb_root, ctx.kb_snapshot, ctx.kb_baseline, branch=ctx.branch)
+        gitutil.add_worktree(ctx.app_root, ctx.app_snapshot, ctx.head_sha)
+        config = load_config(ctx.kb_snapshot)
+        strategy = STRATEGIES.get(config.mode)
+        if strategy is None:
+            raise ValueError(f"init.md: unknown mode '{config.mode}', known: {', '.join(STRATEGIES)}")
+        _prepare_auth(config)
+
+        evidence = build_pack(ctx, config)
+        workers, skipped = plan_workers(config, evidence)
+        ledger = Ledger(config.budget.total_usd)
+
+        results = await strategy(workers, ctx, config, ledger)
+        for result in results:
+            name = result.run.label.replace(":", "-")
+            _dump(ctx.run_dir / "workers" / f"{name}.json", asdict(result.run))
+        review = review_results(results, ctx, evidence)
+        _dump(ctx.run_dir / "review.json", asdict(review))
+
+        outcome = Outcome(workers=workers, skipped=skipped, review=review)
+        if config.cartographer and review.unowned and ledger.has_room():
+            outcome.proposals = await run_cartographer(ctx, config, review, ledger)
+            _dump(ctx.run_dir / "proposals.json", outcome.proposals)
+        if review.accepted and not ledger.has_room():
+            review.failures.append("budget exhausted before the writer; accepted records were not applied")
+        elif review.accepted:
+            outcome.publication, outcome.writer_output = await write_changes(ctx, config, review, ledger)
+            committed = outcome.publication.committed
+
+        report = render_report(ctx, config, outcome, ledger, evidence)
+        if committed and config.output.open_pr:
+            outcome.publication.pr_url = open_pr(ctx, report)
+            if outcome.publication.pr_url:
+                report += f"\nPull request: {outcome.publication.pr_url}\n"
+
+        _write_metrics(ctx, config, ledger)
+        report_path = ctx.run_dir / "report.md"
+        report_path.write_text(report, encoding="utf-8")
+        record_cutoff(ctx.runs_dir, ctx.app_root, ctx.cutoff)
+        return report_path
     finally:
-        os.environ.update(original_auth)
-        if made_kb:
-            try:
-                # Keep the actual patch even when validation or the writer failed.
-                patch = git.call(run.kb_snapshot, "diff", "--no-ext-diff", "--no-textconv", run.baseline, "--")
-                (run.directory / "knowledge.patch").write_text(patch, encoding="utf-8")
-                committed = committed or git.revision(run.kb_snapshot, "HEAD") != run.baseline
-                if not committed:
-                    # Include new Markdown files in retained failure artifacts without staging them.
-                    for code, name in git.status(run.kb_snapshot):
-                        if code == "??":
-                            source = run.kb_snapshot / name
-                            if source.is_file() and not source.is_symlink():
-                                destination = run.directory / "uncommitted" / name
-                                destination.parent.mkdir(parents=True, exist_ok=True)
-                                destination.write_bytes(source.read_bytes())
-            except Exception as exc:
-                failures.append(f"patch retention failed: {exc}")
-                status = "incomplete"
-        for made, repo, snapshot in ((made_app, run.application, run.app_snapshot), (made_kb, run.knowledge, run.kb_snapshot)):
-            if made:
-                try:
-                    git.remove_worktree(repo, snapshot)
-                except Exception as exc:
-                    failures.append(f"worktree cleanup failed: {exc}")
-                    status = "incomplete"
-        if made_kb and not committed and not run.kb_snapshot.exists():
-            try:
-                git.call(run.knowledge, "branch", "-D", run.branch)
-            except Exception as exc:
-                failures.append(f"branch cleanup failed: {exc}")
-                status = "incomplete"
-        if status == "complete":
-            try:
-                checkpoint(run)
-            except Exception as exc:
-                failures.append(f"conversation checkpoint failed: {exc}")
-                status = "incomplete"
-        elapsed = round((time.monotonic() - start) * 1000)
-        dump(run.directory / "review.json", asdict(review))
-        dump(run.directory / "metrics.json", metrics(run, ledger, runtime_versions, elapsed, status))
-        dump(run.directory / "status.json", {"status": status, "failures": failures, "committed": committed})
-        report = render(run, status, review, ledger, manifest, roster, skipped, proposals, publication, failures, elapsed, runtime_versions)
-        path = run.directory / "report.md"
-        path.write_text(report, encoding="utf-8")
-    return path
+        gitutil.remove_worktree(ctx.app_root, ctx.app_snapshot)
+        gitutil.remove_worktree(ctx.kb_root, ctx.kb_snapshot)
+        if not committed:
+            gitutil.git(ctx.kb_root, "branch", "-D", ctx.branch, check=False)
+
+
+def _prepare_auth(config: InitConfig) -> None:
+    if config.auth == "subscription":
+        # An exported API key silently wins over the Claude Code login, so drop it for this run.
+        os.environ.pop("ANTHROPIC_API_KEY", None)
+    elif "ANTHROPIC_API_KEY" not in os.environ:
+        raise RuntimeError("init.md asks for api-key auth but ANTHROPIC_API_KEY is not set")
+
+
+def _write_metrics(ctx: RunContext, config: InitConfig, ledger: Ledger) -> None:
+    agents = [{k: v for k, v in asdict(run).items() if k != "output"} for run in ledger.runs]
+    _dump(ctx.run_dir / "metrics.json", {
+        "run_id": ctx.run_id,
+        "mode": config.mode,
+        "total_cost_usd": ledger.spent,
+        "total_duration_ms": sum(run.duration_ms for run in ledger.runs),
+        "agents": agents,
+    })
+
+
+def _dump(path: Path, data) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")

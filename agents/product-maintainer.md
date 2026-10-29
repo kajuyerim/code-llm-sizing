@@ -26,7 +26,7 @@ Skip generic vendor documentation, dependency presence without actual use, and f
 
 ## Deciding
 
-Use the supplied product ID prefix and ID-based tables. Existing frontmatter is protected. If relevance hints miss a real usage path, report a handoff for human configuration review. New content files are allowed only inside the assigned existing product folder.
+Use the product document's existing ID prefix and ID-based tables. Existing frontmatter is protected. If relevance hints miss a real usage path, report a handoff for human configuration review. New content files are allowed only inside the assigned existing product folder.
 
 ## Example
 

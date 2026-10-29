@@ -1,6 +1,6 @@
 # Terminology
 
-Scope: vocabulary shared across this knowledge bundle. Basis: the team's foundation discussion on 19 October 2026 and the standalone sweeper-first implementation authorized on 21 October 2026. These definitions describe project design, not findings from a pilot application. Human review is pending.
+Scope: vocabulary shared across this knowledge bundle. Basis: the team's project design discussion on 19 October 2026. These definitions describe the project design, not findings from a pilot application. Initial human review is pending.
 
 | ID | Term | Meaning |
 | --- | --- | --- |
@@ -12,12 +12,11 @@ Scope: vocabulary shared across this knowledge bundle. Basis: the team's foundat
 | TERM-006 | Sweeper | The agent in experiment A that inspects all three evidence sources before handing its context to specialists |
 | TERM-007 | Specialist | An agent assigned a specific part of core or product knowledge to maintain |
 | TERM-008 | Knowledge baseline | The recorded starting revision of this knowledge bundle, shared by both experiments before their states diverge |
-| TERM-009 | Initializer | Deterministic code that reads the run configuration and selects specialist assignments before model calls |
-| TERM-010 | Evidence pack | Locally retained diff, conversation, and memory copies with their manifest and immutable application and knowledge revision references |
-| TERM-011 | Literal session fork | A new SDK session that inherits a completed parent conversation while subsequent specialist histories remain independent |
-| TERM-012 | Cartographer | A read-only agent that proposes new knowledge structure from recurring validated unowned findings |
-| TERM-013 | Writer | The only editing agent, applying accepted records before deterministic validation and human review |
-| TERM-014 | Unowned finding | An evidence-backed candidate that no current specialist assignment can reasonably hold |
-| TERM-015 | Pitfall | A non-obvious failure condition with its supported consequence and remedy |
+| TERM-009 | Initializer | The deterministic first step of a maintenance run that reads init.md and decides which specialists start |
+| TERM-010 | Evidence pack | The frozen copy of a push's diff, developer-agent conversation, and memory that every agent in a run reads |
+| TERM-011 | Cartographer | The agent that proposes new core documents or product folders from findings no existing document owns |
+| TERM-012 | Writer | The only agent that edits knowledge files; it applies accepted change records on a branch for review |
+| TERM-013 | Unowned finding | A supported finding that no specialist's assigned document can hold; input for the cartographer |
+| TERM-014 | Pitfall | A non-obvious failure with its trigger and the way to avoid it |
 
 Use [core maintenance guidance](../maintenance/core.md) when changing definitions, adding synonyms, or introducing supported domain terms. Product-specific meanings belong in the appropriate product section unless they apply more broadly.

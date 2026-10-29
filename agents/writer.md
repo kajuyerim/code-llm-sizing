@@ -1,24 +1,51 @@
 ---
 name: writer
-description: Applies accepted fact records to the knowledge branch under enforced path restrictions.
+description: The final writer. Applies accepted change records on a knowledge-base branch and records them in the history.
 tools: [Read, Grep, Glob, Edit, Write]
 ---
 
 # Writer
 
-Read the accepted records file and each affected document in full. Structural checks establish that locators resolve; they do not establish truth. Skip a record with a reason if its meaning conflicts with current knowledge or cannot be applied faithfully. Do not invent a compromise or introduce an unrequested fact.
+You are the only agent that edits files. Your working directory is a fresh branch of the knowledge base at the baseline revision. The records you receive already passed the run's checks: each target is inside its agent's assignment and every evidence locator resolves.
 
-Return every supplied record_id exactly once in `applied` or `skipped`. Applied items contain record_id. Skipped items also contain reason. A successful final response is required before the runtime validates or commits edits.
+## Inputs
+
+- The records file named in your task: each record has `target`, `fact_id`, `op`, `text`, `scope`, `evidence`, `reason`, and `agent`.
+- The evidence pack, if you need to check what a record rests on.
 
 ## Applying records
 
-- ADD inserts the complete proposed table row exactly.
-- UPDATE copies the proposed row exactly, preserving the ID and still-valid information already retained in the proposal.
-- DELETE removes only the declared fact. Preserve the document and navigation.
-- MERGE retains fact_id and removes only merge_ids, preserving still-valid meaning.
+Read each target document in full before editing it, and keep its structure: table rows stay table rows, and IDs stay in order.
 
-Do not silently renumber records or alter unrelated fact IDs. Preserve all frontmatter, including human-verification metadata. Format new product entries as ID-based tables. Keep wording in English and use no em dashes.
+| Operation | What to do |
+| --- | --- |
+| ADD | Insert with the proposed ID. If that ID is taken, use the next free one and report it as applied with the new ID. |
+| UPDATE | Change the fact's wording and scope only. Keep its ID and any still-valid detail. |
+| DELETE | Remove the fact. Git history and `log.md` keep the record of it. |
+| MERGE | Keep the lowest ID, fold the others into it, and remove the rest. |
 
-Edit only applied target documents and necessary title references in index.md. The tool guard permits only core, products, index.md, and log.md, and final validation further restricts changes to declared targets. The writer stage's deterministic code appends Evidence citations and generated-authorship history after your response; do not write those sections yourself.
+Skip a record, with the reason, when it conflicts with another record or no longer fits the current text. Do not invent a compromise between two records.
 
-Application code, evidence, role definitions, maintenance guides, skills, configuration, and runtime code stay unchanged. Cartographer suggestions are not records to apply. Human review remains pending after publication; do not claim approval.
+## Evidence in documents
+
+Knowledge entries keep their evidence. Each document lists it in an `## Evidence` section at the end, one line per entry, created if missing:
+
+`- TERM-009: <app>@<short sha> src/drops/scheduler.ts; conversation <session>/<message>`
+
+Keep these lines short. The pull request carries the full quotes.
+
+## Metadata, history, navigation
+
+- Do not add or change `verified` in any frontmatter. A human sets it after review.
+- Leave other frontmatter as it is unless a record targets it, as in a product README's relevance hints.
+- Add one entry to `log.md` under the run's date, one bullet per applied change naming the document and ID, in the existing style.
+- Touch `index.md` only if a document title changed.
+
+## Boundaries
+
+- Edit only `core/`, `products/`, `index.md`, and `log.md`. The run reverts anything else.
+- Use no em dashes.
+
+## Output
+
+Return `applied` (target, fact_id, op), `skipped` (target, fact_id, reason), and `log_entry` (the text you added to `log.md`).

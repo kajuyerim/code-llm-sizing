@@ -1,79 +1,122 @@
-"""Human report and machine metrics with missing measurements kept explicit."""
+"""The run report. The same text becomes the PR body."""
 
 from __future__ import annotations
 
-import html
-from dataclasses import asdict
+from dataclasses import dataclass
+from datetime import datetime
 
 from contextops.agents import Ledger
-from contextops.review import Review, secrets
-from contextops.runs import Run
+from contextops.config import InitConfig
+from contextops.evidence import Evidence
+from contextops.initializer import Worker
+from contextops.review import Review
+from contextops.run import RunContext
+from contextops.writer import Publication
 
 
-def safe(value) -> str:
-    text = str(value)
-    if secrets(text):
-        return "[withheld: possible secret]"
-    return html.escape(text).replace("\n", " ").replace("|", "\\|").replace("`", "\\`")
+@dataclass
+class Outcome:
+    workers: list[Worker]
+    skipped: list[str]
+    review: Review
+    proposals: dict | None = None
+    publication: Publication | None = None
+    writer_output: dict | None = None
 
 
-def metrics(run: Run, ledger: Ledger, versions: dict, elapsed_ms: int, status: str) -> dict:
-    agents = []
-    for result in ledger.results:
-        record = asdict(result)
-        record.pop("output")
-        agents.append(record)
-    return {
-        "run_id": run.run_id, "mode": "sweeper-first", "status": status, "versions": versions,
-        "resolved_models": sorted({m for r in ledger.results for m in (r.raw_model_usage or {})}),
-        "known_estimated_cost_usd": ledger.spent,
-        "total_cost_available": all(r.cost_usd is not None for r in ledger.results),
-        "budget_usd": ledger.total, "wall_clock_ms": elapsed_ms,
-        "summed_agent_duration_ms": sum(r.duration_ms for r in ledger.results),
-        "summed_call_wall_ms": sum(r.wall_ms for r in ledger.results),
-        "accounting": "Pinned bundled CLI restores parent totals on forks; raw parent totals are subtracted once from each child. New inherited-context processing remains counted. Estimates are not billing.",
-        "coverage": "tool_reads record successful read/search calls, not proof that every matching file or message was read; agent coverage is retained separately in raw stage output",
-        "agents": agents,
-    }
+def render_report(
+    ctx: RunContext, config: InitConfig, outcome: Outcome, ledger: Ledger, evidence: Evidence
+) -> str:
+    review = outcome.review
+    lines = [
+        f"# ContextOps run {ctx.run_id}",
+        "",
+        f"- Application: `{ctx.app_root.name}` {ctx.ref} `{ctx.base_sha[:7]}..{ctx.head_sha[:7]}`",
+        f"- Knowledge baseline: `{ctx.kb_baseline[:7]}`",
+        f"- Mode: `{config.mode}`",
+        f"- Conversation window: {_when(ctx.since)} to {_when(ctx.cutoff)}",
+        f"- Estimated spend: ${ledger.spent:.2f} of ${config.budget.total_usd:.2f}",
+        f"- Records: {len(review.accepted)} accepted, {len(review.deferred)} need review, "
+        f"{len(review.rejected)} rejected, {len(review.no_change)} no change",
+    ]
 
-
-def render(run: Run, status: str, review: Review, ledger: Ledger, manifest: dict | None,
-           roster: list[dict], skipped: list[str], proposals: dict | None,
-           publication: dict | None, failures: list[str], elapsed_ms: int, versions: dict) -> str:
-    lines = [f"# Context Ops run {run.run_id}", "", f"- Status: {safe(status)}",
-             "- Mode: sweeper-first; context handoff: literal SDK session forks",
-             f"- Application: {safe(run.application.name)} at {run.base}..{run.head}",
-             f"- Knowledge baseline: {run.baseline}; publication base: {safe(run.base_branch)}",
-             f"- Conversation window: {safe(run.since or 'all available history')} to {run.cutoff}",
-             f"- SDK / bundled CLI: {safe(versions.get('sdk', 'unavailable'))} / {safe(versions.get('bundled_cli', 'unavailable'))}",
-             f"- Wall-clock elapsed: {elapsed_ms} ms",
-             f"- Known estimated spend: USD {ledger.spent:.6f}; configured total: USD {ledger.total:.2f}",
-             "- Costs are estimates. Unavailable measurements are not zero. No automated semantic truth evaluation is performed."]
-    def section(title, items):
-        if items:
-            lines.extend(["", f"## {title}", "", *(f"- {safe(item)}" for item in items)])
-    section("Selected assignments", [f"{w['label']}: {w['owns']} ({w['reason']})" for w in roster])
-    section("Skipped workers", skipped)
-    lines.extend(["", "## Agent resources", "", "| Agent | Status | Session | Turns | Call estimate USD | SDK duration ms |", "| --- | --- | --- | --- | --- | --- |"])
-    for result in ledger.results:
-        amount = "unavailable" if result.cost_usd is None else f"{result.cost_usd:.6f}"
-        lines.append(f"| {safe(result.label)} | {safe(result.status)} | {safe(result.session_id or 'unavailable')} | {result.turns} | {amount} | {result.duration_ms} |")
-    section("Accepted proposals", [f"{r['record_id']}: {r['op']} {r['target']} {r['fact_id']}: {r['text']}" for r in review.accepted])
-    section("Evidence for accepted proposals", [f"{r['record_id']}: {e['kind']} {e.get('path') or ''} {e.get('session') or ''}/{e.get('message') or ''}; quote: {e['quote']}" for r in review.accepted for e in r["evidence"]])
-    section("Needs human review", [f"{r['record_id']}: {r['target']}: {r['text']}; {r['reason']}" for r in review.deferred])
-    section("Rejected by structural checks", [f"{r['record_id']}: {r['rejected_because']}" for r in review.rejected])
-    section("No change", [f"{r['agent']}: {r['target']}; {r['reason']}" for r in review.no_change])
-    section("Handoffs", [f"{h['agent']} to {h['to']}: {h['note']}" for h in review.handoffs])
-    section("Unowned findings", [f"{f['finding_id']}: {f['summary']}" for f in review.unowned])
-    for proposal in (proposals or {}).get("proposals", []):
-        section("Structure proposal, not applied", [f"{proposal['path']}: {proposal['rationale']}",
-                *proposal["seed_entries"], f"Definition draft: {proposal['definition_draft']}",
-                f"Index entry: {proposal['index_line']}", f"Findings: {', '.join(proposal['finding_refs'])}"])
-    if manifest:
-        section("Evidence collection", [f"Conversation selection/exclusions: {manifest['conversation_selection']}",
-                f"Auto-memory collection time: {manifest['memory_capture_time']}; not aligned to the conversation cutoff.", *manifest["notes"]])
-    if publication:
-        section("Writer and publication", [str(publication)])
-    section("Failures and incomplete work", failures + review.failures + [f"{r.label}: {error}" for r in ledger.results for error in r.errors])
-    lines.extend(["", "Raw evidence, proposals, coverage reports, tool traces, and resource records are retained locally alongside this report. Generated knowledge requires human review."])
+    writer = outcome.writer_output or {}
+    lines += _section("Applied", [
+        f"`{r['target']}` {r['op']} {r['fact_id'] or ''}" for r in writer.get("applied", [])
+    ])
+    lines += _section("Skipped by the writer", [
+        f"`{r['target']}` {r['fact_id'] or ''}: {r['reason']}" for r in writer.get("skipped", [])
+    ])
+    lines += _section("Needs human review", [_record(r) for r in review.deferred])
+    lines += _section("Rejected by checks", [
+        f"{_record(r)}. Reason: {r['rejected_because']}" for r in review.rejected
+    ])
+    lines += _section("Handoffs to other owners", [
+        f"to `{h['to']}` from {h['from']}: {h['note']}" for h in review.handoffs
+    ])
+    lines += _proposals(outcome.proposals)
+    lines += _workers_table(outcome.workers, ledger)
+    lines += _section("Skipped workers", outcome.skipped)
+    lines += _section("Evidence notes", evidence.notes)
+    lines += _section("Failures", review.failures)
+    if outcome.publication:
+        lines += _section("Publication", [
+            f"branch `{outcome.publication.branch}`, committed: {outcome.publication.committed}",
+            *(f"reverted out-of-scope edit: `{p}`" for p in outcome.publication.reverted),
+            *([outcome.publication.note] if outcome.publication.note else []),
+        ])
     return "\n".join(lines) + "\n"
+
+
+def _section(title: str, items: list[str]) -> list[str]:
+    if not items:
+        return []
+    return ["", f"## {title}", ""] + [f"- {item}" for item in items]
+
+
+def _record(record: dict) -> str:
+    text = record["text"] if len(record["text"]) <= 200 else record["text"][:197] + "..."
+    return f"`{record['target']}` {record['op']} {record['fact_id'] or 'new'} ({record['agent']}): {text}"
+
+
+def _proposals(proposals: dict | None) -> list[str]:
+    items = (proposals or {}).get("proposals", [])
+    if not items:
+        return []
+    lines = ["", "## Structure proposals (not applied)", ""]
+    for p in items:
+        lines += [
+            f"### `{p['path']}` ({p['kind']}, {p['type']})",
+            "",
+            p["rationale"],
+            "",
+            "Seed entries:",
+            *(f"- {entry}" for entry in p["seed_entries"]),
+            "",
+            f"Index line: {p['index_line']}",
+            "",
+            "<details><summary>Draft agent definition</summary>",
+            "",
+            "```markdown",
+            p["agent_draft"],
+            "```",
+            "",
+            "</details>",
+            "",
+        ]
+    return lines
+
+
+def _workers_table(workers: list[Worker], ledger: Ledger) -> list[str]:
+    reasons = {w.label: w.reason for w in workers}
+    lines = ["", "## Agents", "", "| Agent | Why | Status | Turns | Cost |", "| --- | --- | --- | --- | --- |"]
+    for run in ledger.runs:
+        lines.append(
+            f"| {run.label} | {reasons.get(run.label, '')} | {run.status} "
+            f"| {run.num_turns} | ${run.cost_usd:.2f} |"
+        )
+    return lines
+
+
+def _when(moment: datetime | None) -> str:
+    return moment.strftime("%Y-%m-%d %H:%M UTC") if moment else "the beginning"
