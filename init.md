@@ -3,7 +3,7 @@
 version: 0.1
 mode: fresh-specialists        # experiment B; experiment A registers "sweeper-first"
 auth: subscription             # subscription (Claude Code login) or api-key
-model: sonnet                  # default for agents whose definition sets no model
+model: claude-sonnet-5-5                  # default for agents whose definition sets no model
 shared_rules: agents/shared-rules.md
 
 evidence:
@@ -46,7 +46,7 @@ budget:
 output:
   runs_dir: ~/.contextops/runs
   branch: contextops/{run_id}
-  open_pr: true
+  open_pr: false
 ---
 
 # Run Notes
