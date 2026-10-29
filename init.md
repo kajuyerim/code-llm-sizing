@@ -2,7 +2,7 @@
 version: "0.1"
 mode: sweeper-first
 auth: subscription
-model: sonnet
+model: claude-sonnet-5-5
 shared_rules: agents/shared-rules.md
 sweeper: agents/sweeper.md
 workers:
@@ -45,7 +45,7 @@ budget:
 output:
   runs_dir: ~/.contextops/sweeper-first/runs
   branch: contextops/{run_id}
-  open_pr: true
+  open_pr: false
 ---
 
 # Run Notes
