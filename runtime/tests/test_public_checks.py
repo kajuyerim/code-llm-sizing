@@ -25,5 +25,12 @@ class PublicChecks(unittest.TestCase):
         self.assertEqual(scanner.scan_text('password="your-placeholder-value"','example.txt'),[])
 
     def test_auth_files_are_never_publishable(self):
-        for name in ('.env','sample/.env.local','auth.json','private.pem','.claude/settings.json'):
+        for name in ('.env','sample/.env.local','auth.json','private.pem','.claude/settings.json','.netrc','.git-credentials'):
             self.assertTrue(scanner.forbidden_file(name))
+
+    def test_unquoted_assignments_and_credential_queries(self):
+        value='z'*24
+        for text in ('export API_KEY='+value, 'https://example.invalid/?access_token='+value):
+            findings=scanner.scan_text(text,'example.txt')
+            self.assertTrue(findings)
+            self.assertFalse(any(value in item for item in findings))
