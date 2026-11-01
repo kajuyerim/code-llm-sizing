@@ -1,0 +1,23 @@
+name: Public repository checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.11', '3.14']
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -r runtime/requirements-lock.txt
+      - run: python -m pip install --no-deps -e runtime
+      - run: contextops --help
+      - run: python -m unittest discover -s runtime/tests -v
+      - run: python runtime/check_docs.py
+      - run: python runtime/check_public.py --history
