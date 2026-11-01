@@ -60,6 +60,7 @@ class InitConfig:
     workers: list[WorkerEntry]
     cartographer: Path | None
     writer: Path
+    sweeper: Path
     budget: Budget
     conversation: ConversationSettings
     memory: MemorySettings
@@ -83,6 +84,7 @@ def load_config(kb_root: Path) -> InitConfig:
         workers=[_worker(kb_root, raw) for raw in meta.get("workers", [])],
         cartographer=kb_root / after["cartographer"] if after.get("cartographer") else None,
         writer=kb_root / after.get("writer", "agents/writer.md"),
+        sweeper=kb_root / meta.get("sweeper", "agents/sweeper.md"),
         budget=Budget(**meta.get("budget", {})),
         conversation=ConversationSettings(**evidence.get("conversation", {})),
         memory=MemorySettings(**evidence.get("memory", {})),
@@ -107,7 +109,7 @@ def load_config(kb_root: Path) -> InitConfig:
         raise ValueError("init.md: budgets and limits must be positive")
     if not all(token in config.output.branch for token in ("{strategy}", "{run_id}")):
         raise ValueError("init.md: output.branch must include {strategy} and {run_id}")
-    for path in [config.shared_rules, config.writer, config.cartographer,
+    for path in [config.shared_rules, config.writer, config.cartographer, config.sweeper,
                  *(w.agent for w in config.workers)]:
         if path and (not path.is_file() or not path.resolve().is_relative_to(kb_root.resolve())):
             raise ValueError("init.md: agent definitions must exist inside the knowledge checkout")

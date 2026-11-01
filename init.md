@@ -5,6 +5,7 @@ mode: null                    # choose explicitly with --strategy
 auth: subscription             # subscription (Claude Code login) or api-key
 model: claude-sonnet-5-5                  # default for agents whose definition sets no model
 shared_rules: agents/shared-rules.md
+sweeper: agents/sweeper.md
 
 evidence:
   conversation:

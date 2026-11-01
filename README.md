@@ -18,7 +18,7 @@ Context Ops is a CMPE 492 senior project at Boğaziçi University studying how a
 
 Both maintain documentation only, use equivalent responsibilities and common checks, and keep independent output state. Four core specialists always run; tool specialists are selected by relevance. The [architecture](docs/architecture.md) explains the boundaries and actual call flow.
 
-This branch exposes **B, `fresh-specialists`**. A is described in the historical walkthrough and is integrated by the dependent sweeper-first PR. There is no default winner or implicit strategy choice.
+Both **A, `sweeper-first`**, and **B, `fresh-specialists`**, are available through the shared Claude runtime. There is no default winner or implicit strategy choice.
 
 ## Repository layout
 

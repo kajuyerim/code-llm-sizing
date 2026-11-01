@@ -6,7 +6,7 @@ This is the Context Ops shared-knowledge destination. Application sources, evalu
 
 The current taxonomy is `core/`, `tools/`, `maintenance/`, `agents/`, and `skills/`. `tools/` replaced `products/` on 1 November 2026. Preserve the old names in archived evidence and explain their historical meaning. `runtime/` contains the shared Claude implementation; `docs/` contains project explanations and selected sanitized walkthrough evidence.
 
-This branch implements B, fresh specialists. The dependent A PR integrates sweeper-first orchestration into the same pipeline. Completed historical pilots exist outside the repository; the integrated code and unified role prompts are a new configuration. Do not attribute old scores to it or describe deterministic tests as live model verification. The hook remains experimental.
+This branch implements A, sweeper first, and B, fresh specialists, through one shared Claude pipeline. Completed historical pilots exist outside the repository; the integrated code and unified role prompts are a new configuration. Do not attribute old scores to it or describe deterministic tests as live model verification. The hook remains experimental.
 
 ## Implementation and verification
 
