@@ -7,7 +7,8 @@ import shutil
 import subprocess
 from dataclasses import dataclass, field
 
-from contextops import gitutil
+from contextops import gitutil, frontmatter
+from contextops.access import writable
 from contextops.agents import Ledger, load_agent, run_agent, system_prompt
 from contextops.config import InitConfig
 from contextops.review import Review
@@ -16,7 +17,7 @@ from contextops.schemas import WRITER_OUTPUT
 
 # Agent definitions, maintenance guides, skills, init.md and the runtime are never a
 # maintenance output, so anything the writer touches outside these paths is reverted.
-WRITABLE = ("core/", "products/", "index.md", "log.md")
+WRITABLE = ("core/", "tools/", "index.md", "log.md")
 
 
 @dataclass
@@ -57,13 +58,28 @@ async def write_changes(
     ledger.add(run)
 
     publication = Publication(branch=ctx.branch, reverted=_revert_outside_scope(ctx))
+    for _, path in gitutil.status(ctx.kb_snapshot):
+        if gitutil.file_exists(ctx.kb_root, ctx.kb_baseline, path):
+            original = gitutil.git(ctx.kb_root, "show", f"{ctx.kb_baseline}:{path}")
+            current = ctx.kb_snapshot / path
+            if current.is_file() and frontmatter.split(original)[0] != frontmatter.read(current)[0]:
+                gitutil.git(ctx.kb_snapshot, "restore", "--source=HEAD", "--staged", "--worktree", "--", path)
+                publication.reverted.append(path)
+    # Include new Markdown files in the candidate patch, including failed writers.
+    for code, path in gitutil.status(ctx.kb_snapshot):
+        if code == "??":
+            gitutil.git(ctx.kb_snapshot, "add", "-N", "--", path)
+    (ctx.run_dir / "knowledge.patch").write_text(gitutil.git(ctx.kb_snapshot, "diff", "HEAD") + "\n")
+    if run.status != "success":
+        publication.note = "writer failed; candidate patch retained locally, no commit or publication"
+        return publication, run.output
     if not gitutil.status(ctx.kb_snapshot):
         publication.note = "the writer made no changes"
         return publication, run.output
 
     gitutil.git(ctx.kb_snapshot, "add", "-A")
     gitutil.git(
-        ctx.kb_snapshot, "commit", "-m",
+        ctx.kb_snapshot, "-c", "core.hooksPath=/dev/null", "commit", "-m",
         f"contextops: knowledge updates from {ctx.app_root.name}@{ctx.head_sha[:7]}\n\n"
         f"Run: {ctx.run_id}\nAccepted records: {len(review.accepted)}",
     )
@@ -99,11 +115,11 @@ def open_pr(ctx: RunContext, body: str) -> str | None:
 def _revert_outside_scope(ctx: RunContext) -> list[str]:
     reverted = []
     for code, path in gitutil.status(ctx.kb_snapshot):
-        if path.startswith(WRITABLE):
+        if writable(path) and not (ctx.kb_snapshot / path).is_symlink():
             continue
         if code == "??":
             (ctx.kb_snapshot / path).unlink(missing_ok=True)
         else:
-            gitutil.git(ctx.kb_snapshot, "checkout", "--", path)
+            gitutil.git(ctx.kb_snapshot, "restore", "--source=HEAD", "--staged", "--worktree", "--", path)
         reverted.append(path)
     return reverted

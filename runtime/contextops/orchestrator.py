@@ -18,7 +18,7 @@ from contextops.evidence import build_pack
 from contextops.initializer import plan_workers
 from contextops.report import Outcome, render_report
 from contextops.review import review_results
-from contextops.run import RunContext, load_run, record_cutoff
+from contextops.run import RunContext, load_run, record_cutoff, frozen_sessions
 from contextops.strategies import STRATEGIES
 from contextops.writer import open_pr, write_changes
 
@@ -26,13 +26,25 @@ from contextops.writer import open_pr, write_changes
 async def orchestrate(run_dir: Path) -> Path:
     """Run everything for a prepared run directory and return the report path."""
     ctx = load_run(run_dir)
+    frozen_sessions(ctx)
+    if ctx.strategy not in STRATEGIES:
+        raise ValueError("Prepared strategy is unavailable in this runtime")
+    if gitutil.succeeds(ctx.kb_root, "show-ref", "--verify", f"refs/heads/{ctx.branch}"):
+        raise ValueError("Run branch already exists; existing branches are never replaced")
+    # Never overwrite an attempted run or reuse its branch/session state.
+    with (ctx.run_dir / "started").open("x") as marker:
+        marker.write("This run was attempted. Prepare a new run for another attempt.\n")
     committed = False
+    kb_created = app_created = False
     try:
         # Agents read from snapshots, never from the developer's live checkouts.
         gitutil.add_worktree(ctx.kb_root, ctx.kb_snapshot, ctx.kb_baseline, branch=ctx.branch)
+        kb_created = True
         gitutil.add_worktree(ctx.app_root, ctx.app_snapshot, ctx.head_sha)
+        app_created = True
         config = load_config(ctx.kb_snapshot)
-        strategy = STRATEGIES.get(config.mode)
+        config.mode = ctx.strategy
+        strategy = STRATEGIES.get(ctx.strategy)
         if strategy is None:
             raise ValueError(f"init.md: unknown mode '{config.mode}', known: {', '.join(STRATEGIES)}")
         _prepare_auth(config)
@@ -70,9 +82,11 @@ async def orchestrate(run_dir: Path) -> Path:
         record_cutoff(ctx.runs_dir, ctx.app_root, ctx.cutoff)
         return report_path
     finally:
-        gitutil.remove_worktree(ctx.app_root, ctx.app_snapshot)
-        gitutil.remove_worktree(ctx.kb_root, ctx.kb_snapshot)
-        if not committed:
+        if app_created:
+            gitutil.remove_worktree(ctx.app_root, ctx.app_snapshot)
+        if kb_created:
+            gitutil.remove_worktree(ctx.kb_root, ctx.kb_snapshot)
+        if kb_created and not committed:
             gitutil.git(ctx.kb_root, "branch", "-D", ctx.branch, check=False)
 
 

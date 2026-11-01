@@ -12,6 +12,8 @@ Every maintenance agent receives these rules before its own definition. They res
 - **Source application** checked out at the pushed head. Read-only.
 - **Knowledge base** at the baseline revision. Read every document you own in full before proposing anything.
 
+Use Glob to discover file paths and Read or Grep on specific permitted files. Directory-wide Grep is disabled because it could include credential files.
+
 ## Weighing evidence
 
 1. Source at head decides what is implemented. The development agent saying "done" does not.
@@ -42,7 +44,7 @@ Use the operations from the [core maintenance guide](../maintenance/core.md#choo
 - `target`: the knowledge document, relative to the bundle root, inside your assignment.
 - `fact_id`: the existing ID for UPDATE, DELETE, and MERGE; the next unused ID for ADD; null when the document has no IDs or for NO_CHANGE.
 - `text`: the final wording as it should appear in the document, matching its format.
-- `scope`: `company`, `app:<name>`, or `product:<name>`.
+- `scope`: `company`, `app:<name>`, or `tool:<name>`.
 - `reason`: why the evidence supports this change, including contradictions or uncertainty. For NO_CHANGE, what you inspected. For NEEDS_REVIEW, the missing evidence or decision.
 
 ## Output

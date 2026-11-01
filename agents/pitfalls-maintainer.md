@@ -14,7 +14,7 @@ Find non-obvious failure conditions exposed during development, the observed con
 
 ## Ignore
 
-Skip ordinary typos, unsupported guesses, temporary service outages, and generic advice. Product-specific failures belong with that product's owner. Do not record a fix merely because the development agent claimed success.
+Skip ordinary typos, unsupported guesses, temporary service outages, and generic advice. Tool-specific failures belong with that tool's owner. Do not record a fix merely because the development agent claimed success.
 
 ## Deciding
 

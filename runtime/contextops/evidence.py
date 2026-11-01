@@ -17,7 +17,7 @@ from pathlib import Path
 
 from contextops import gitutil, transcripts
 from contextops.config import InitConfig
-from contextops.run import RunContext
+from contextops.run import RunContext, frozen_sessions
 
 
 @dataclass
@@ -61,11 +61,10 @@ def _write_conversation(ctx: RunContext, config: InitConfig, evidence: Evidence)
     out = ctx.pack / "conversation"
     out.mkdir(parents=True, exist_ok=True)
     settings = config.conversation
-    sessions = transcripts.load_sessions(
-        ctx.app_root, ctx.since, ctx.cutoff, settings.include_sidechains
-    )
+    sessions = frozen_sessions(ctx)
     if not sessions:
-        evidence.notes.append("No Claude Code conversation found for this repository in the window.")
+        raise ValueError("Frozen conversation contains no selected sessions")
+    evidence.notes.append("Explicit sessions: complete retained history through cutoff; tool results and thinking excluded.")
 
     for session in sessions:
         text, kept = transcripts.to_markdown(session, settings.max_chars_per_session)
@@ -98,6 +97,9 @@ def _write_memory(ctx: RunContext, config: InitConfig, evidence: Evidence) -> No
 def _write_manifest(ctx: RunContext, evidence: Evidence) -> None:
     manifest = {
         "run_id": ctx.run_id,
+        "strategy": ctx.strategy,
+        "selected_sessions": ctx.sessions,
+        "conversation_sha256": ctx.conversation_sha256,
         "application": str(ctx.app_snapshot),
         "ref": ctx.ref,
         "base_sha": ctx.base_sha,

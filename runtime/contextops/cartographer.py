@@ -33,7 +33,7 @@ async def run_cartographer(
         f"This run's evidence pack: {ctx.pack}",
         f"Knowledge base at baseline: {ctx.kb_snapshot} (start with index.md and init.md)",
         "",
-        "Decide whether any group of findings justifies a new core document or product "
+        "Decide whether any group of findings justifies a new core document or tool "
         "folder. Return an empty proposal list when none does.",
     ])
     run = await run_agent(

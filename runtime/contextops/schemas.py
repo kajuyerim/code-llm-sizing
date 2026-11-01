@@ -25,7 +25,7 @@ CHANGE_RECORD = {
         "fact_id": {"type": ["string", "null"]},
         "op": {"enum": OPERATIONS},
         "text": {"type": "string", "description": "Final wording as it should appear in the document"},
-        "scope": {"type": "string", "description": "company, app:<name>, or product:<name>"},
+        "scope": {"type": "string", "description": "company, app:<name>, or tool:<name>"},
         "evidence": {"type": "array", "items": EVIDENCE},
         "reason": {"type": "string"},
     },
@@ -79,7 +79,7 @@ CARTOGRAPHER_OUTPUT = {
             "items": {
                 "type": "object",
                 "properties": {
-                    "kind": {"enum": ["core-file", "product-folder"]},
+                    "kind": {"enum": ["core-file", "tool-folder"]},
                     "path": {"type": "string"},
                     "type": {"type": "string"},
                     "scope": {"type": "string"},

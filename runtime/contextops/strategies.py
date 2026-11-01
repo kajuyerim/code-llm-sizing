@@ -1,8 +1,8 @@
 """Evidence-gathering strategies, the only step where the two experiments differ.
 
-sweeper-first (experiment A): one sweeper reads the raw evidence broadly, then every
-worker starts from a fork of the sweeper's completed session.
-fresh-specialists (experiment B) lives on its own branch with the same helpers.
+fresh-specialists (experiment B): every worker sweeps the raw evidence on its own.
+sweeper-first (experiment A): a sweeper completes, then each worker independently
+forks that session. Shared collection, review, and writing stay outside this module.
 """
 
 from __future__ import annotations
@@ -11,7 +11,6 @@ import asyncio
 import json
 from dataclasses import asdict, dataclass
 
-from contextops import frontmatter
 from contextops.agents import AgentRun, Ledger, load_agent, run_agent, system_prompt
 from contextops.config import InitConfig
 from contextops.initializer import Worker
@@ -30,8 +29,8 @@ def worker_prompt(worker: Worker, ctx: RunContext) -> str:
         f"Assignment: {worker.label}",
         f"You own: {worker.owns}",
     ]
-    if worker.product:
-        lines.append(f"Product: {worker.product}")
+    if worker.tool:
+        lines.append(f"Tool: {worker.tool}")
     lines += [
         "",
         f"Evidence pack, read manifest.json first: {ctx.pack}",
@@ -76,6 +75,20 @@ async def run_worker(
     return WorkerResult(worker, run)
 
 
+async def fresh_specialists(
+    workers: list[Worker], ctx: RunContext, config: InitConfig, ledger: Ledger
+) -> list[WorkerResult]:
+    gate = asyncio.Semaphore(config.budget.max_parallel)
+
+    async def start(worker: Worker) -> WorkerResult:
+        async with gate:
+            if not ledger.has_room():
+                return WorkerResult(worker, AgentRun(worker.label, status="skipped-budget"))
+            return await run_worker(worker, ctx, config, ledger)
+
+    return list(await asyncio.gather(*(start(worker) for worker in workers)))
+
+
 SWEEPER_OUTPUT = {
     "type": "object",
     "properties": {
@@ -118,8 +131,8 @@ def fork_prompt(worker: Worker, ctx: RunContext) -> str:
 
 
 def _subtract_parent(child: AgentRun, parent: AgentRun) -> dict:
-    """A fork reports its parent's spend again; keep only what the child added."""
-    raw = {"raw_cost_usd": child.cost_usd, "raw_model_usage": child.model_usage}
+    """Estimate incremental usage from cumulative fork reports, retaining raw values."""
+    raw = {"raw": asdict(child), "accounting": "cumulative-parent subtraction estimate"}
     if child.cost_usd >= parent.cost_usd:
         child.cost_usd -= parent.cost_usd
     else:
@@ -139,8 +152,7 @@ def _subtract_parent(child: AgentRun, parent: AgentRun) -> dict:
 async def sweeper_first(
     workers: list[Worker], ctx: RunContext, config: InitConfig, ledger: Ledger
 ) -> list[WorkerResult]:
-    meta, _ = frontmatter.read(config.kb_root / "init.md")
-    spec = load_agent(config.kb_root / meta.get("sweeper", "agents/sweeper.md"), config.default_model)
+    spec = load_agent(config.sweeper, config.default_model)
     sweeper = await run_agent(
         spec,
         label="sweeper",
@@ -181,12 +193,22 @@ async def sweeper_first(
             )
             raw = _subtract_parent(run, sweeper)
             ledger.add(run)
-            handoff["children"].append({"label": worker.label, "session_id": run.session_id, "status": run.status, **raw})
+            handoff["children"].append({"label": worker.label, "session_id": run.session_id, "status": run.status, "incremental": asdict(run), **raw})
             return WorkerResult(worker, run)
 
     results = list(await asyncio.gather(*(start(worker) for worker in workers)))
     ids = [result.run.session_id for result in results if result.run.session_id]
-    handoff["independent_children"] = len(ids) == len(set(ids)) and sweeper.session_id not in ids
+    for result in results:
+        run = result.run
+        if run.status == "success" and (not run.session_id or run.session_id == sweeper.session_id
+                                         or ids.count(run.session_id) > 1):
+            run.status = "invalid-fork-lineage"
+            run.output = None
+            run.error = "Fork must report a unique child session distinct from its parent"
+    handoff["independent_children"] = all(
+        r.run.status != "invalid-fork-lineage" for r in results
+    ) and len(ids) == len(set(ids)) and sweeper.session_id not in ids
+    handoff["validated_children"] = [asdict(r.run) for r in results]
     _write(ctx.run_dir / "sweeper.json", handoff)
     return results
 
@@ -196,5 +218,6 @@ def _write(path, data) -> None:
 
 
 STRATEGIES = {
+    "fresh-specialists": fresh_specialists,
     "sweeper-first": sweeper_first,
 }

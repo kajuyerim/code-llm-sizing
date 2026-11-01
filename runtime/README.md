@@ -1,79 +1,57 @@
-# ContextOps Runtime
+# Runtime operations
 
-The runtime turns a `git push` in an application repository into a pull request on this knowledge bundle. It reads [init.md](../init.md), freezes the evidence, runs the agents defined in [agents/](../agents/README.md) through the Claude Agent SDK, checks what they propose, and lets the writer apply the accepted changes on a branch.
-
-Status: written, not yet run. Treat the first runs as pilots and read every report.
-
-## Flow
-
-```text
-git push
-  └─ pre-push hook (returns immediately, never blocks the push)
-       └─ background: contextops run <run_dir>
-            1. snapshots       app worktree at the pushed head, knowledge-base worktree on a new branch
-            2. evidence pack   diff, Claude Code conversation in the window, memory files
-            3. initializer     init.md -> workers; product workers only when relevant
-            4. strategy        sweeper-first: one sweeper reads the pack, each worker forks its session
-            5. checks          assignment scope, evidence locators, secret patterns
-            6. cartographer    only if a worker reported unowned findings
-            7. writer          applies accepted records, updates log.md, commits
-            8. publish         push the branch and open a PR with gh
-```
-
-## Setup
-
-Python 3.10 or newer, git, and a logged-in Claude Code (`claude`, then `/login`). `gh` is optional; without it the branch is pushed and no PR is opened.
-
-```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -e runtime/
-
-# In each application repository that should feed this knowledge base:
-contextops install --kb /path/to/this/repo --repo /path/to/app
-```
-
-`install` writes `.git/hooks/pre-push` (it refuses to replace a foreign hook without `--force`) and stores the knowledge-base path in the application's `git config contextops.kb`.
+Start with [setup](../setup.md) for installation and tests without credentials. The supported first-use path is a manual run against a separate application. The shared pipeline registers both `fresh-specialists` and `sweeper-first` with explicit selection.
 
 ## Commands
 
-| Command | Use |
+| Command | Purpose |
 | --- | --- |
-| `contextops install --kb PATH [--repo PATH]` | Install the hook in an application repository |
-| `contextops sweep --base REF [--head REF]` | Run the whole pipeline by hand for a commit range, in the foreground. Use this for pilots. |
-| `contextops run RUN_DIR` | Rerun a prepared run directory |
-| `contextops hook REMOTE [URL]` | Called by git; not meant for direct use |
+| `contextops sweep --repo PATH --kb PATH --base REF --head REF --strategy MODE --session ID [--session ID] [--cutoff ISO_TIME]` | Freeze selected evidence and run locally. Real model calls occur. |
+| `contextops run RUN_DIR` | Execute an unattempted prepared run with its recorded inputs. |
+| `contextops install --kb PATH --repo PATH` | Explicitly install the experimental application pre-push hook. |
+| `contextops hook REMOTE [URL]` | Internal experimental hook entry point. |
 
-## Authentication
+There is no implicit strategy. The checked-in `init.md` has `mode: null`; the manual command requires an explicit mode. Unknown or unimplemented modes fail before inference. Sessions come from Claude Code's local JSONL history. Missing/ambiguous sessions, invalid refs, dirty knowledge checkouts, and invalid settings fail before model calls. Cutoffs require a timezone and cannot be in the future.
 
-`auth: subscription` in `init.md` uses the Claude Code login on the machine. The runtime removes `ANTHROPIC_API_KEY` from its own environment for the run, because an exported key would silently take precedence and bill the API. If a background run cannot reach the login, create a token with `claude setup-token` and export `CLAUDE_CODE_OAUTH_TOKEN` in the shell that runs `git push`.
+The selected conversation is copied before inference, with a SHA-256 recorded in `run.json`. Later messages cannot change it. A changed frozen copy fails integrity validation. Explicit sessions include retained history through the cutoff, independently of the old last-run window. Tool results and thinking are excluded; truncation and sidechain policy are recorded. Legacy manifests remain readable, but cannot execute without the new frozen-input contract. Attempted runs are never overwritten; create a new attempt.
 
-`auth: api-key` requires `ANTHROPIC_API_KEY`. Use it when the hook is shared with people outside the team.
+## Configuration and authentication
 
-## What a run leaves behind
+`init.md` supplies model, budgets, common instructions, role paths, and output settings. Commit configuration/role changes before running so the snapshot matches the settings you reviewed. Specialist tools are Read/Grep/Glob (Grep requires a specific file after Glob discovery); the writer additionally receives scoped Edit/Write. These SDK capabilities are unrelated to the `tools/` knowledge taxonomy.
 
-Everything stays outside the bundle, in `~/.contextops/sweeper-first/runs/<run_id>/`:
+Subscription mode uses the user's private Claude Code authentication and removes `ANTHROPIC_API_KEY` from the runtime process. API-key mode requires that environment variable. No credential value belongs in this repository or its chats, examples, logs, screenshots, or published evidence. No authentication is required for the deterministic tests. Inference uses the configured provider, not a local model.
 
-| Path | Content |
+`output.runs_dir` is the common parent, defaulting to `~/.contextops/runs`. The runtime always appends the strategy and run ID. `output.branch` must include `{strategy}` and `{run_id}`. `open_pr: false` is the default; no remote push occurs unless publication is explicitly enabled. A successful writer can create a local knowledge commit. Generated branches are never merged automatically.
+
+## Outputs
+
+| Artifact | Meaning |
 | --- | --- |
-| `run.json` | Frozen refs, baseline, conversation window, branch name |
-| `pack/` | The evidence pack the agents read |
-| `workers/<agent>.json` | Each agent's raw output, status, turns, cost |
-| `review.json` | Accepted, deferred, rejected, and no-change records, handoffs, unowned findings |
-| `proposals.json` | Cartographer proposals, when it ran |
-| `metrics.json` | Cost, duration, and token use per agent, for comparing experiments |
-| `report.md` | Human summary; also the PR body |
-| `run.log` | Output of the background process |
+| `run.json`, `conversation.json` | Frozen selections and normalized conversation with integrity hash |
+| `pack/manifest.json`, `pack/diff/`, `pack/conversation/` | Evidence, source refs, selected sessions, and filtering notes |
+| `workers/`, `review.json` | Raw specialist responses and accepted/deferred/rejected decisions |
+| `proposals.json` | Optional cartographer suggestions, never automatically applied |
+| `knowledge.patch` | Candidate or committed knowledge changes; inspect writer status |
+| `report.md`, `metrics.json` | Outcomes, failures, and client-reported resource estimates |
+| `started` | Prevents silently rerunning an attempted directory |
 
-`~/.contextops/sweeper-first/runs/state.json` remembers the last conversation cutoff per application, and `unowned.jsonl` collects unowned findings across runs for the cartographer.
+Cutoff state and unowned findings live under each strategy's directory. Raw evidence and run artifacts stay outside the repository. They are not guaranteed secret-free; the public credential scan is separate from the limited proposal validator. Do not publish raw directories.
 
-## Experiment A on the shared core
+## Experimental pre-push adapter
 
-This branch shares every module with experiment B except `contextops/strategies.py`, where `sweeper_first` replaces `fresh_specialists`. The strategy runs [the sweeper](../agents/sweeper.md) once, then starts each worker with `resume=<sweeper session>` and `fork=True`. A failed sweeper skips the workers instead of falling back to fresh sessions.
-
-A forked session reports its parent's cost and token use again. The strategy subtracts the sweeper's totals from each fork before adding it to the ledger and keeps the raw figures in `sweeper.json`, next to the parent and child session IDs. Each fork's SDK budget is the per-agent allowance plus the sweeper's cost, because the SDK cap also sees the inherited spend.
+The hook source remains available but is not installed or production-verified by setup or tests. It requires an explicit committed `init.md` mode and application `contextops.sessions` configuration containing selected session IDs. It captures refs from Git, prepares evidence, and launches maintenance in the background. Preparation itself can delay the hook; background completion does not gate the push. A knowledge commit created afterward is not part of the original application push. The adapter skips failures and does not turn a missing conversation into a valid run.
 
 ## Known limits
 
-- The Claude Code transcript format is internal and changes between versions. All parsing is in `contextops/transcripts.py`; check it after Claude Code upgrades. Transcripts are deleted after 30 days by default.
-- Costs in reports are client-side estimates, not billing.
-- Product relevance is a glob and keyword match on the README frontmatter, so a product used only through unlisted files is skipped until its hints are updated.
+- Claude Code history is an internal format. Deleted history, malformed entries, or filtered tool results may hide evidence.
+- Relevance uses globs and keywords; unknown usage paths may require human updates to hints.
+- Cost estimates are not billing. Concurrent calls and the writer can exceed the aggregate scheduling threshold.
+- Reports include agent claims; deterministic locator checks do not prove semantic correctness. Review actual document changes.
+- Tests exercise fake calls, permissions, and SDK option construction. They do not prove live provider behavior. No experiments were rerun for this integration.
+- The separate historical GPT adapter is future Codex-backend work. It is not installed by this package.
+
+## A session lineage and accounting
+
+A retains the completed parent and each child in `sweeper.json`. Every specialist uses the same parent session ID with `fork_session=True`. A missing, reused, or parent-equal child ID fails lineage validation and its proposals are withheld. A failed sweeper skips specialists without a B fallback.
+
+Raw child usage remains available beside the incremental estimate and the validated result. Cost and model token counters subtract the parent when the reported values permit it; smaller reports are retained rather than forced negative. This follows the historical cumulative-report interpretation, and live SDK billing semantics remain unverified by the deterministic tests. Timing and turn counts are retained as reported.

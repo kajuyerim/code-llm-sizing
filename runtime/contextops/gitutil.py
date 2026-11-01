@@ -27,7 +27,7 @@ def repo_root(path: Path) -> Path:
 
 
 def rev_parse(repo: Path, ref: str) -> str:
-    return git(repo, "rev-parse", ref)
+    return git(repo, "rev-parse", "--verify", "--end-of-options", f"{ref}^{{commit}}")
 
 
 def config_get(repo: Path, key: str) -> str | None:
@@ -71,8 +71,15 @@ def remove_worktree(repo: Path, path: Path) -> None:
 
 def status(repo: Path) -> list[tuple[str, str]]:
     """(code, path) pairs from `git status --porcelain`, untracked files listed one by one."""
+    result = subprocess.run(["git", "-C", str(repo), "status", "--porcelain", "-z", "-uall"],
+                            capture_output=True, text=True, check=True)
+    records = iter(result.stdout.split("\0"))
     entries = []
-    for line in git(repo, "status", "--porcelain", "-uall").splitlines():
-        code, path = line[:2].strip(), line[3:]
-        entries.append((code, path.split(" -> ")[-1]))
+    for item in records:
+        if not item:
+            continue
+        code, path = item[:2].strip(), item[3:]
+        entries.append((code, path))
+        if "R" in code or "C" in code:
+            next(records, None)  # NUL format puts the old path after the destination.
     return entries

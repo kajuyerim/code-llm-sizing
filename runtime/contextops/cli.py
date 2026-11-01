@@ -7,6 +7,7 @@ import asyncio
 import subprocess
 import sys
 from pathlib import Path
+from datetime import datetime
 
 from contextops import gitutil
 from contextops.run import create_run
@@ -39,10 +40,28 @@ def main(argv: list[str] | None = None) -> None:
     sweep.add_argument("--head", default="HEAD")
     sweep.add_argument("--repo", type=Path, default=Path.cwd())
     sweep.add_argument("--kb", type=Path, help="defaults to the repo's contextops.kb setting")
+    sweep.add_argument("--strategy", choices=["fresh-specialists", "sweeper-first"], required=True)
+    sweep.add_argument("--session", action="append", required=True, help="Claude Code session ID; repeat to include more")
+    sweep.add_argument("--cutoff", type=_cutoff, help="ISO 8601 timestamp with timezone; defaults to now")
 
     args = parser.parse_args(argv)
     handlers = {"install": _install, "hook": _hook, "run": _run, "sweep": _sweep}
-    handlers[args.command](args)
+    try:
+        handlers[args.command](args)
+    except (ValueError, FileNotFoundError, subprocess.CalledProcessError) as exc:
+        # Do not echo subprocess stderr, which can contain private source or auth data.
+        message = "Git operation failed; check the repository and commit refs" if isinstance(exc, subprocess.CalledProcessError) else str(exc)
+        parser.exit(2, f"contextops: {message}\n")
+
+
+def _cutoff(value: str) -> datetime:
+    try:
+        stamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if stamp.tzinfo is None:
+            raise ValueError
+        return stamp
+    except ValueError:
+        raise argparse.ArgumentTypeError("cutoff must be ISO 8601 with a timezone") from None
 
 
 def _install(args: argparse.Namespace) -> None:
@@ -74,7 +93,10 @@ def _hook(args: argparse.Namespace) -> None:
             continue  # malformed, or a branch deletion
         local_ref, local_sha, _, remote_sha = fields
         try:
-            ctx = create_run(app, Path(kb), args.remote, local_ref, local_sha, remote_sha)
+            # Explicit selection is required even for this experimental adapter.
+            selected = gitutil.config_get(app, "contextops.sessions")
+            ctx = create_run(app, Path(kb), args.remote, local_ref, local_sha, remote_sha,
+                             sessions=selected.split() if selected else None)
         except Exception as exc:  # the push must go through whatever happens here
             print(f"contextops: skipped ({exc})", file=sys.stderr)
             continue
@@ -100,7 +122,7 @@ def _sweep(args: argparse.Namespace) -> None:
         sys.exit("No knowledge base: pass --kb or run `contextops install` first.")
     ctx = create_run(
         app, Path(kb).expanduser(), "origin", "manual",
-        gitutil.rev_parse(app, args.head), gitutil.rev_parse(app, args.base),
+        args.head, args.base, strategy=args.strategy, sessions=args.session, cutoff=args.cutoff,
     )
     if ctx is None:
         sys.exit("Nothing to sweep: base and head are the same commit.")

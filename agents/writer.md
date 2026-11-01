@@ -37,13 +37,13 @@ Keep these lines short. The pull request carries the full quotes.
 ## Metadata, history, navigation
 
 - Do not add or change `verified` in any frontmatter. A human sets it after review.
-- Leave other frontmatter as it is unless a record targets it, as in a product README's relevance hints.
+- Leave other frontmatter as it is unless a record targets it, as in a tool README's relevance hints.
 - Add one entry to `log.md` under the run's date, one bullet per applied change naming the document and ID, in the existing style.
 - Touch `index.md` only if a document title changed.
 
 ## Boundaries
 
-- Edit only `core/`, `products/`, `index.md`, and `log.md`. The run reverts anything else.
+- Edit only `core/`, `tools/`, `index.md`, and `log.md`. The run reverts anything else.
 - Use no em dashes.
 
 ## Output

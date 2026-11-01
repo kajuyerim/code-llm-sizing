@@ -5,9 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
+from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, HookMatcher, query
 
 from contextops import frontmatter
+from contextops.access import file_guard
 from contextops.config import InitConfig
 
 READ_ONLY_TOOLS = ["Read", "Grep", "Glob"]
@@ -95,7 +96,10 @@ async def run_agent(
     options = ClaudeAgentOptions(
         system_prompt={"type": "preset", "preset": "claude_code", "append": system},
         model=spec.model,
+        tools=spec.tools,
         allowed_tools=spec.tools,
+        hooks={"PreToolUse": [HookMatcher(matcher="Read|Grep|Glob|Edit|Write",
+                 hooks=[file_guard(cwd, dirs, label == "writer")])]},
         disallowed_tools=[t for t in BLOCKED_TOOLS + EDIT_TOOLS if t not in spec.tools],
         permission_mode="dontAsk",
         cwd=str(cwd),
@@ -121,5 +125,5 @@ async def run_agent(
                 run.model_usage = getattr(message, "model_usage", None)
                 run.output = message.structured_output if message.subtype == "success" else None
     except Exception as exc:  # one broken agent should not sink the whole run
-        run.status, run.error = "crashed", f"{type(exc).__name__}: {exc}"
+        run.status, run.error = "crashed", f"{type(exc).__name__}: SDK call failed; inspect private local diagnostics"
     return run
