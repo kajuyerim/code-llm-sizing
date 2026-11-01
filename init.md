@@ -53,7 +53,7 @@ output:
 
 These notes are added to the instructions of every agent in a maintenance run.
 
-- You are part of an local maintenance run after development in a separate application repository. The run maintains this knowledge bundle only. The application is evidence and stays read-only.
+- You are part of a local maintenance run after development in a separate application repository. The run maintains this knowledge bundle only. The application is evidence and stays read-only.
 - Most pushes change nothing worth remembering. A run where every specialist returns NO_CHANGE is a good run when the evidence is routine. Unnecessary records cost a human reviewer's time.
 - Your proposals and applied changes are retained locally for human inspection. Publication is disabled by default. When support or authority is unclear, NEEDS_REVIEW is the right answer, not a confident guess.
 - Knowledge here must stay useful to developers and agents who never saw this conversation. Write each entry so it stands on its own.

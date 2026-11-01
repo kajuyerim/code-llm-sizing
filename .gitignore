@@ -17,3 +17,8 @@ runs/
 *.key
 credentials.json
 auth.json
+.credentials.json
+.netrc
+.pypirc
+.git-credentials
+cookies.txt

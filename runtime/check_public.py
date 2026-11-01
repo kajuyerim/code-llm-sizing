@@ -16,9 +16,12 @@ PATTERNS = {
     'credential-url': r'(?i)\b(?:https?|postgres(?:ql)?|mysql|mongodb(?:\+srv)?)://[^\s:/]+:[^\s/@]{6,}@',
     'cookie': r'(?i)\b(?:set-cookie|cookie)[\s"\x27:=]+[^\s"\x27;=]{2,}=[A-Za-z0-9_./+=-]{16,}',
     'secret-assignment': r'(?i)\b(?:[A-Z_]*(?:API_KEY|AUTH_TOKEN|PASSWORD|CLIENT_SECRET|ACCESS_TOKEN|REFRESH_TOKEN)|apiKey|clientSecret|password|accessToken|refreshToken)["\x27\s]*[:=]\s*["\x27]([A-Za-z0-9_./+=-]{12,})["\x27]',
+    'unquoted-secret': r'(?im)^\s*(?:export\s+)?(?:[A-Z_]*(?:API_KEY|AUTH_TOKEN|PASSWORD|CLIENT_SECRET|ACCESS_TOKEN|REFRESH_TOKEN)|token|secret)\s*=\s*([A-Za-z0-9_./+=-]{8,})\s*$',
+    'credential-query': r'(?i)[?&](?:api[_-]?key|access[_-]?token|auth[_-]?token|password|secret)=([A-Za-z0-9_%./+=-]{8,})',
 }
 PATTERNS = {k: re.compile(v) for k, v in PATTERNS.items()}
-SENSITIVE_NAMES = {'auth.json', 'credentials.json', '.credentials.json', '.env', '.DS_Store'}
+SENSITIVE_NAMES = {'auth.json', 'credentials.json', '.credentials.json', '.env', '.DS_Store',
+                   '.netrc', '.pypirc', '.git-credentials', 'cookies.txt'}
 
 
 def scan_text(text: str, label: str) -> list[str]:
@@ -28,7 +31,7 @@ def scan_text(text: str, label: str) -> list[str]:
     def scan(value: str, where: str):
         for category, pattern in PATTERNS.items():
             for match in pattern.finditer(value):
-                if category == 'secret-assignment':
+                if category in {'secret-assignment', 'unquoted-secret', 'credential-query'}:
                     literal = match.group(1).lower()
                     if any(x in literal for x in ('example', 'placeholder', 'your_', 'your-', 'not-a-real')):
                         continue
@@ -81,6 +84,10 @@ def scan_repository(root: Path, history: bool = False) -> tuple[int, list[str]]:
         except UnicodeDecodeError:
             findings.append(f'{name}: binary-file-requires-manual-review')
     if history:
+        for oid in git('rev-list', '--all').decode().splitlines():
+            count += 1
+            findings += scan_text(git('show', '-s', '--format=%B', oid).decode('utf-8'),
+                                  f'commit:{oid[:12]}')
         objects = git('rev-list', '--objects', '--all').decode().splitlines()
         for row in objects:
             oid, _, name = row.partition(' ')
