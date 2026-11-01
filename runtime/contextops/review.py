@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from contextops import gitutil
+from contextops.access import writable
 from contextops.evidence import Evidence
 from contextops.run import RunContext
 from contextops.strategies import WorkerResult
@@ -78,8 +79,13 @@ def _file(record: dict, owns: str, ctx: RunContext, evidence: Evidence, review: 
 
 def _problem(record: dict, owns: str, ctx: RunContext, evidence: Evidence) -> str | None:
     target = record["target"]
+    if not writable(target):
+        return "target is not a permitted knowledge Markdown path"
     if not (target == owns or (owns.endswith("/") and target.startswith(owns))):
         return f"target {target} is outside the assignment {owns}"
+    scope = record["scope"]
+    if scope != "company" and not scope.startswith(("app:", "tool:")):
+        return "scope must be company, app:<name>, or tool:<name>"
     if not record["evidence"]:
         return "no evidence"
     for item in record["evidence"]:

@@ -22,8 +22,16 @@ class Worker:
     label: str
     spec: AgentSpec
     owns: str
-    product: str | None
+    tool: str | None
     reason: str
+
+    @classmethod
+    def from_record(cls, record: dict) -> "Worker":
+        """Read archived worker metadata without modifying its historical names."""
+        data = dict(record)
+        if "tool" not in data and "product" in data:
+            data["tool"] = data.pop("product")
+        return cls(**data)
 
 
 def plan_workers(config: InitConfig, evidence: Evidence) -> tuple[list[Worker], list[str]]:
@@ -32,14 +40,14 @@ def plan_workers(config: InitConfig, evidence: Evidence) -> tuple[list[Worker], 
     planned, skipped = [], []
     for entry in config.workers:
         spec = load_agent(entry.agent, config.default_model)
-        for owns, product in _assignments(entry, config.kb_root):
-            label = f"{spec.name}:{product}" if product else spec.name
+        for owns, tool in _assignments(entry, config.kb_root):
+            label = f"{spec.name}:{tool}" if tool else spec.name
             if entry.run == "always":
                 reason = "always"
             else:
                 reason = _relevance(config.kb_root / owns, evidence.changed_files, conversation)
             if reason:
-                planned.append(Worker(label, spec, owns, product, reason))
+                planned.append(Worker(label, spec, owns, tool, reason))
             else:
                 skipped.append(f"{label}: nothing in the diff or conversation points at {owns}")
     return planned, skipped

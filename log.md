@@ -1,5 +1,15 @@
 # Knowledge Change History
 
+## 2026-11-01
+
+- Renamed the current products knowledge area to tools, including role, maintenance guide, routing, scopes, and writer permissions. Historical evidence retains its original paths and labels.
+- Added the approved English walkthrough as a path-sanitized derivative, an English Markdown companion, architecture, evaluation, provenance, and public setup guidance.
+- Reconciled shared specialist definitions and made strategy/session selection explicit. Conversations are frozen before inference, and state is separated by strategy.
+- Added deterministic credential-free checks and publication scans. The integrated configuration has not been evaluated by rerunning historical experiments; the production hook remains unverified.
+- This branch exposes fresh specialists. Sweeper-first integration is a dependent PR. Existing issues and human review checkboxes remain unchanged.
+
+The dated entries below describe their implementation-time state. Completed historical pilot evidence is summarized in docs/evaluation.md.
+
 ## 2026-10-20
 
 - Added `init.md` as the run configuration and `runtime/`, a Python orchestrator on the Claude Agent SDK with a background pre-push hook. Experiment B runs as the `fresh-specialists` mode. The runtime has not yet been run.

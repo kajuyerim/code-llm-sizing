@@ -1,50 +1,51 @@
-# Context Ops Shared Knowledge
+# Context Ops
 
-A CMPE 492 senior project at Boğaziçi University studying how to maintain shared knowledge as software evolves. This repository is the knowledge destination for terminology, stack standards, conventions, and reusable development guidance. Its current repository name, `code-llm-sizing`, will change in the future.
-
-Application code lives in separate repositories. After development, a local pre-push workflow will inspect the application repository, its Git diff, and the conversation between the developer and the local agent to maintain this knowledge base.
+Context Ops is a CMPE 492 senior project at Boğaziçi University studying how agents maintain shared knowledge as software evolves. After application development, maintenance reads a separate application's source revision, Git diff, and developer-agent conversation, then proposes updates to this knowledge repository.
 
 ## Start here
 
-- [Knowledge index](index.md): core guidance, product knowledge, maintenance guides, agent definitions, and skills.
-- [Setup walkthrough](setup.md): connect an existing application to this bundle and prepare manual maintenance.
-- [Repository instructions](AGENTS.md): scope and editing rules.
-- [Change history](log.md): changes to the knowledge bundle.
+1. **Understand:** read [How Our Knowledge Maintenance System Works](docs/walkthrough/README.md). Download its [interactive HTML](docs/walkthrough/index.html) and open it locally for original evidence and A/B comparisons.
+2. **Install and test:** follow [setup](setup.md). Deterministic tests use fake responses and temporary repositories, with no account, model call, or API charge.
+3. **Run on your application:** select a strategy, committed revision range, and Claude Code conversation sessions. Real runs use your own private Claude authentication.
+4. **Inspect:** review the local proposals, knowledge patch, report, and knowledge branch before deciding what to keep.
+
+## Two ways to acquire context
+
+| Strategy | How specialists start |
+| --- | --- |
+| A: sweeper first | A sweeper investigates the original evidence; specialists independently fork its completed session. |
+| B: fresh specialists | Specialists start fresh and inspect the same original evidence themselves. |
+
+Both maintain documentation only, use equivalent responsibilities and common checks, and keep independent output state. Four core specialists always run; tool specialists are selected by relevance. The [architecture](docs/architecture.md) explains the boundaries and actual call flow.
+
+This branch exposes **B, `fresh-specialists`**. A is described in the historical walkthrough and is integrated by the dependent sweeper-first PR. There is no default winner or implicit strategy choice.
 
 ## Repository layout
 
-| Folder | Contents |
+| Area | Responsibility |
 | --- | --- |
-| `core/` | Shared terminology, stack standards, naming conventions, and pitfalls |
-| `maintenance/` | Instructions for maintaining core and product knowledge |
-| `products/` | Product-specific knowledge, starting with Firebase and Dataform |
-| `agents/` | Sweeper, specialist, cartographer, and writer role definitions |
-| `init.md` | Run configuration read by the initializer |
-| `runtime/` | Python orchestrator and pre-push hook |
-| `skills/` | Reusable setup and GitHub issue creation procedures |
+| `core/` | Terminology, stack standards, naming conventions, and pitfalls |
+| `tools/` | Knowledge about technologies, initially Firebase and Dataform |
+| `maintenance/` | Procedures for maintaining core and tool knowledge |
+| `agents/` | Shared role definitions, assignments, sweeper, and writer |
+| `skills/` | Reusable setup and issue-creation procedures |
+| `docs/` | Walkthrough, architecture, evaluation, and provenance |
+| `runtime/` | Shared Claude runtime, operational guide, and tests |
+| `init.md` | Common run settings and instructions |
 
-## First experiments
+[Knowledge index](index.md) · [Repository instructions](AGENTS.md) · [Change history](log.md)
 
-- **Sweeper, then delegation:** one agent examines all three evidence sources, then forks into 5–6 specialists with the gathered context.
-- **Immediate delegation:** 5–6 specialists start fresh and inspect the same evidence sources themselves.
+`tools/` replaces the former `products/` folder. These are knowledge areas, not executable agent tools. Application sources, evaluation fixtures, and private run artifacts stay outside this repository. Firebase/Dataform folders do not imply application usage or company policy.
 
-Both workflows only maintain documentation. Their [shared assignments and input contract](agents/README.md) keep the comparison consistent. The initial documents are ready for team review; the experiments have not been run.
+## Evidence and current status
 
-Version 0.1 covers the foundation, manual pilots, and a first [runtime](runtime/README.md) for the fresh-specialist workflow with a background pre-push hook. The runtime has been written but not yet run against an application.
+The [evaluation summary](docs/evaluation.md) covers 60 archived maintenance outputs from three applications and five checkpoints. It separates proposals from applied documents and records execution limitations. The GPT results came from a separate evaluation adapter, not the Claude backend shipped here. The integrated code and unified prompts form a new configuration and have not been evaluated by rerunning those experiments.
+
+The public checks use no model inference. Real model integration and the optional pre-push adapter still require separate verification. Publication is disabled by default; the runtime can create a local knowledge commit, but does not merge automatically.
 
 ## Tracking
 
-Milestone: [v0.1 - Structure & First tests](https://github.com/kajuyerim/code-llm-sizing/milestone/1).
-
-| Issue | Work |
-| --- | --- |
-| [#1](https://github.com/kajuyerim/code-llm-sizing/issues/1) | Shared structure and setup guidance, awaiting team review |
-| [#2](https://github.com/kajuyerim/code-llm-sizing/issues/2) | Prepare sweeper-first maintenance |
-| [#3](https://github.com/kajuyerim/code-llm-sizing/issues/3) | Run the sweeper-first pilot |
-| [#4](https://github.com/kajuyerim/code-llm-sizing/issues/4) | Prepare fresh-specialist maintenance |
-| [#5](https://github.com/kajuyerim/code-llm-sizing/issues/5) | Run the fresh-specialist pilot and compare results |
-
-The foundation is prepared locally. Issue #1 remains open for publication and review by Kerem and Barış; the four experiment issues remain open for later work.
+[Milestone v0.1](https://github.com/kajuyerim/code-llm-sizing/milestone/1) and issues [#1](https://github.com/kajuyerim/code-llm-sizing/issues/1), [#2](https://github.com/kajuyerim/code-llm-sizing/issues/2), [#3](https://github.com/kajuyerim/code-llm-sizing/issues/3), [#4](https://github.com/kajuyerim/code-llm-sizing/issues/4), [#5](https://github.com/kajuyerim/code-llm-sizing/issues/5) predate the completed pilots. They remain open for reconciliation and human review; publication of this code does not complete their checkboxes.
 
 ## Team
 
@@ -52,3 +53,5 @@ The foundation is prepared locally. Issue #1 remains open for publication and re
 - Barış Öksüz - 2021400099
 
 **Advisor:** Assoc. Prof. Atay Özgövde
+
+The historical repository name remains `code-llm-sizing` until a replacement is selected.

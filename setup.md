@@ -1,55 +1,76 @@
-# Set Up Shared Knowledge
+# Install, test, and run Context Ops
 
-Use this walkthrough to connect an existing application repository to this knowledge bundle and prepare manual maintenance. Application code stays in its own repository. The [setup skill](skills/setup-shared-knowledge/SKILL.md) provides an agent entry point to this guide.
+Keep this knowledge checkout separate from your application. Do not copy your application, conversation exports, or evaluation fixtures into it. Read the [walkthrough](docs/walkthrough/README.md) first.
 
-## 1. Inspect the existing setup
+## 1. Install in a clean environment
 
-Identify the application repository and this knowledge checkout. Read their current agent instructions and inspect Git status before changing documentation. Reuse paths and choices already supplied by the developer. Preserve unrelated work and existing integration settings.
+Use Python 3.11 or newer and Git. From this repository's root:
 
-Read the [knowledge index](index.md). The initial product areas are [Firebase](products/firebase/README.md) and [Dataform](products/dataform/README.md); their presence is not evidence that the application uses either one.
+```sh
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -r runtime/requirements-lock.txt
+python -m pip install --no-deps -e runtime
+contextops --help
+```
 
-## 2. Choose the applicable knowledge
+The lock records the dependencies verified for this integration. Installation downloads packages but does not authenticate or call a model.
 
-Select relevant core documents and product areas from the application's evidence and the developer's stated scope. Record unknowns rather than choosing technologies for the application. Add a new product entry only when an actual maintained scope calls for it.
+## 2. Test without credentials
 
-## 3. Reference the bundle from the application
+```sh
+python -m unittest discover -s runtime/tests -v
+python runtime/check_docs.py
+python runtime/check_public.py --history
+```
 
-For initial manual use, use the existing separate local knowledge checkout. Preserve a Git subtree integration when the application already uses one. A new subtree integration is a separate explicit setup choice, not an automatic pull, merge, or push.
+Tests inject fake agent responses and create disposable repositories in the system temporary directory, outside this checkout. They do not read your real Claude history, install hooks, call a model, or push anything. Mock checks verify software wiring; they do not establish live SDK inheritance or reproduce pilot scores.
 
-When setup is requested for an identified application, add or update a short shared-knowledge section in its existing agent instructions. Record:
+## 3. Prepare your own evidence
 
-- The resolved local knowledge location and index entry point.
-- The applicable product areas and core guidance.
-- Maintenance timing: after development, before push.
-- Required evidence: source repository, explicit diff, and developer-agent conversation.
-- The selected strategy, or that selection is pending.
-- Integration status: manual workflow available; automated runner/hook pending unless an actual implementation has been verified.
+Identify an existing application repository outside this checkout and an explicit committed base/head range. Keep its development conversation in the local Claude Code history for that repository. Find the desired session IDs through Claude Code's session history or the filenames in its project history directory. Use only IDs, never account tokens.
 
-Preserve unrelated application instructions. This repository's own AGENTS.md describes the knowledge destination and must not be replaced with application setup details.
+The current collector supports Claude Code JSONL history. It does not accept arbitrary chat exports or Codex history. Each selected session must contain developer/assistant messages for the application before the cutoff. Missing or ambiguous sessions fail before inference. Explicit selection includes the complete retained session history through the cutoff, not only messages newer than the base commit. Tool results and thinking are omitted; sidechains are excluded by default. Truncation is reported.
 
-## 4. Prepare evidence inputs
+Commit any changes to the knowledge configuration or role definitions first. Runs use the committed knowledge baseline. Keep both strategies on the same baseline, refs, selected sessions, cutoff, model, and budgets when comparing them. Their output states remain separate; this command is not an automatic evaluation harness.
 
-Record the source repository identity, base/head commit IDs, knowledge baseline revision, and explicit diff. Locate the relevant local conversation export and declare a cutoff before maintenance starts. Preserve speaker roles, message order, session/message references, and any known exclusions or truncation.
+## 4. Choose settings and authenticate privately
 
-Ask for a missing repository path or conversation export when needed for an actual run. Do not silently omit the conversation, invent an export path, or claim that a Git hook supplies conversation history automatically.
+Review [init.md](init.md). It selects no strategy. The baseline uses `claude-sonnet-5-5`, a $1.50 estimated per-agent allowance, a $10 estimated total threshold, 30 turns, and at most three concurrent specialists. Choose a model available to your own Claude account and commit that setting before running. Client estimates are not subscription invoices, and concurrent calls can overshoot the total threshold.
 
-## 5. Select roles and strategy
+Use your own Claude Code login outside this repository. Subscription mode uses that local login and removes the API-key environment variable from the runtime process. An optional API-key mode reads the user's environment. Never place a credential value in `init.md`, command examples, issue bodies, chat evidence, screenshots, or tracked files. Do not paste credentials into this project's discussions.
 
-Use the six [specialist assignments](agents/README.md#initial-specialist-assignments) in both experiments. Record the selected model configuration and resource limits before measured work.
+Authentication is needed only for real inference. It does not make inference local; this runtime invokes the configured Claude service. Auto-memory ingestion is disabled by default. Repository instruction files are treated as evidence, not runtime instructions.
 
-- **A:** invoke the sweeper on all three evidence sources, then transfer its context to the specialists. Record the actual transfer mechanism.
-- **B:** start fresh specialists with the same raw evidence and role instructions, without sweeper context or A's outputs.
+## 5. Run once manually
 
-Both strategies produce the same [change record](maintenance/core.md#change-record). Use independent knowledge states from the same baseline for comparison.
+Replace the placeholders below with your paths, immutable commits, session ID, and development cutoff:
 
-## 6. Run manually and report integration status
+```sh
+contextops sweep \
+  --repo /path/to/application \
+  --kb /path/to/code-llm-sizing \
+  --base BASE_COMMIT \
+  --head HEAD_COMMIT \
+  --strategy fresh-specialists \
+  --session SESSION_ID \
+  --cutoff 2026-11-01T12:00:00+03:00
+```
 
-For a manual run, supply the frozen evidence and role instructions through the chosen local agent. Have specialists return proposals, then use one final writer to reconcile them in the appropriate knowledge checkout. Keep the source application read-only during maintenance and retain local run artifacts outside this bundle.
+Repeat `--session` to select additional sessions. Omit `--cutoff` to freeze the current time. The selected normalized conversation is copied and hashed before inference. A run cannot silently switch to another strategy or pick up later messages. The A strategy name is `sweeper-first`; it becomes available through the dependent A integration PR.
 
-For an automated run, install the [runtime](runtime/README.md) and its pre-push hook in the application repository. The hook captures the refs being pushed and starts the run in the background; `contextops sweep` runs the same pipeline by hand for a chosen commit range. The runtime has not yet been run against an application, so report the hook as installed but unverified until a run has produced a report.
+This command makes real model calls. No hook installation is necessary. The current defaults keep all output local and may create a local knowledge branch and commit. A run containing only NO_CHANGE records is a valid result.
 
-## 7. Finish with a setup report
+## 6. Inspect the output
 
-Report the application and knowledge paths, selected guidance, reference-document changes, available evidence inputs, strategy and role assignments, and remaining work. Distinguish documentation setup from a completed maintenance run and from working hook automation.
+New artifacts are under `~/.contextops/runs/<strategy>/<run-id>/`. The printed report location is the starting point. Inspect `run.json`, `pack/manifest.json`, `workers/`, `review.json`, `knowledge.patch`, `report.md`, and `metrics.json`. Compare accepted proposals with the actual patch; accepted records do not prove faithful writing.
 
-Repository-local skills are available by reading their [SKILL.md entry points](index.md#skills). Automatic skill discovery has not been configured. Use the [issue creation skill](skills/create-github-issue/SKILL.md) when the developer requests GitHub tracking for follow-up work.
+The report identifies any local knowledge branch. Inspect it using Git before merging or publishing it yourself. The application checkout is not a write target. A failed writer is not committed; its candidate patch is retained. A failed or interrupted run is not silently reused: prepare a new run and preserve the old artifacts.
+
+Raw evidence and logs are private local artifacts, not automatically sanitized publication material. Scan any material you decide to share. Do not upload an entire run directory.
+
+## Optional integration
+
+Existing separate-checkout references or subtree integrations can be preserved. A new subtree integration is an explicit application setup choice, not part of installation. Link the application's agent instructions to this bundle only when setting up that application intentionally.
+
+The pre-push installer remains experimental. It is not installed by these steps and is not a verified production trigger. See the [runtime guide](runtime/README.md) for its requirements and limitations.

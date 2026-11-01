@@ -1,56 +1,36 @@
-# Agent Definitions and Experiment Conventions
+# Agent definitions and experiment conventions
 
-These files define the roles of a maintenance run. Each specialist receives an explicit assignment and reads the applicable maintenance guide. The same files serve manual pilots and the [runtime](../runtime/README.md): the runtime reads each definition's frontmatter (name, tools, optional model) and uses its body as the agent's instructions, after the [shared rules](shared-rules.md) and the run notes in [init.md](../init.md).
+The runtime combines [shared rules](shared-rules.md), committed [run notes](../init.md), and each role's definition. Both strategies use the same selected responsibilities and raw evidence. The role files on this integration branch are unified from A's stricter definitions and are a new configuration, not the archived pilot prompts.
 
 ## Run stages
 
-| Stage | Definition | What it does |
-| --- | --- | --- |
-| Initializer | [init.md](../init.md), implemented in the runtime | Freezes the evidence pack and picks the specialists for this push |
-| Specialists | The assignments below | Sweep the evidence for their own document and return change records |
-| Checks | Runtime code | Reject records outside an assignment or with evidence that does not resolve |
-| Cartographer | [Cartographer](cartographer.md) | Proposes new core documents or product folders from unowned findings |
-| Writer | [Writer](writer.md) | Applies accepted records on a branch and opens the pull request |
+Collection freezes source refs, the knowledge baseline, and explicitly selected conversation sessions/cutoff. Plain code selects specialists. A then investigates with the [sweeper](sweeper.md) before specialist forks; B starts fresh specialists immediately. Shared checks validate proposals. The optional [cartographer](cartographer.md) proposes structure changes, and one [writer](writer.md) applies accepted knowledge locally.
 
-## Shared inputs
-
-Both strategies inspect the same source application revision, Git diff, and developer-agent conversation export. Also provide the knowledge baseline revision, transcript cutoff, allowed output path, and the task instructions. Preserve source/session identifiers, speaker roles, message order, and any recorded exclusions or truncation.
-
-An export of the development conversation is evidence available to both strategies. It does not give B an inherited sweeper interpretation. Keep independent sessions and knowledge states for each strategy, and keep evaluator answers and future evidence outside agent access.
+This branch registers B. The dependent A PR adds literal SDK forks to the common strategy registry. The architecture and historical walkthrough explain both approaches.
 
 ## Initial specialist assignments
 
-| Assignment | Definition | Allowed knowledge target |
-| --- | --- | --- |
-| Terminology | [Terminology maintainer](terminology-maintainer.md) | core/terminology.md |
-| Stack standards | [Stack maintainer](stack-maintainer.md) | core/tech-stack-standards.md |
-| Naming conventions | [Conventions maintainer](conventions-maintainer.md) | core/naming-conventions.md |
-| Pitfalls | [Pitfalls maintainer](pitfalls-maintainer.md) | core/pitfalls.md |
-| Firebase | [Product maintainer](product-maintainer.md) | products/firebase/ |
-| Dataform | [Product maintainer](product-maintainer.md) | products/dataform/ |
+| Assignment | Definition | Knowledge target | Selection |
+| --- | --- | --- | --- |
+| Terminology | [Terminology maintainer](terminology-maintainer.md) | core/terminology.md | Always |
+| Stack | [Stack maintainer](stack-maintainer.md) | core/tech-stack-standards.md | Always |
+| Conventions | [Conventions maintainer](conventions-maintainer.md) | core/naming-conventions.md | Always |
+| Pitfalls | [Pitfalls maintainer](pitfalls-maintainer.md) | core/pitfalls.md | Always |
+| Firebase | [Tool maintainer](tool-maintainer.md) | tools/firebase/ | When relevant |
+| Dataform | [Tool maintainer](tool-maintainer.md) | tools/dataform/ | When relevant |
 
-The product role is instantiated once per product folder. In automated runs a product instance starts only when the diff or conversation matches the relevance hints in its README frontmatter. Both experiments use these six specialist assignments. Changes outside an assignment are handoffs to the relevant owner, not permission to edit another specialist's documents.
+Tool maintainers are instantiated from existing folders and selected with their frontmatter relevance hints. The actual roster is recorded. The five specialists in the Actual P3 walkthrough are a case-specific roster, not a fixed runtime count. Knowledge about tools is distinct from Read/Grep/Glob/Edit/Write capabilities available to an agent.
 
-## Experiment A: Sweeper first
+## Shared inputs and isolation
 
-Start the [sweeper](sweeper.md) with the shared inputs. It examines all three evidence sources broadly before the same six specialist roles begin. Transfer its gathered context together with the original evidence references.
+Preserve immutable source base/head, explicit diff, selected conversation sessions and cutoff, baseline revision, and declared settings. Keep message roles, order, references, exclusions, and truncation. Both strategies read the conversation. B receives no semantic sweeper summary, inherited session, A-generated memory, or A-produced knowledge. Keep evaluator answers and future evidence outside agent access.
 
-Record whether the handoff is a literal session fork, copied history, or a summary. Record truncation or omitted context. A summary-based run must not be reported as a literal fork. Include sweeper calls, inherited context, and any final reconciliation calls in total resource use.
+A must record actual parent/child lineage and inheritance mechanism. A summary is not a literal fork. Its sweeper failure must skip specialists rather than turn the run into B. Count sweeper calls and inherited-resource accounting in A's totals. Keep raw usage alongside adjusted figures.
 
-## Experiment B: Fresh specialists
+## Outputs
 
-Start fresh specialist sessions, one per assignment, with the same knowledge baseline and raw evidence inputs. Each inspects the repository, diff, and conversation for its assignment. Supply no sweeper summary, A-generated knowledge, or inherited session memory. Record each agent's actual evidence reads and context truncation.
+Use the [change record](../maintenance/core.md#change-record), including NO_CHANGE and NEEDS_REVIEW. Each specialist proposes changes only within its assignment. The application stays read-only. Unowned findings and handoffs do not expand write permissions. Structure and relevance-hint changes are human-review proposals.
 
-## Outputs and final writing
+The writer preserves frontmatter and writes only permitted knowledge paths. Publication is off by default; a successful writer can create a local knowledge commit. Inspect the actual patch separately from accepted proposals and writer claims. Run state, backlog, and knowledge branches are strategy-specific and outside the maintained knowledge folders.
 
-Each specialist returns the [shared change record](../maintenance/core.md#change-record), including NO_CHANGE or NEEDS_REVIEW when appropriate. Treat the application as read-only. Do not create application code or change maintenance rules, agent definitions, or skills as a maintenance output.
-
-One final [writer](writer.md) combines proposals in the corresponding strategy's knowledge checkout, resolves overlaps or defers conflicts, and updates the root index/history only as necessary. Keep the source application unchanged. Retain proposals and run records outside this bundle alongside the local experiment artifacts; the runtime keeps them under `~/.contextops/runs/`.
-
-Findings that fit no assigned document are returned as unowned. The [cartographer](cartographer.md) reads them across runs and proposes new documents or product folders. Its proposals go to the pull request for a human decision and are never applied automatically.
-
-## Manual pilot record
-
-Before running, freeze source base/head revisions, the knowledge baseline, conversation export and cutoff, model configuration, and resource limits. Both strategies use the same declared settings. Record actual inputs, coverage, outputs, failures, elapsed time, and reported token use; mark unavailable measurements as unavailable.
-
-Pilot preparation and evaluation remain tracked in GitHub issues. The first pilot cases should cover a relevant update, an irrelevant diff, a conversation-only term, a rejected proposal, a later correction, and an implementation claim contradicted by the source. Keep expected answers outside the agents' accessible workspace.
+Legacy evidence retains `products/`, `product:` scopes, and original role names. The current role is `tool-maintainer`; new targets use `tools/` and new tool scopes use `tool:<name>`. Archived results remain historical, not rewritten to look like outputs of this revision.

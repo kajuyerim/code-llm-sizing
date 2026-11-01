@@ -9,15 +9,15 @@ This bundle is the shared-knowledge destination for Context Ops. Application rep
 - [Naming conventions](core/naming-conventions.md)
 - [Pitfalls](core/pitfalls.md)
 
-## Products
+## Tools
 
-- [Firebase](products/firebase/README.md)
-- [Dataform](products/dataform/README.md)
+- [Firebase](tools/firebase/README.md)
+- [Dataform](tools/dataform/README.md)
 
 ## Maintenance
 
 - [Maintaining core knowledge](maintenance/core.md)
-- [Maintaining product knowledge](maintenance/products.md)
+- [Maintaining tool knowledge](maintenance/tools.md)
 
 ## Agents
 
@@ -29,7 +29,7 @@ This bundle is the shared-knowledge destination for Context Ops. Application rep
 - [Stack maintainer](agents/stack-maintainer.md)
 - [Conventions maintainer](agents/conventions-maintainer.md)
 - [Pitfalls maintainer](agents/pitfalls-maintainer.md)
-- [Product maintainer](agents/product-maintainer.md)
+- [Tool maintainer](agents/tool-maintainer.md)
 - [Cartographer](agents/cartographer.md)
 - [Writer](agents/writer.md)
 
@@ -43,3 +43,11 @@ This bundle is the shared-knowledge destination for Context Ops. Application rep
 - [Create a GitHub issue](skills/create-github-issue/SKILL.md)
 
 See the [change history](log.md) for bundle updates. Skill files are repository-local procedures; read the desired file explicitly until a local-agent discovery mechanism is selected.
+
+## Project explanations
+
+- [English walkthrough](docs/walkthrough/README.md)
+- [Interactive walkthrough](docs/walkthrough/index.html)
+- [Architecture and A/B boundary](docs/architecture.md)
+- [Historical evaluation](docs/evaluation.md)
+- [Evidence provenance](docs/provenance.md)

@@ -5,7 +5,7 @@ Scope: this knowledge repository. Status: initial foundation conventions, awaiti
 | ID | Convention |
 | --- | --- |
 | NAME-001 | Use lowercase folder and document names with hyphens between words. Preserve conventional entry point names such as README.md, AGENTS.md, LICENSE, and SKILL.md. |
-| NAME-002 | Place product-specific knowledge under its lowercase product folder within products. |
+| NAME-002 | Place tool-specific knowledge under its lowercase tool folder within tools. |
 | NAME-003 | Give Markdown documents a descriptive first-level title and use relative links for documents in the bundle. |
 | NAME-004 | Preserve an existing knowledge ID when revising the same fact. New terminology uses the TERM prefix, naming rules the NAME prefix, stack standards the STACK prefix, and pitfalls the PIT prefix, each followed by a three-digit number. |
 | NAME-005 | Use no em dashes in authored project documents or GitHub tracking text. |

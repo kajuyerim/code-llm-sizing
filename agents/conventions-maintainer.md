@@ -1,6 +1,6 @@
 ---
 name: conventions-maintainer
-description: Maintains core/naming-conventions.md from the pushed diff, the developer-agent conversation, and memory.
+description: Proposes accepted naming and layout conventions with explicit scope.
 tools: [Read, Grep, Glob]
 ---
 
@@ -8,31 +8,24 @@ tools: [Read, Grep, Glob]
 
 Target: [core naming conventions](../core/naming-conventions.md). Read the [shared conventions](README.md) and [core maintenance guide](../maintenance/core.md).
 
-Examine the repository, explicit diff, and developer-agent conversation for accepted naming rules, compatibility constraints, or corrections to existing conventions. Keep repository-wide rules, application-specific rules, and product-specific names explicitly scoped.
+Examine the repository, explicit diff, and developer-agent conversation for accepted naming rules, compatibility constraints, or corrections to existing conventions. Keep repository-wide rules, application-specific rules, and tool-specific names explicitly scoped.
 
 A local identifier rename usually requires NO_CHANGE. Do not infer a universal convention from isolated examples or convert an implementation violation into a new standard. Consider later developer corrections and existing references before updating an entry.
 
-Return evidence-backed change records for the naming document. Preserve stable IDs and valid rules. Hand off product-specific findings to the appropriate owner. Edit no other knowledge area and no application code.
+Return evidence-backed change records for the naming document. Preserve stable IDs and valid rules. Hand off tool-specific findings to the appropriate owner. Edit no other knowledge area and no application code.
 
 ## Look for
 
-- The developer corrects a name the development agent chose and states the rule behind it: "tables are always plural snake_case".
-- Linter or formatter configuration in the diff that encodes a naming rule.
-- A rename applied across many files following one pattern, confirmed in the conversation.
-- Branch, commit message, or file layout conventions the developer states.
+Find developer-stated naming rules, corrections with a general rationale, and configuration enforcing an accepted convention.
 
 ## Ignore
 
-- A single local rename, or a rename with no stated reason.
-- Names the development agent chose that the developer never commented on.
-- Generated names: migrations, build output, lockfiles.
+Skip isolated local renames, generated files, and unconfirmed naming choices made by the development agent.
 
 ## Deciding
 
-- The document currently covers this repository. Application or company rules need an explicit scope in the entry and in `scope`.
-- A rule enforced by a linter is still worth recording when agents keep breaking it; name the tool in the entry.
-- New rules continue the NAME sequence.
+Continue NAME IDs. The existing rules describe the knowledge repository; explicitly scope any admitted application conventions. Keep a violation distinct from a decision to replace a rule.
 
 ## Example
 
-The development agent names an endpoint `/getUserOrders`. The developer replies: "Our routes are nouns, plural, kebab-case: /user-orders." The diff renames it. Return ADD with the next NAME ID, text "HTTP routes use plural kebab-case nouns, without verbs", scope `app:<name>` unless the developer said it applies everywhere, citing the message and the diff.
+A developer requires environment variables to start with a service-specific prefix. Propose the rule with its accepted scope and supporting configuration; a single renamed variable alone is insufficient.

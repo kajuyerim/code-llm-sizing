@@ -28,8 +28,8 @@ def worker_prompt(worker: Worker, ctx: RunContext) -> str:
         f"Assignment: {worker.label}",
         f"You own: {worker.owns}",
     ]
-    if worker.product:
-        lines.append(f"Product: {worker.product}")
+    if worker.tool:
+        lines.append(f"Tool: {worker.tool}")
     lines += [
         "",
         f"Evidence pack, read manifest.json first: {ctx.pack}",

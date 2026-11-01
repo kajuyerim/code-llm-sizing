@@ -42,18 +42,27 @@ def auto_memory_dir(repo_root: Path) -> Path:
 
 
 def load_sessions(
-    app_root: Path, since: datetime | None, until: datetime, include_sidechains: bool = False
+    app_root: Path, since: datetime | None, until: datetime, include_sidechains: bool = False,
+    selected: list[str] | None = None,
 ) -> list[Session]:
     """Sessions with at least one developer or agent message inside the window."""
     sessions = []
     for directory in _project_dirs(app_root):
         for path in sorted(directory.glob("*.jsonl")):
+            if selected is not None and path.stem not in selected:
+                continue
             modified = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
             if since and modified < since:
                 continue
             session = _parse(path, app_root, since, until, include_sidechains)
             if session.messages:
                 sessions.append(session)
+    if selected is not None:
+        ids = [s.session_id for s in sessions]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Selected conversation has an ambiguous session ID")
+        if set(selected) != set(ids):
+            raise ValueError("Selected conversation is missing or has no messages before the cutoff")
     return sessions
 
 

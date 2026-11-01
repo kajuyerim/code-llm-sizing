@@ -2,10 +2,10 @@
 name = "contextops"
 version = "0.1.0"
 description = "Pre-push knowledge maintenance: sweeps the pushed diff, the developer-agent conversation and memory, and proposes shared-knowledge updates."
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
-    "claude-agent-sdk>=0.1",
-    "pyyaml>=6",
+    "claude-agent-sdk==0.2.176",
+    "pyyaml==6.0.3",
 ]
 
 [project.scripts]

@@ -4,7 +4,7 @@ This guide explains how to maintain documents under core. Read the current docum
 
 ## Admission and placement
 
-- Store shared terms, approved stack standards, and broadly applicable conventions in core. Keep product-specific implementation details in the appropriate product area.
+- Store shared terms, approved stack standards, and broadly applicable conventions in core. Keep tool-specific implementation details in the appropriate tool area.
 - Cite source revisions and paths for implementation claims. Cite conversation session and message references for developer definitions, requirements, and decisions. Preserve message order and speaker roles.
 - Treat accepted decisions, proposed ideas, rejected approaches, and later corrections differently. An agent's completion message alone does not establish implementation.
 - Distinguish descriptive behavior from normative policy. A code deviation does not automatically replace an approved standard; record the discrepancy or propose a scoped exception.
@@ -42,4 +42,4 @@ In automated runs the record is structured JSON with the fields `target`, `fact_
 
 Keep edits within the assigned core documents and preserve valid definitions, links, and evidence. Have one final writer combine proposals so specialists do not overwrite each other. That writer records semantic changes in the bundle history and updates navigation when needed.
 
-Check that cited evidence supports the particular claim, cross-links resolve, IDs remain stable, and generated changes are not stamped as human-verified. Use [product maintenance guidance](products.md) when a claim belongs under a product instead.
+Check that cited evidence supports the particular claim, cross-links resolve, IDs remain stable, and generated changes are not stamped as human-verified. Use [tool maintenance guidance](tools.md) when a claim belongs under a tool instead.

@@ -10,7 +10,7 @@ Purpose: gather broad context for experiment A before specialized documentation 
 
 ## Assignment
 
-Inspect the supplied source repository, explicit diff, and developer-agent conversation. Read the existing core/product knowledge to understand what may need maintenance. Capture implementation findings, accepted decisions, definitions, corrections, contradictions, and unresolved questions with evidence references.
+Inspect the supplied source repository, explicit diff, and developer-agent conversation. Read the existing core/tool knowledge to understand what may need maintenance. Capture implementation findings, accepted decisions, definitions, corrections, contradictions, and unresolved questions with evidence references.
 
 ## Handoff
 
