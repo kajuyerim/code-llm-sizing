@@ -1,5 +1,16 @@
 # Knowledge Change History
 
+## 2026-11-05: Run maintenance agents without MCP servers; list sessions
+
+- A live A run showed forks reading the inherited history from the prompt cache on their first call and re-writing all of it on the second. Claude.ai connectors tied to the login were attached to every agent and connected asynchronously, which changed the tool list between calls. Maintenance agents now run with no MCP servers (`strict_mcp_config`, connectors disabled). After the change, every fork call read the full inherited history from the cache.
+- Added `contextops sessions` to list an application's Claude Code sessions for choosing `--session` IDs.
+
+## 2026-11-05: Share the cache prefix between the sweeper and its forks
+
+- Pilot metrics showed each A fork re-writing about 42k inherited tokens to the prompt cache, because its system prompt and output schema differed from the sweeper's. This made A cost about twice as much as B.
+- The sweeper and all specialists, in both strategies, now share one role-free system prompt and one output schema. Each role travels in the agent's first user message; a fork receives its role in the message after the inherited sweeper history.
+- `sweeper.json` records the parent's prefix fingerprint and whether each fork shares it. A deterministic test checks the shared prefix. The cache effect and any change in role adherence are not yet verified with live inference.
+
 ## 2026-11-01: Integrate sweeper-first orchestration
 
 - Merged the updated fresh-specialist foundation into the existing sweeper-first history.

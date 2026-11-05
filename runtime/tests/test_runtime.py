@@ -238,6 +238,9 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(options.tools,spec.tools)
         self.assertIn('PreToolUse',options.hooks)
         self.assertNotIn('Bash',options.tools)
+        self.assertTrue(options.strict_mcp_config)
+        self.assertEqual(options.mcp_servers,{})
+        self.assertEqual(options.env.get('ENABLE_CLAUDEAI_MCP_SERVERS'),'false')
 
     def test_recursive_grep_cannot_read_sensitive_descendants(self):
         (self.app / 'credentials.json').write_text('{}')
@@ -355,3 +358,43 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(child.model_usage['model']['inputTokens'],25)
         self.assertEqual(raw['raw']['cost_usd'],0.1)
         self.assertIn('note',raw)
+
+    def test_a_forks_and_b_share_role_free_cache_prefix(self):
+        from contextops.strategies import sweeper_first
+        from contextops.schemas import AGENT_OUTPUT
+        calls = {}
+        for strategy, run in (('sweeper-first', sweeper_first), ('fresh-specialists', fresh_specialists)):
+            ctx = self.prepare(strategy=strategy); config = load_config(self.kb)
+            workers, _ = plan_workers(config, build_pack(ctx, config))
+            seen = calls[strategy] = []
+            async def fake(spec, **kw):
+                seen.append((spec, kw))
+                session = 'parent' if kw['label'] == 'sweeper' else 'child-' + kw['label']
+                return AgentRun(kw['label'], status='success', session_id=session, output={'records': []})
+            with patch('contextops.strategies.run_agent', fake):
+                asyncio.run(run(workers, ctx, config, Ledger(10)))
+        a, b = calls['sweeper-first'], calls['fresh-specialists']
+        # Cached prefix order is tools, system, messages: all must match the sweeper's.
+        sweeper_spec, sweeper_kw = a[0]
+        for spec, kw in a + b:
+            self.assertEqual(kw['system'], sweeper_kw['system'])
+            self.assertIs(kw['schema'], AGENT_OUTPUT)
+            self.assertEqual(sorted(spec.tools), sorted(sweeper_spec.tools))
+            self.assertEqual(spec.model, sweeper_spec.model)
+            # Roles travel in the first user message, never in the shared system prompt.
+            self.assertNotIn(spec.prompt, kw['system'])
+            self.assertIn(spec.prompt, kw['prompt'])
+        for spec, kw in a[1:]:
+            self.assertTrue(kw['prompt'].startswith('The sweeper phase above is complete'))
+            self.assertNotIn(sweeper_spec.prompt, kw['prompt'])
+        handoff = json.loads((self.root / 'runs' / 'sweeper-first').glob('*/sweeper.json').__next__().read_text())
+        self.assertTrue(handoff['children'])
+        self.assertTrue(all(child['shares_cache_prefix'] for child in handoff['children']))
+
+    def test_sessions_lists_selectable_history_without_inference(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            main(['sessions', '--repo', str(self.app)])
+        text = out.getvalue()
+        self.assertIn('chosen-session', text)
+        self.assertIn('Firebase is the chosen tool', text)

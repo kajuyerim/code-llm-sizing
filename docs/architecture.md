@@ -30,7 +30,7 @@ Manual runs require an explicit strategy and Claude Code session selection. Sour
 
 Four core specialists handle terminology, stack, conventions, and pitfalls. One tool maintainer is instantiated for each relevant folder under `tools/`; relevance comes from that folder's frontmatter. Both strategies receive the same selected roster and raw evidence. Neither receives future evidence, evaluator answers, or the other strategy's outputs. The public command does not select or score comparison cases.
 
-Shared prompts use the stricter evidence and scope rules from A. They are a new integrated configuration, not the archived pilot prompts. Developer statements can establish intent and definitions; source can establish implementation. Dependency declarations or completion messages alone do not demonstrate runtime use. Observed application choices do not establish company policy.
+Shared prompts use the stricter evidence and scope rules from A. They are a new integrated configuration, not the archived pilot prompts. Every sweeper and specialist receives the same role-free system prompt and output schema; its role arrives as the first user message. This keeps an A fork on its sweeper's prompt cache prefix, and B uses the same layout so the strategies differ only in the sweeper. Developer statements can establish intent and definitions; source can establish implementation. Dependency declarations or completion messages alone do not demonstrate runtime use. Observed application choices do not establish company policy.
 
 ## Writing and boundaries
 

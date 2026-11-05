@@ -7,6 +7,7 @@ Start with [setup](../setup.md) for installation and tests without credentials. 
 | Command | Purpose |
 | --- | --- |
 | `contextops sweep --repo PATH --kb PATH --base REF --head REF --strategy MODE --session ID [--session ID] [--cutoff ISO_TIME]` | Freeze selected evidence and run locally. Real model calls occur. |
+| `contextops sessions --repo PATH [--limit N]` | List the application's Claude Code sessions (ID, last message, opening line) to choose `--session` values. No model calls. |
 | `contextops run RUN_DIR` | Execute an unattempted prepared run with its recorded inputs. |
 | `contextops install --kb PATH --repo PATH` | Explicitly install the experimental application pre-push hook. |
 | `contextops hook REMOTE [URL]` | Internal experimental hook entry point. |
@@ -55,3 +56,5 @@ The hook source remains available but is not installed or production-verified by
 A retains the completed parent and each child in `sweeper.json`. Every specialist uses the same parent session ID with `fork_session=True`. A missing, reused, or parent-equal child ID fails lineage validation and its proposals are withheld. A failed sweeper skips specialists without a B fallback.
 
 Raw child usage remains available beside the incremental estimate and the validated result. Cost and model token counters subtract the parent when the reported values permit it; smaller reports are retained rather than forced negative. This follows the historical cumulative-report interpretation, and live SDK billing semantics remain unverified by the deterministic tests. Timing and turn counts are retained as reported.
+
+Forks reuse the sweeper's prompt cache only when the cached prefix (tools and output schema, then the system prompt, then the inherited messages) is unchanged. The runtime therefore gives the sweeper and every specialist the same role-free system prompt and output schema, and sends each role as a user message. `sweeper.json` stores the parent's prefix fingerprint and a `shares_cache_prefix` flag per child. In a live run, a fork's first turn should report the inherited history as `cacheReadInputTokens`, not `cacheCreationInputTokens`.

@@ -28,7 +28,7 @@ Tests inject fake agent responses and create disposable repositories in the syst
 
 ## 3. Prepare your own evidence
 
-Identify an existing application repository outside this checkout and an explicit committed base/head range. Keep its development conversation in the local Claude Code history for that repository. Find the desired session IDs through Claude Code's session history or the filenames in its project history directory. Use only IDs, never account tokens.
+Identify an existing application repository outside this checkout and an explicit committed base/head range. Keep its development conversation in the local Claude Code history for that repository. List the application's sessions with `contextops sessions --repo /path/to/application`; it prints each session ID with its last message time and opening line, and makes no model call. Use only IDs, never account tokens.
 
 The current collector supports Claude Code JSONL history. It does not accept arbitrary chat exports or Codex history. Each selected session must contain developer/assistant messages for the application before the cutoff. Missing or ambiguous sessions fail before inference. Explicit selection includes the complete retained session history through the cutoff, not only messages newer than the base commit. Tool results and thinking are omitted; sidechains are excluded by default. Truncation is reported.
 
