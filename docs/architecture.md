@@ -22,7 +22,7 @@ Application revision + explicit diff + selected frozen conversation
        local patch, branch, report and resource records
 ```
 
-This branch registers B (`fresh-specialists`). The dependent A PR registers `sweeper-first` in the same pipeline. A's historical evaluation used real session forks, not a pasted summary. Its sweeper completion is a prerequisite; there is no fresh-session fallback.
+The shared pipeline registers B (`fresh-specialists`) and A (`sweeper-first`). A's historical evaluation used real session forks, not a pasted summary. Its sweeper completion is a prerequisite; there is no fresh-session fallback.
 
 ## Shared contract
 

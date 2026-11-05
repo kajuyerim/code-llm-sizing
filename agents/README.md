@@ -6,7 +6,7 @@ The runtime combines [shared rules](shared-rules.md), committed [run notes](../i
 
 Collection freezes source refs, the knowledge baseline, and explicitly selected conversation sessions/cutoff. Plain code selects specialists. A then investigates with the [sweeper](sweeper.md) before specialist forks; B starts fresh specialists immediately. Shared checks validate proposals. The optional [cartographer](cartographer.md) proposes structure changes, and one [writer](writer.md) applies accepted knowledge locally.
 
-This branch registers B. The dependent A PR adds literal SDK forks to the common strategy registry. The architecture and historical walkthrough explain both approaches.
+The common strategy registry includes B with fresh sessions and A with literal SDK forks from a completed sweeper. The architecture and historical walkthrough explain both approaches.
 
 ## Initial specialist assignments
 

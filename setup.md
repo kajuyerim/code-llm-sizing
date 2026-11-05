@@ -57,7 +57,7 @@ contextops sweep \
   --cutoff 2026-11-01T12:00:00+03:00
 ```
 
-Repeat `--session` to select additional sessions. Omit `--cutoff` to freeze the current time. The selected normalized conversation is copied and hashed before inference. A run cannot silently switch to another strategy or pick up later messages. The A strategy name is `sweeper-first`; it becomes available through the dependent A integration PR.
+Repeat `--session` to select additional sessions. Omit `--cutoff` to freeze the current time. The selected normalized conversation is copied and hashed before inference. A run cannot silently switch to another strategy or pick up later messages. Use `--strategy sweeper-first` to run A through the same pipeline. It completes a sweeper session before forking each specialist; a failed sweeper never falls back to B.
 
 This command makes real model calls. No hook installation is necessary. The current defaults keep all output local and may create a local knowledge branch and commit. A run containing only NO_CHANGE records is a valid result.
 

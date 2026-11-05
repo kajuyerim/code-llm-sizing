@@ -285,3 +285,73 @@ class RuntimeTests(unittest.TestCase):
                 self.assertEqual(gitutil.status(target),[])
             finally:
                 link.unlink()
+
+    def test_both_strategies_have_independent_state(self):
+        a=self.prepare(strategy='sweeper-first');b=self.prepare()
+        self.assertNotEqual(a.runs_dir,b.runs_dir)
+        self.assertIn('/sweeper-first/',a.branch)
+        self.assertEqual(a.sessions,b.sessions)
+        self.assertEqual(a.conversation_sha256,b.conversation_sha256)
+        self.assertEqual(a.kb_baseline,b.kb_baseline)
+        record_cutoff(a.runs_dir,self.app,self.cutoff)
+        self.assertIsNone(last_cutoff(b.runs_dir,self.app))
+
+    def test_a_forks_same_completed_parent_with_raw_accounting(self):
+        from contextops.strategies import sweeper_first
+        ctx=self.prepare(strategy='sweeper-first');config=load_config(self.kb)
+        workers,_=plan_workers(config,build_pack(ctx,config));ledger=Ledger(10)
+        calls=[]
+        async def fake(spec,**kw):
+            calls.append(kw)
+            if kw['label']=='sweeper':
+                self.assertNotIn('resume',kw)
+                return AgentRun('sweeper',status='success',session_id='parent',cost_usd=0.2,
+                                model_usage={'test':{'inputTokens':100,'outputTokens':20,'costUSD':0.2}})
+            self.assertEqual(calls[0]['label'],'sweeper')
+            self.assertEqual(kw['resume'],'parent');self.assertTrue(kw['fork'])
+            self.assertEqual(kw['budget_usd'],config.budget.per_agent_usd+0.2)
+            return AgentRun(kw['label'],status='success',session_id='child-'+kw['label'],cost_usd=0.3,
+                            model_usage={'test':{'inputTokens':150,'outputTokens':30,'costUSD':0.3}},output={'records':[]})
+        with patch('contextops.strategies.run_agent',fake):
+            results=asyncio.run(sweeper_first(workers,ctx,config,ledger))
+        self.assertEqual(len(calls),len(workers)+1)
+        self.assertAlmostEqual(ledger.spent,0.2+len(workers)*0.1)
+        self.assertTrue(all(r.run.model_usage['test']['inputTokens']==50 for r in results))
+        handoff=json.loads((ctx.run_dir/'sweeper.json').read_text())
+        self.assertTrue(handoff['independent_children'])
+        self.assertEqual(handoff['children'][0]['raw']['cost_usd'],0.3)
+        self.assertAlmostEqual(handoff['children'][0]['incremental']['cost_usd'],0.1)
+
+    def test_a_failed_sweeper_has_no_fresh_fallback(self):
+        from contextops.strategies import sweeper_first
+        ctx=self.prepare(strategy='sweeper-first');config=load_config(self.kb)
+        workers,_=plan_workers(config,build_pack(ctx,config))
+        for parent in (AgentRun('sweeper',status='crashed'),AgentRun('sweeper',status='success')):
+            fake=AsyncMock(return_value=parent)
+            with patch('contextops.strategies.run_agent',fake):
+                results=asyncio.run(sweeper_first(workers,ctx,config,Ledger(10)))
+            self.assertEqual(fake.call_count,1)
+            self.assertTrue(all(r.run.status=='skipped-sweeper-failed' for r in results))
+
+    def test_a_rejects_missing_parent_or_duplicate_child_identity(self):
+        from contextops.strategies import sweeper_first
+        ctx=self.prepare(strategy='sweeper-first');config=load_config(self.kb)
+        workers,_=plan_workers(config,build_pack(ctx,config))
+        for child_id in (None,'parent','same-child'):
+            async def fake(spec,**kw):
+                return AgentRun(kw['label'],status='success',session_id='parent' if kw['label']=='sweeper' else child_id,
+                                output={'records':[{'unvalidated':'candidate'}]})
+            with patch('contextops.strategies.run_agent',fake):
+                results=asyncio.run(sweeper_first(workers,ctx,config,Ledger(10)))
+            self.assertTrue(all(r.run.status=='invalid-fork-lineage' and r.run.output is None for r in results))
+            self.assertFalse(json.loads((ctx.run_dir/'sweeper.json').read_text())['independent_children'])
+
+    def test_a_smaller_usage_reports_remain_raw(self):
+        from contextops.strategies import _subtract_parent
+        parent=AgentRun('sweeper',cost_usd=0.4,model_usage={'model':{'inputTokens':100}})
+        child=AgentRun('child',cost_usd=0.1,model_usage={'model':{'inputTokens':25}})
+        raw=_subtract_parent(child,parent)
+        self.assertEqual(child.cost_usd,0.1)
+        self.assertEqual(child.model_usage['model']['inputTokens'],25)
+        self.assertEqual(raw['raw']['cost_usd'],0.1)
+        self.assertIn('note',raw)

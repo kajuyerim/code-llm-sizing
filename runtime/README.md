@@ -1,6 +1,6 @@
 # Runtime operations
 
-Start with [setup](../setup.md) for installation and tests without credentials. The supported first-use path is a manual run against a separate application. This branch registers `fresh-specialists`; the dependent A PR adds `sweeper-first` to the same shared pipeline.
+Start with [setup](../setup.md) for installation and tests without credentials. The supported first-use path is a manual run against a separate application. The shared pipeline registers both `fresh-specialists` and `sweeper-first` with explicit selection.
 
 ## Commands
 
@@ -49,3 +49,9 @@ The hook source remains available but is not installed or production-verified by
 - Reports include agent claims; deterministic locator checks do not prove semantic correctness. Review actual document changes.
 - Tests exercise fake calls, permissions, and SDK option construction. They do not prove live provider behavior. No experiments were rerun for this integration.
 - The separate historical GPT adapter is future Codex-backend work. It is not installed by this package.
+
+## A session lineage and accounting
+
+A retains the completed parent and each child in `sweeper.json`. Every specialist uses the same parent session ID with `fork_session=True`. A missing, reused, or parent-equal child ID fails lineage validation and its proposals are withheld. A failed sweeper skips specialists without a B fallback.
+
+Raw child usage remains available beside the incremental estimate and the validated result. Cost and model token counters subtract the parent when the reported values permit it; smaller reports are retained rather than forced negative. This follows the historical cumulative-report interpretation, and live SDK billing semantics remain unverified by the deterministic tests. Timing and turn counts are retained as reported.

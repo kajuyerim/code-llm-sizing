@@ -1,5 +1,12 @@
 # Knowledge Change History
 
+## 2026-11-01: Integrate sweeper-first orchestration
+
+- Merged the updated fresh-specialist foundation into the existing sweeper-first history.
+- Registered both modes in one runtime, with equivalent tool routing, stricter shared prompts, validation, and writer permissions.
+- A forks each specialist from its completed sweeper; retained lineage and raw/incremental usage distinguish its behavior from B. Failed or invalid forks do not fall back to B.
+- Deterministic tests verify orchestration parameters and failure handling without live inference. Historical evaluation scores remain separate from this new configuration.
+
 ## 2026-11-01
 
 - Renamed the current products knowledge area to tools, including role, maintenance guide, routing, scopes, and writer permissions. Historical evidence retains its original paths and labels.
@@ -9,6 +16,14 @@
 - This branch exposes fresh specialists. Sweeper-first integration is a dependent PR. Existing issues and human review checkboxes remain unchanged.
 
 The dated entries below describe their implementation-time state. Completed historical pilot evidence is summarized in docs/evaluation.md.
+
+## 2026-10-21
+
+- Implemented the standalone sweeper-first runtime and run configuration on feat/sweeper-first-runtime, starting from foundation commit fdecc82.
+- Added literal-session-fork orchestration, raw evidence collection, proposal validation, restricted writing, resource records, and hook/PR publication source.
+- Added pitfalls, cartographer and writer roles, shared rules, six assignments, product relevance hints, and runtime vocabulary.
+- Updated navigation, maintenance guidance, and setup status. Implementation is not run or verified; no dependencies or hooks were installed, no agents or tests were executed, and no API charges were incurred.
+- Left GitHub tracking and human review checkboxes unchanged. Pilot execution and results remain pending.
 
 ## 2026-10-20
 
