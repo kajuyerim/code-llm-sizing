@@ -1,5 +1,11 @@
 # Knowledge Change History
 
+## 2026-11-05: Share the cache prefix between the sweeper and its forks
+
+- Pilot metrics showed each A fork re-writing about 42k inherited tokens to the prompt cache, because its system prompt and output schema differed from the sweeper's. This made A cost about twice as much as B.
+- The sweeper and all specialists, in both strategies, now share one role-free system prompt and one output schema. Each role travels in the agent's first user message; a fork receives its role in the message after the inherited sweeper history.
+- `sweeper.json` records the parent's prefix fingerprint and whether each fork shares it. A deterministic test checks the shared prefix. The cache effect and any change in role adherence are not yet verified with live inference.
+
 ## 2026-11-01: Integrate sweeper-first orchestration
 
 - Merged the updated fresh-specialist foundation into the existing sweeper-first history.

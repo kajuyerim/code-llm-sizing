@@ -52,12 +52,21 @@ UNOWNED = {
     "required": ["summary", "suggested_home", "evidence"],
 }
 
-WORKER_OUTPUT = {
+# One schema for the sweeper and every specialist. The SDK sends the schema as a tool
+# definition, which sits at the front of the prompt cache prefix; a fork whose schema
+# differed from its sweeper's would re-write the whole inherited history to the cache.
+AGENT_OUTPUT = {
     "type": "object",
     "properties": {
-        "records": {"type": "array", "items": CHANGE_RECORD},
+        "records": {"type": "array", "items": CHANGE_RECORD,
+                    "description": "Change records. Specialists only; the sweeper returns an empty list"},
+        "findings": {"type": "array", "items": UNOWNED,
+                     "description": "Sweeper candidates for the specialists; specialists return an empty list"},
         "handoffs": {"type": "array", "items": HANDOFF},
-        "unowned": {"type": "array", "items": UNOWNED},
+        "unowned": {"type": "array", "items": UNOWNED,
+                    "description": "Supported findings no specialist document can hold; the sweeper returns an empty list"},
+        "contradictions": {"type": "array", "items": {"type": "string"}},
+        "unresolved": {"type": "array", "items": {"type": "string"}},
         "coverage": {
             "type": "object",
             "properties": {
@@ -68,8 +77,10 @@ WORKER_OUTPUT = {
             "required": ["sessions_read", "files_read", "notes"],
         },
     },
-    "required": ["records", "handoffs", "unowned", "coverage"],
+    "required": ["records", "findings", "handoffs", "unowned", "contradictions", "unresolved", "coverage"],
 }
+
+WORKER_OUTPUT = AGENT_OUTPUT
 
 CARTOGRAPHER_OUTPUT = {
     "type": "object",

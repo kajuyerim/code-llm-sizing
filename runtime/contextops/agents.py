@@ -79,6 +79,20 @@ def system_prompt(config: InitConfig, spec: AgentSpec) -> str:
     return "\n\n---\n\n".join(part for part in parts if part)
 
 
+def shared_system_prompt(config: InitConfig) -> str:
+    """The role-free system prompt the sweeper and specialists share.
+
+    Roles travel in the first user message instead (role_message), so a fork keeps its
+    sweeper's exact cache prefix and reads the inherited history from the prompt cache.
+    """
+    _, shared = frontmatter.read(config.shared_rules)
+    return "\n\n---\n\n".join(part for part in (shared.strip(), config.instructions) if part)
+
+
+def role_message(spec: AgentSpec) -> str:
+    return f"# Your role: {spec.name}\n\n{spec.prompt}"
+
+
 async def run_agent(
     spec: AgentSpec,
     *,
