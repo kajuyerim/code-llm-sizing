@@ -9,6 +9,24 @@ Context Ops is a CMPE 492 senior project at Boğaziçi University studying how a
 3. **Run on your application:** select a strategy, committed revision range, and Claude Code conversation sessions. Real runs use your own private Claude authentication.
 4. **Inspect:** review the local proposals, knowledge patch, report, and knowledge branch before deciding what to keep.
 
+## Quickstart
+
+You need Python 3.11 or newer, Git, a Claude Code login, and an application repository of your own that you have worked on with Claude Code.
+
+```sh
+git clone https://github.com/kajuyerim/code-llm-sizing.git && cd code-llm-sizing
+python3 -m venv .venv && . .venv/bin/activate
+python -m pip install -r runtime/requirements-lock.txt && python -m pip install --no-deps -e runtime
+python -m unittest discover -s runtime/tests        # no account, no model calls
+
+contextops sessions --repo /path/to/your/app        # pick the Claude Code sessions to learn from
+contextops sweep --repo /path/to/your/app --kb . \
+  --base <commit before the work> --head <commit after it> \
+  --strategy sweeper-first --session <session id>   # real model calls; output stays local
+```
+
+The last line prints a report path. The proposed knowledge changes are in `knowledge.patch` next to it and on a local branch of this checkout. Nothing is pushed or merged. [Setup](setup.md) covers each step in detail.
+
 ## Two ways to acquire context
 
 | Strategy | How specialists start |
@@ -38,6 +56,18 @@ Both **A, `sweeper-first`**, and **B, `fresh-specialists`**, are available throu
 `tools/` replaces the former `products/` folder. These are knowledge areas, not executable agent tools. Application sources, evaluation fixtures, and private run artifacts stay outside this repository. Firebase/Dataform folders do not imply application usage or company policy.
 
 ## Evidence and current status
+
+**Experiment v2 (5 November 2026).** Three applications, each replayed as one long push of five tasks done by three simulated teammates (18 sessions, 53k to 96k characters of conversation per push), maintained by A and B with Sonnet 5.5 and Haiku 5.5. One run per condition, blind-scored against 21 required facts:
+
+| Condition | Required facts found | Traps | Cost per run | Wall time per run |
+| --- | --- | --- | --- | --- |
+| A, Sonnet | 17 / 21 | 1 / 19 | $1.40 | 3m 53s |
+| B, Sonnet | 10 / 21 | 0 / 19 | $1.09 | 1m 55s |
+| A, Haiku | 13 / 21 | 4 / 19 | $0.99 | 9m 57s |
+| B, Haiku | 11 / 21 | 3 / 19 | $0.37 | 5m 38s |
+
+Costs are list-price estimates. With the fork cache fix, A's extra cost comes from the sweeper; its forked specialists are cheaper than fresh ones. On long evidence, fresh specialists tended to skim the conversations, which is where A's advantage came from. See [evaluation](docs/evaluation.md) for method and limits.
+
 
 The [evaluation summary](docs/evaluation.md) covers 60 archived maintenance outputs from three applications and five checkpoints. It separates proposals from applied documents and records execution limitations. The GPT results came from a separate evaluation adapter, not the Claude backend shipped here. The integrated code and unified prompts form a new configuration and have not been evaluated by rerunning those experiments.
 
