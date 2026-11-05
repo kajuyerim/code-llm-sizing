@@ -390,3 +390,11 @@ class RuntimeTests(unittest.TestCase):
         handoff = json.loads((self.root / 'runs' / 'sweeper-first').glob('*/sweeper.json').__next__().read_text())
         self.assertTrue(handoff['children'])
         self.assertTrue(all(child['shares_cache_prefix'] for child in handoff['children']))
+
+    def test_sessions_lists_selectable_history_without_inference(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            main(['sessions', '--repo', str(self.app)])
+        text = out.getvalue()
+        self.assertIn('chosen-session', text)
+        self.assertIn('Firebase is the chosen tool', text)

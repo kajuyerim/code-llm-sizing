@@ -35,6 +35,10 @@ def main(argv: list[str] | None = None) -> None:
     run = commands.add_parser("run", help="run a prepared run directory in the foreground")
     run.add_argument("run_dir", type=Path)
 
+    sessions = commands.add_parser("sessions", help="list Claude Code sessions for an application, to pick --session IDs")
+    sessions.add_argument("--repo", type=Path, default=Path.cwd())
+    sessions.add_argument("--limit", type=int, default=20)
+
     sweep = commands.add_parser("sweep", help="sweep a commit range by hand, without pushing")
     sweep.add_argument("--base", required=True)
     sweep.add_argument("--head", default="HEAD")
@@ -45,7 +49,7 @@ def main(argv: list[str] | None = None) -> None:
     sweep.add_argument("--cutoff", type=_cutoff, help="ISO 8601 timestamp with timezone; defaults to now")
 
     args = parser.parse_args(argv)
-    handlers = {"install": _install, "hook": _hook, "run": _run, "sweep": _sweep}
+    handlers = {"install": _install, "hook": _hook, "run": _run, "sweep": _sweep, "sessions": _sessions}
     try:
         handlers[args.command](args)
     except (ValueError, FileNotFoundError, subprocess.CalledProcessError) as exc:
@@ -111,6 +115,19 @@ def _run(args: argparse.Namespace) -> None:
     from contextops.orchestrator import orchestrate
 
     print(asyncio.run(orchestrate(args.run_dir.expanduser())))
+
+
+def _sessions(args: argparse.Namespace) -> None:
+    from contextops import transcripts
+
+    app = gitutil.repo_root(args.repo).resolve()
+    found = transcripts.list_sessions(app)
+    if not found:
+        sys.exit(f"No Claude Code sessions with messages in {app} under {transcripts.PROJECTS_DIR}.")
+    print(f"{'SESSION ID':36}  {'LAST MESSAGE (UTC)':19}  {'USER':>4}  {'AGENT':>5}  OPENING MESSAGE")
+    for s in found[: args.limit]:
+        print(f"{s.session_id:36}  {s.last[:19].replace('T', ' '):19}  {s.user_messages:>4}  {s.agent_messages:>5}  {s.opening}")
+    print(f"\nPass the ones you want as --session ID (repeat for several). {len(found)} session(s) found.")
 
 
 def _sweep(args: argparse.Namespace) -> None:

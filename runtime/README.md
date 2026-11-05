@@ -7,6 +7,7 @@ Start with [setup](../setup.md) for installation and tests without credentials. 
 | Command | Purpose |
 | --- | --- |
 | `contextops sweep --repo PATH --kb PATH --base REF --head REF --strategy MODE --session ID [--session ID] [--cutoff ISO_TIME]` | Freeze selected evidence and run locally. Real model calls occur. |
+| `contextops sessions --repo PATH [--limit N]` | List the application's Claude Code sessions (ID, last message, opening line) to choose `--session` values. No model calls. |
 | `contextops run RUN_DIR` | Execute an unattempted prepared run with its recorded inputs. |
 | `contextops install --kb PATH --repo PATH` | Explicitly install the experimental application pre-push hook. |
 | `contextops hook REMOTE [URL]` | Internal experimental hook entry point. |

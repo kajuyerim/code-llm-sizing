@@ -66,6 +66,36 @@ def load_sessions(
     return sessions
 
 
+@dataclass
+class SessionSummary:
+    session_id: str
+    started: str
+    last: str
+    user_messages: int
+    agent_messages: int
+    branch: str | None
+    opening: str
+
+
+def list_sessions(app_root: Path, include_sidechains: bool = False) -> list[SessionSummary]:
+    """Claude Code sessions with messages inside app_root, newest first, for choosing --session."""
+    now = datetime.now(timezone.utc)
+    found = []
+    for directory in _project_dirs(app_root):
+        for path in directory.glob("*.jsonl"):
+            session = _parse(path, app_root, None, now, include_sidechains)
+            if not session.messages:
+                continue
+            users = [m for m in session.messages if m.role == "user" and not m.text.startswith("[tool ")]
+            opening = " ".join(users[0].text.split()) if users else ""
+            found.append(SessionSummary(
+                session.session_id, session.messages[0].timestamp, session.messages[-1].timestamp,
+                len(users), sum(m.role == "assistant" for m in session.messages), session.branch,
+                opening if len(opening) <= 90 else opening[:87] + "...",
+            ))
+    return sorted(found, key=lambda s: s.last, reverse=True)
+
+
 def to_markdown(session: Session, max_chars: int) -> tuple[str, set[str]]:
     """Render a session for agents. Keeps the newest messages when it is too long."""
     blocks = [f"[msg:{m.uuid}] {m.role} @ {m.timestamp}\n{m.text}\n" for m in session.messages]
