@@ -8,6 +8,6 @@ Firebase and Dataform are knowledge categories, not mandatory dependencies for e
 
 For each accepted standard, record a stable ID, its scope, the required or preferred behavior, the reason, and the developer decision or other evidence supporting it. Distinguish a preference from a requirement and identify approved exceptions explicitly.
 
-Implementation findings without an approved shared decision can be proposed as scoped product knowledge or deferred for review. Do not promote them into company-wide policy automatically.
+Implementation findings without an approved shared decision can be proposed as scoped tool knowledge or deferred for review. Do not promote them into company-wide policy automatically.
 
-Use [core maintenance guidance](../maintenance/core.md) and the [stack maintainer definition](../agents/stack-maintainer.md). Product-specific patterns belong in the [Firebase](../products/firebase/README.md) or [Dataform](../products/dataform/README.md) area when relevant.
+Use [core maintenance guidance](../maintenance/core.md) and the [stack maintainer definition](../agents/stack-maintainer.md). Tool-specific patterns belong in the [Firebase](../tools/firebase/README.md) or [Dataform](../tools/dataform/README.md) area when relevant.
