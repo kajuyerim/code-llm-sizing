@@ -238,6 +238,9 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(options.tools,spec.tools)
         self.assertIn('PreToolUse',options.hooks)
         self.assertNotIn('Bash',options.tools)
+        self.assertTrue(options.strict_mcp_config)
+        self.assertEqual(options.mcp_servers,{})
+        self.assertEqual(options.env.get('ENABLE_CLAUDEAI_MCP_SERVERS'),'false')
 
     def test_recursive_grep_cannot_read_sensitive_descendants(self):
         (self.app / 'credentials.json').write_text('{}')

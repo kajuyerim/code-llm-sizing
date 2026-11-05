@@ -123,6 +123,12 @@ async def run_agent(
         output_format={"type": "json_schema", "schema": schema},
         # Keep the developer's own settings, hooks and CLAUDE.md out of maintenance runs.
         setting_sources=[],
+        # No MCP servers at all, including claude.ai connectors tied to the login. They connect
+        # asynchronously, so the tool list changed between calls and broke the prompt cache prefix
+        # (a fork re-wrote its whole inherited history); maintenance agents need none of them.
+        mcp_servers={},
+        strict_mcp_config=True,
+        env={"ENABLE_CLAUDEAI_MCP_SERVERS": "false"},
         resume=resume,
         fork_session=fork,
     )
