@@ -57,7 +57,9 @@ Both **A, `sweeper-first`**, and **B, `fresh-specialists`**, are available throu
 
 ## Evidence and current status
 
-**Experiment v2 (5 November 2026).** Three applications, each replayed as one long push of five tasks done by three simulated teammates (18 sessions, 53k to 96k characters of conversation per push), maintained by A and B with Sonnet 5.5 and Haiku 5.5. One run per condition, blind-scored against 21 required facts:
+Both strategies and the shared runtime are merged into `master` through [PR #7](https://github.com/kajuyerim/code-llm-sizing/pull/7) and [PR #8](https://github.com/kajuyerim/code-llm-sizing/pull/8). [PR #9](https://github.com/kajuyerim/code-llm-sizing/pull/9) adds fork cache reuse, MCP-free maintenance execution, conversation-session discovery, and the v2 evaluation summary.
+
+**Experiment v2 (5 November 2026).** Three applications, each replayed as one long push of five tasks done by three simulated teammates (18 sessions, 53k to 96k characters of conversation per push), maintained by A and B with Sonnet 5.5 and Haiku 5.5. There was one run per application and condition. A blind reviewer model scored accepted proposals against 21 required facts across the three applications; final writer fidelity was not scored.
 
 | Condition | Required facts found | Traps | Cost per run | Wall time per run |
 | --- | --- | --- | --- | --- |
@@ -66,16 +68,25 @@ Both **A, `sweeper-first`**, and **B, `fresh-specialists`**, are available throu
 | A, Haiku | 13 / 21 | 4 / 19 | $0.99 | 9m 57s |
 | B, Haiku | 11 / 21 | 3 / 19 | $0.37 | 5m 38s |
 
-Costs are list-price estimates. With the fork cache fix, A's extra cost comes from the sweeper; its forked specialists are cheaper than fresh ones. On long evidence, fresh specialists tended to skim the conversations, which is where A's advantage came from. See [evaluation](docs/evaluation.md) for method and limits.
+Cost and wall time are averages per run; costs are client-side list-price estimates, not invoices. In these runs, A's forked specialists were cheaper than fresh specialists, while the sweeper added cost and latency. B's incomplete conversation reading and search friction are relevant to the observed coverage difference. Changed conversations and configuration prevent attributing the difference from the October pilot solely to caching. These limited trials do not establish a general winner. See [evaluation](docs/evaluation.md) for method and limits.
 
+**October pilot.** The [evaluation summary](docs/evaluation.md) also covers 60 archived maintenance outputs from three applications and five checkpoints. It separates proposals from applied documents and records execution limitations. Knowledge reset to the original baseline at each checkpoint, so this was not cumulative knowledge evolution. The GPT results came from a separate evaluation adapter, not a supported backend in this package. V2 is a separate experiment, not a rerun of the October conditions.
 
-The [evaluation summary](docs/evaluation.md) covers 60 archived maintenance outputs from three applications and five checkpoints. It separates proposals from applied documents and records execution limitations. The GPT results came from a separate evaluation adapter, not the Claude backend shipped here. The integrated code and unified prompts form a new configuration and have not been evaluated by rerunning those experiments.
-
-The public checks use no model inference. Real model integration and the optional pre-push adapter still require separate verification. Publication is disabled by default; the runtime can create a local knowledge commit, but does not merge automatically.
+The public automated checks use no model inference. PR #9 separately records live fork-cache verification and v2 runs; these do not establish production readiness. The optional pre-push adapter remains experimental and unverified in production. Publication is disabled by default; the runtime can create a local knowledge commit, but does not merge automatically.
 
 ## Tracking
 
-[Milestone v0.1](https://github.com/kajuyerim/code-llm-sizing/milestone/1) and issues [#1](https://github.com/kajuyerim/code-llm-sizing/issues/1), [#2](https://github.com/kajuyerim/code-llm-sizing/issues/2), [#3](https://github.com/kajuyerim/code-llm-sizing/issues/3), [#4](https://github.com/kajuyerim/code-llm-sizing/issues/4), [#5](https://github.com/kajuyerim/code-llm-sizing/issues/5) predate the completed pilots. They remain open for reconciliation and human review; publication of this code does not complete their checkboxes.
+Issues [#1](https://github.com/kajuyerim/code-llm-sizing/issues/1), [#2](https://github.com/kajuyerim/code-llm-sizing/issues/2), [#3](https://github.com/kajuyerim/code-llm-sizing/issues/3), [#4](https://github.com/kajuyerim/code-llm-sizing/issues/4), and [#5](https://github.com/kajuyerim/code-llm-sizing/issues/5), grouped under [milestone v0.1](https://github.com/kajuyerim/code-llm-sizing/milestone/1), are closed for their delivered foundation, preparation, and exploratory pilot scopes. Their closing comments preserve the evidence and limitations; closure does not imply unrecorded human-review sign-offs.
+
+The immediate priorities from the 6 November meeting are:
+
+- [#10: Evaluate development with and without Context Ops knowledge](https://github.com/kajuyerim/code-llm-sizing/issues/10). Prepare a controlled comparison of quality, cost, time, and clarification rounds on the same feature task, without putting the tested knowledge into the task prompt.
+- [#11: Prepare the midterm report and report index](https://github.com/kajuyerim/code-llm-sizing/issues/11). Explain completed work, results, limitations, and planned research, and make current and previous reports easy to find.
+- [#12: Deliver a reproducible template-to-populated-knowledge demo](https://github.com/kajuyerim/code-llm-sizing/issues/12). Show a clean starting knowledge state, a manual run against a separate application, and the actual written result.
+
+These are planned deliverables. The downstream comparison studies whether generated knowledge helps application development; A/B maintenance evaluation studies how that knowledge is maintained. Application development remains outside the knowledge repository and outside maintenance-agent responsibilities.
+
+[#6: Codex runtime backend](https://github.com/kajuyerim/code-llm-sizing/issues/6) remains separate future work. The current package supports Claude; historical GPT evaluation results do not establish an installable Codex backend.
 
 ## Team
 
