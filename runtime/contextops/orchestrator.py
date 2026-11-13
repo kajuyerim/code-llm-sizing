@@ -16,7 +16,7 @@ from contextops.cartographer import run_cartographer
 from contextops.config import InitConfig, load_config
 from contextops.evidence import build_pack
 from contextops.initializer import plan_workers
-from contextops.report import Outcome, render_report
+from contextops.report import Outcome, render_report, render_completion
 from contextops.review import review_results
 from contextops.run import RunContext, load_run, record_cutoff, frozen_sessions
 from contextops.strategies import STRATEGIES
@@ -79,6 +79,7 @@ async def orchestrate(run_dir: Path) -> Path:
         _write_metrics(ctx, config, ledger)
         report_path = ctx.run_dir / "report.md"
         report_path.write_text(report, encoding="utf-8")
+        (ctx.run_dir / "completion.txt").write_text(render_completion(ctx, outcome, ledger), encoding="utf-8")
         record_cutoff(ctx.runs_dir, ctx.app_root, ctx.cutoff)
         return report_path
     finally:

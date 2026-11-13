@@ -23,6 +23,10 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="contextops")
     commands = parser.add_subparsers(dest="command", required=True)
 
+    initialize = commands.add_parser("init", help="prepare empty knowledge on a new local branch")
+    initialize.add_argument("--kb", type=Path, required=True)
+    initialize.add_argument("--branch", required=True)
+
     install = commands.add_parser("install", help="install the pre-push hook in an application repo")
     install.add_argument("--kb", type=Path, required=True, help="path to the knowledge base checkout")
     install.add_argument("--repo", type=Path, default=Path.cwd())
@@ -49,7 +53,7 @@ def main(argv: list[str] | None = None) -> None:
     sweep.add_argument("--cutoff", type=_cutoff, help="ISO 8601 timestamp with timezone; defaults to now")
 
     args = parser.parse_args(argv)
-    handlers = {"install": _install, "hook": _hook, "run": _run, "sweep": _sweep, "sessions": _sessions}
+    handlers = {"init": _init, "install": _install, "hook": _hook, "run": _run, "sweep": _sweep, "sessions": _sessions}
     try:
         handlers[args.command](args)
     except (ValueError, FileNotFoundError, subprocess.CalledProcessError) as exc:
@@ -66,6 +70,16 @@ def _cutoff(value: str) -> datetime:
         return stamp
     except ValueError:
         raise argparse.ArgumentTypeError("cutoff must be ISO 8601 with a timezone") from None
+
+
+def _init(args: argparse.Namespace) -> None:
+    from contextops.onboarding import initialize_knowledge
+
+    changed = initialize_knowledge(args.kb, args.branch)
+    print(f"Prepared empty knowledge on {args.branch} (no model calls).")
+    print("Files reset:\n" + "\n".join(f"  {name}" for name in changed))
+    print("Review init.md, configure your run, and commit the baseline before sweeping.")
+    print("For subsequent runs, reuse the accepted knowledge branch without running init again.")
 
 
 def _install(args: argparse.Namespace) -> None:
@@ -114,7 +128,7 @@ def _run(args: argparse.Namespace) -> None:
     # Imported here so the hook path stays fast and does not load the Agent SDK.
     from contextops.orchestrator import orchestrate
 
-    print(asyncio.run(orchestrate(args.run_dir.expanduser())))
+    _execute(args.run_dir.expanduser(), orchestrate)
 
 
 def _sessions(args: argparse.Namespace) -> None:
@@ -143,7 +157,13 @@ def _sweep(args: argparse.Namespace) -> None:
     )
     if ctx is None:
         sys.exit("Nothing to sweep: base and head are the same commit.")
-    print(asyncio.run(orchestrate(ctx.run_dir)))
+    _execute(ctx.run_dir, orchestrate)
+
+
+def _execute(run_dir: Path, orchestrate) -> None:
+    print(f"Run artifacts: {run_dir}", flush=True)
+    asyncio.run(orchestrate(run_dir))
+    print((run_dir / "completion.txt").read_text(encoding="utf-8"), end="")
 
 
 def _spawn(run_dir: Path) -> None:
