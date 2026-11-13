@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+import shlex
 
+from contextops import gitutil
 from contextops.agents import Ledger
 from contextops.config import InitConfig
 from contextops.evidence import Evidence
@@ -41,7 +43,7 @@ def render_report(
     ]
 
     writer = outcome.writer_output or {}
-    lines += _section("Applied", [
+    lines += _section("Writer-reported applications (verify against the patch)", [
         f"`{r['target']}` {r['op']} {r['fact_id'] or ''}" for r in writer.get("applied", [])
     ])
     lines += _section("Skipped by the writer", [
@@ -65,6 +67,49 @@ def render_report(
             *(f"reverted out-of-scope edit: `{p}`" for p in outcome.publication.reverted),
             *([outcome.publication.note] if outcome.publication.note else []),
         ])
+    return "\n".join(lines) + "\n"
+
+
+def render_completion(ctx: RunContext, outcome: Outcome, ledger: Ledger) -> str:
+    """Describe actual Git output, independently of the writer's claims."""
+    review, publication = outcome.review, outcome.publication
+    committed = bool(publication and publication.committed)
+    if committed:
+        status = "Knowledge changes committed locally"
+        if review.failures:
+            status += " (partial run; inspect failures)"
+    elif review.failures:
+        status = "Run incomplete; no knowledge commit"
+    elif publication:
+        status = "No knowledge commit: " + (publication.note or "inspect the report")
+    elif review.deferred or review.rejected or review.unowned or review.handoffs:
+        status = "No knowledge changes; findings need review"
+    else:
+        status = "No knowledge changes"
+    lines = [status, f"Strategy: {ctx.strategy}",
+             f"Records: {len(review.accepted)} accepted, {len(review.deferred)} deferred, "
+             f"{len(review.rejected)} rejected, {len(review.no_change)} no change",
+             f"Estimated spend: ${ledger.spent:.2f}"]
+    if committed:
+        changed = gitutil.git(ctx.kb_root, "diff", "--name-only", ctx.kb_baseline, ctx.branch).splitlines()
+    else:
+        changed = [path for _, path in gitutil.status(ctx.kb_snapshot)]
+    if changed:
+        lines += ["Changed files" + (":" if committed else " (uncommitted candidate):")]
+        lines += [f"  {path}" for path in changed]
+    lines += [f"Report: {ctx.run_dir / 'report.md'}"]
+    patch = ctx.run_dir / "knowledge.patch"
+    if patch.is_file():
+        lines += [f"{'Knowledge' if committed else 'Candidate'} patch: {patch}"]
+    lines += [f"Failure: {failure}" for failure in review.failures]
+    if publication and publication.note:
+        lines += [publication.note]
+    if committed:
+        lines += [f"Result branch: {ctx.branch}", "Review the actual changes:",
+                  shlex.join(["git", "-C", str(ctx.kb_root), "diff", ctx.kb_baseline, ctx.branch]),
+                  "Open the result branch when ready:",
+                  shlex.join(["git", "-C", str(ctx.kb_root), "switch", ctx.branch])]
+    lines += ["Your knowledge checkout stays on its starting branch. Nothing is merged automatically."]
     return "\n".join(lines) + "\n"
 
 

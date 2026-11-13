@@ -6,11 +6,14 @@ Start with [setup](../setup.md) for installation and tests without credentials. 
 
 | Command | Purpose |
 | --- | --- |
+| `contextops init --kb PATH --branch knowledge/APP_NAME` | Prepare blank knowledge on a new local branch, without committing or inference. |
 | `contextops sweep --repo PATH --kb PATH --base REF --head REF --strategy MODE --session ID [--session ID] [--cutoff ISO_TIME]` | Freeze selected evidence and run locally. Real model calls occur. |
 | `contextops sessions --repo PATH [--limit N]` | List the application's Claude Code sessions (ID, last message, opening line) to choose `--session` values. No model calls. |
 | `contextops run RUN_DIR` | Execute an unattempted prepared run with its recorded inputs. |
 | `contextops install --kb PATH --repo PATH` | Explicitly install the experimental application pre-push hook. |
 | `contextops hook REMOTE [URL]` | Internal experimental hook entry point. |
+
+The [setup skill](../skills/setup-shared-knowledge/SKILL.md) guides first-run setup. `init` requires a clean checkout and an unused branch, preserves the original branch, resets core/tool knowledge to empty templates while retaining frontmatter, refreshes the index/log, and leaves edits uncommitted. Additional learned Markdown under core/tools is removed on the new branch. Non-Markdown knowledge files and symlinks are rejected. Configure and commit the baseline before sweeping; subsequent runs do not initialize again.
 
 There is no implicit strategy. The checked-in `init.md` has `mode: null`; the manual command requires an explicit mode. Unknown or unimplemented modes fail before inference. Sessions come from Claude Code's local JSONL history. Missing/ambiguous sessions, invalid refs, dirty knowledge checkouts, and invalid settings fail before model calls. Cutoffs require a timezone and cannot be in the future.
 
@@ -33,10 +36,12 @@ Subscription mode uses the user's private Claude Code authentication and removes
 | `workers/`, `review.json` | Raw specialist responses and accepted/deferred/rejected decisions |
 | `proposals.json` | Optional cartographer suggestions, never automatically applied |
 | `knowledge.patch` | Candidate or committed knowledge changes; inspect writer status |
-| `report.md`, `metrics.json` | Outcomes, failures, and client-reported resource estimates |
+| `report.md`, `metrics.json`, `completion.txt` | Detailed outcomes, client-reported resource estimates, and the CLI review summary |
 | `started` | Prevents silently rerunning an attempted directory |
 
 Cutoff state and unowned findings live under each strategy's directory. Raw evidence and run artifacts stay outside the repository. They are not guaranteed secret-free; the public credential scan is separate from the limited proposal validator. Do not publish raw directories.
+
+Both `sweep` and `run` print a completion summary with actual changed files, report/patch locations when present, and commands to inspect a committed result branch. Candidate patches are identified as uncommitted; no-change or failed runs do not advertise a result branch. `completion.txt` preserves this summary. The selected checkout branch is unchanged by maintenance. `total_duration_ms` sums agent durations, so measure wall-clock elapsed time separately for acceptance records.
 
 ## Experimental pre-push adapter
 

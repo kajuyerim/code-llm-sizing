@@ -2,30 +2,30 @@
 
 Context Ops is a CMPE 492 senior project at Boğaziçi University studying how agents maintain shared knowledge as software evolves. After application development, maintenance reads a separate application's source revision, Git diff, and developer-agent conversation, then proposes updates to this knowledge repository.
 
-## Start here
+## Set up with your agent
 
-1. **Understand:** read [How Our Knowledge Maintenance System Works](docs/walkthrough/README.md). Download its [interactive HTML](docs/walkthrough/index.html) and open it locally for original evidence and A/B comparisons.
-2. **Install and test:** follow [setup](setup.md). Deterministic tests use fake responses and temporary repositories, with no account, model call, or API charge.
-3. **Run on your application:** select a strategy, committed revision range, and Claude Code conversation sessions. Real runs use your own private Claude authentication.
-4. **Inspect:** review the local proposals, knowledge patch, report, and knowledge branch before deciding what to keep.
-
-## Quickstart
-
-You need Python 3.11 or newer, Git, a Claude Code login, and an application repository of your own that you have worked on with Claude Code.
+Clone this repository into a directory separate from your application, then open the clone in your coding agent:
 
 ```sh
-git clone https://github.com/kajuyerim/code-llm-sizing.git && cd code-llm-sizing
-python3 -m venv .venv && . .venv/bin/activate
-python -m pip install -r runtime/requirements-lock.txt && python -m pip install --no-deps -e runtime
-python -m unittest discover -s runtime/tests        # no account, no model calls
-
-contextops sessions --repo /path/to/your/app        # pick the Claude Code sessions to learn from
-contextops sweep --repo /path/to/your/app --kb . \
-  --base <commit before the work> --head <commit after it> \
-  --strategy sweeper-first --session <session id>   # real model calls; output stays local
+git clone https://github.com/kajuyerim/code-llm-sizing.git
+cd code-llm-sizing
 ```
 
-The last line prints a report path. The proposed knowledge changes are in `knowledge.patch` next to it and on a local branch of this checkout. Nothing is pushed or merged. [Setup](setup.md) covers each step in detail.
+You need **Python 3.11+, Git, private Claude authentication, and an existing application with committed development changes and local Claude Code development sessions**. Your setup agent can be any coding agent; maintenance currently uses the Claude backend and Claude Code history. Inference runs on the configured Claude service.
+
+Give your agent this prompt:
+
+> Read this repository’s README and setup skill. Configure Context Ops for my existing application, prepare an empty knowledge branch, run the sweeper-first workflow using my relevant Claude Code development sessions, and show me the resulting knowledge changes. Ask for missing inputs and keep the result local for review.
+
+The [setup skill](skills/setup-shared-knowledge/SKILL.md) is the authoritative procedure. It helps your agent select the application, committed range and sessions, prepare blank knowledge on a new local branch, configure and commit the baseline, and run **A, sweeper first**. The setup agent invokes Context Ops; the maintenance runtime writes learned knowledge. Existing installations reuse their accepted knowledge rather than resetting it.
+
+A successful writer creates a local result branch. The command shows changed files, the report and patch, and Git commands to review and open that branch. Your starting branch remains selected. Some runs correctly produce no changes; incomplete runs and candidate patches are identified. Nothing is pushed or merged by the default configuration.
+
+## Manual setup and evidence
+
+Follow [setup](setup.md) for the equivalent manual commands, authentication details, troubleshooting, and optional B execution. Installation and deterministic tests need no model account or inference; running maintenance uses your private Claude authentication.
+
+For an explanation of the system, read [How Our Knowledge Maintenance System Works](docs/walkthrough/README.md), or download the [interactive walkthrough](docs/walkthrough/index.html) and open it locally. These are historical evaluation evidence. The new first-run path has credential-free software checks; a separately authorized live acceptance run remains [pending](docs/first-run-acceptance.md).
 
 ## Two ways to acquire context
 
