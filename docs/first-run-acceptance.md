@@ -1,6 +1,6 @@
 # First-run acceptance
 
-Status: implementation and credential-free verification are reviewable. One live acceptance run on the public [first-run demo](demo/README.md) is recorded below; it used simulated development conversations, so acceptance on a team's own application and sessions is still open.
+Status: implementation and credential-free verification are reviewable. Live acceptance runs on the public [first-run demo](demo/README.md) are recorded below, the latest at revision `b20f3f9`; it used simulated development conversations, so acceptance on a team's own application and sessions is still open.
 
 ## Software verification
 
@@ -25,7 +25,7 @@ Acceptance requires supported knowledge to appear in the actual committed docume
 
 Keep application sources, raw conversations, credentials, and full run directories outside the knowledge repository. Share only explicitly selected, sanitized evidence. Mark generated knowledge as awaiting human review. Do not claim this checklist is complete until the evidence exists.
 
-## Live acceptance record (14 November 2026)
+## Live acceptance record 1 (14 November 2026, `caf4bdb`)
 
 | Item | Value |
 | --- | --- |
@@ -51,3 +51,35 @@ Discrepancies and limitations found in this run:
 - Fact IDs are inconsistent: the writer used `STACK-001` and `TERM-001` but `PIT001`. The empty template shows the prefix but no example, and the run notes do not state the hyphen.
 - Handoffs are reported but not acted on. The conventions maintainer handed typing rules (`satisfies` over `as`, no `@ts-strict-ignore`) and the release note requirement to the stack document, but forks run in parallel, so no specialist picked them up.
 - The developer side of the sessions was simulated, and this is a single run.
+
+These three problems, and inconsistent application scopes seen in a later run, were fixed in `43888a7` and `b20f3f9`:
+
+- Review drops only unresolvable locators and accepts `diff/commits.txt`.
+- Handoffs reach their owner in one extra turn on a fork of its own session.
+- The run notes and empty templates state the ID format.
+- Specialists are told to scope facts as `app:<checkout folder name>`.
+
+## Live acceptance record 2 (14 November 2026, `b20f3f9`)
+
+Same platform, application, range, sessions, cutoff, conversation hash, model, and budgets as record 1. A clean clone of `feat/first-run-demo` at `b20f3f9` was installed from the lock file; 42 tests passed.
+
+| Item | Value |
+| --- | --- |
+| Knowledge baseline | `ce001cde3bedc6987b2e790aa75b07fd899abf4e`, from `contextops init`, committed without edits |
+| Roster | Sweeper, then forks for terminology, stack, conventions, and pitfalls; Firebase and Dataform skipped; no handoffs were sent; writer |
+| Wall clock | 20:27:10 to 20:32:08 UTC, 4 min 58 s |
+| Estimated cost | $1.35 (sweeper $0.66, four forks $0.50, writer $0.19) |
+| Outcome | Knowledge committed on `contextops/sweeper-first/20261114-202710-8cece04-ab77e26d`; 15 accepted, 1 deferred, 0 rejected |
+| Written documents | `core/naming-conventions.md` (3 entries), `core/tech-stack-standards.md` (5), `core/pitfalls.md` (5), `core/terminology.md` (2), `log.md`; the actual patch is [result.patch](demo/actual/result.patch) |
+
+All fifteen entries use `app:actual` and hyphenated IDs. The naming document now holds the `[AI]` commit prefix, the release note requirement, and one component per file. Two of these records had cited `diff/files.txt`, which is not a diff path. Review dropped that locator and kept the records on their conversation evidence, where record 1's rules would have rejected them.
+
+An intermediate run at `43888a7` exercised the handoff pass:
+
+- The conventions specialist handed the `ts-strict-ignore` rule to the stack document.
+- The stack specialist's extra turn added it as `STACK-004`, for $0.03.
+- The run cost $0.72 and wrote 14 entries.
+
+A strategy B run from the same empty baseline wrote 3 entries for $0.50.
+
+Single runs on simulated sessions; the remaining limitation is acceptance on a team's own application.

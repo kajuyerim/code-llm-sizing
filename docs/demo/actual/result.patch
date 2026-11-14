@@ -1,93 +1,123 @@
+diff --git a/core/naming-conventions.md b/core/naming-conventions.md
+index 2191814..1d78307 100644
+--- a/core/naming-conventions.md
++++ b/core/naming-conventions.md
+@@ -1,10 +1,19 @@
+ # Naming Conventions
+ 
+-Status: empty template. No application or company facts have been admitted.
++Status: generated entries, pending human review.
+ 
+ Write NAME IDs as NAME, a hyphen, and three digits for evidence-backed entries, with explicit scope. Generated entries require human review. Implementation observations do not establish company policy.
+ 
+ | ID | Convention | Scope | Evidence |
+ | --- | --- | --- | --- |
++| NAME-001 | Every commit message and PR title starts with the `[AI]` prefix, for example `[AI] Fix custom report range flipping for a To in the same period as From`. | app:actual | Developer statements in session 70de19bb (msg 239b2ae3) and session de720aee (msg 2b41817d); commit subjects in diff/commits.txt. |
++| NAME-002 | Each change adds a release note file under `upcoming-release-notes/`, named with a short descriptive kebab-case slug (for example `custom-reports-quarterly-interval.md`), not a PR number. The front matter has `category` (for example Bugfix, Enhancements or Maintenance) and `authors`. | app:actual | Developer: release notes are 'needed for every change' (session de720aee, msg 3cd09d35). Slug file names in diff/files.txt. |
++| NAME-003 | One React component per file. A shared props type used by several components goes in its own small file so the components do not import from each other. Example: `ActiveShapeMobile.tsx` and `ActiveShapeDesktop.tsx` import the type from `activeShapeProps.ts`. | app:actual | Developer correction in session d34fc234 (msg 6d99f24a); files added in diff/files.txt. |
+ 
+ Follow the [core maintenance guide](../maintenance/core.md).
++
++## Evidence
++
++- NAME-001: actual@8cece04 diff/commits.txt; conversation 70de19bb-341e-4ca0-a42f-f4262eb59326/239b2ae3-2fd0-484e-bb19-ebebe1e5f8ef
++- NAME-002: actual@8cece04 conversation de720aee-7716-4ecb-ba17-3a38c00ee07e/3cd09d35-5542-41bf-b111-e9e3934309d8
++- NAME-003: actual@8cece04 conversation d34fc234-ffeb-4f49-b9b7-9037b2a87b69/6d99f24a-b085-4a98-9ccf-2d2c5690d126
 diff --git a/core/pitfalls.md b/core/pitfalls.md
-index 302b0a3..093e83b 100644
+index 3355df4..8c4bdf0 100644
 --- a/core/pitfalls.md
 +++ b/core/pitfalls.md
 @@ -1,10 +1,23 @@
  # Pitfalls
  
 -Status: empty template. No application or company facts have been admitted.
-+Status: generated entries from the first maintenance run. They require human review.
++Status: generated entries, pending human review.
  
- Use PIT IDs for evidence-backed entries, with explicit scope. Generated entries require human review. Implementation observations do not establish company policy.
+ Write PIT IDs as PIT, a hyphen, and three digits for evidence-backed entries, with explicit scope. Generated entries require human review. Implementation observations do not establish company policy.
  
  | ID | Trigger | What goes wrong | Do instead | Scope | Evidence |
  | --- | --- | --- | --- | --- | --- |
-+| PIT001 | Scaling a stored amount by a currency's decimalPlaces (e.g. 10^decimalPlaces), or giving a helper a decimalPlaces argument that changes the stored scale | The same value is read at different scales on different screens. A 1,500 yen budget showed as 15 on one screen and 150,000 on another, because useFormat and some util helpers used 10^decimalPlaces while the rest of the code used x100. | Store every amount at x100 for all currencies (1500 yen is 150000 in the DB). Use decimalPlaces only for display and input formatting. amountToInteger, integerToAmount and integerToCurrency take no decimalPlaces argument. | app:actual | Developer decision; `packages/loot-core/src/shared/util.ts` |
-+| PIT002 | Typing into the legacy AmountInput with autoDecimals on, for a currency with no decimals (e.g. yen), when the field treats typed digits as cents | Typing 1500 shows 15.00 instead of 1500 whole units, so the value is wrong by a factor of 100. | Skip autoDecimals when the currency's decimalPlaces is 0 (guard `autoDecimals && format.currency.decimalPlaces > 0`). Keep the AmountInput tests for yen and dollars that fail without the guard. | app:actual | Developer accepted the guard; `packages/desktop-client/src/components/util/AmountInput.tsx:135` |
-+| PIT003 | Passing an undici Agent (e.g. the SSRF-safe dispatcher) to Node's built-in global fetch in the sync server | The global fetch bundles a different undici version than the installed undici package, so the dispatcher and fetch can mismatch. SimpleFIN bank sync stopped working on a nightly build. | Import fetch from undici in every sync-server module, so the dispatcher and fetch come from the same package. Do not add another HTTP library (axios, node-fetch). In tests, mock undici's fetch, not the global one. | app:actual | Commit 9c300f5 message; developer decision; `packages/sync-server/src/app-simplefin/app-simplefin.js:3` |
-+| PIT004 | Comparing a full date string (the stored From) with a bare month or year key (the raw To pick) in custom report range validation | As strings the shorter key sorts before a full date in the same period, so a To in the same month, quarter or year looks reversed and From is reset to the fallback range. | Compare the From date against the normalized end date computed for the interval (validateEnd in reportRanges.ts). Keep tests for the same month, quarter and year. | app:actual | Developer accepted; `packages/desktop-client/src/components/reports/reportRanges.ts:99-103` |
-+| PIT005 | Using @zumer/snapdom's toPng result as a download URL (assigning the result directly to link.href) | toPng returns an image element, not a data URL, so the download breaks with no error. | Use the element's src (`link.href = image.src`). | app:actual | Developer statement; `packages/desktop-client/src/components/reports/ReportTopbar.tsx:75-77` |
++| PIT-001 | Scaling a stored amount by the active currency's `decimalPlaces` (for example in `useFormat` or a util helper) instead of the fixed x100 | Zero-decimal currencies disagree between screens. A 1,500 yen budget showed as 15 on one screen and 150,000 on another. | Stored amounts are always x100 for every currency (1,500 yen is 150000). Use `decimalPlaces` only for display. `amountToInteger`, `integerToAmount` and `integerToCurrency` take no scale argument. | app:actual | Developer decision in the yen session; source `packages/loot-core/src/shared/util.ts` |
++| PIT-002 | Passing an undici `Agent` dispatcher (such as the SimpleFIN SSRF dispatcher) to Node's built-in global `fetch` in the sync server | The built-in fetch bundles a different undici version than the installed package. The mismatch is fragile and can break bank sync after a Node or undici change. | Import `fetch` from `undici` in every sync server module so the dispatcher and fetch always match. In tests, mock undici's `fetch`, not the global one. No lint rule catches a new bare `fetch(`. | app:actual | Commit 9c300f54 message; `packages/sync-server/src/app-cors-proxy.test.js` |
++| PIT-003 | A shared module-level `vi.fn()` mock (such as undici's `fetch` in the sync server tests) whose behavior is set with `mockImplementation` | `mockImplementation` keeps recorded calls, so a `toHaveBeenCalledWith` assertion can pass on a call made by an earlier test. | Call `mockClear()` on the shared mock in a top-level `beforeEach`, as `app-cors-proxy.test.js` does. | app:actual | Commit 216a1ad7; `packages/sync-server/src/app-cors-proxy.test.js` |
++| PIT-004 | Comparing a stored full date (`2026-07-01`) with a raw period key (`2026-07`, `2026`) as strings, as `validateEnd` in `reportRanges.ts` did | The longer string sorts later, so a To in the same month, quarter or year as From looked reversed and From was reset to the fallback range. | Compare against the normalized end date computed for the interval (for example `getMonthEnd` or `end + '-12-31'`), not the raw key. | app:actual | Commit 8cece049; `reportRanges.ts` `validateEnd` |
++| PIT-005 | Typing digits into the legacy `AmountInput` with `autoDecimals` on, for a currency with no decimals such as yen | Digits are read as cents, so 1500 shows as 15.00 instead of 1500 yen. | `autoDecimals` is skipped when the currency's `decimalPlaces` is 0 (`format.currency.decimalPlaces > 0`). Keep that guard. `AmountInput.test.tsx` covers yen and dollars. | app:actual | Developer accepted the guard; `AmountInput.tsx` |
  
  Follow the [core maintenance guide](../maintenance/core.md).
 +
 +## Evidence
 +
-+- PIT001: actual@8cece04 packages/loot-core/src/shared/util.ts; conversation de720aee-7716-4ecb-ba17-3a38c00ee07e/d208a293-ba9d-4d21-bb27-8001a9983cc5 and eb04ddcb-065d-465b-b2c5-93cc1726eaf9
-+- PIT002: actual@8cece04 packages/desktop-client/src/components/util/AmountInput.tsx:135; conversation de720aee-7716-4ecb-ba17-3a38c00ee07e/eb04ddcb-065d-465b-b2c5-93cc1726eaf9
-+- PIT003: actual@8cece04 packages/sync-server/src/app-simplefin/app-simplefin.js:3; conversation 70de19bb-341e-4ca0-a42f-f4262eb59326/aeb3ca2c-cd97-49d0-8c21-cb2687b48a96
-+- PIT004: actual@8cece04 packages/desktop-client/src/components/reports/reportRanges.ts:99; conversation b44d114c-d4b7-4694-95b1-228bb7dd60bd/c32d2289-948e-436b-b166-ed20e16e71f7
-+- PIT005: actual@8cece04 packages/desktop-client/src/components/reports/ReportTopbar.tsx:77; conversation d34fc234-ffeb-4f49-b9b7-9037b2a87b69/1968406d-8b38-42a1-a4f2-f3631e7f9995
++- PIT-001: actual@8cece04 packages/loot-core/src/shared/util.ts; conversation de720aee-7716-4ecb-ba17-3a38c00ee07e/d208a293-ba9d-4d21-bb27-8001a9983cc5
++- PIT-002: actual@8cece04 packages/sync-server/src/app-cors-proxy.test.js; conversation 70de19bb-341e-4ca0-a42f-f4262eb59326/be2af540-6678-4141-aaad-1ff9103a384b
++- PIT-003: actual@8cece04 packages/sync-server/src/app-cors-proxy.test.js; diff/commits.txt
++- PIT-004: actual@8cece04 packages/desktop-client/src/components/reports/reportRanges.ts; conversation b44d114c-d4b7-4694-95b1-228bb7dd60bd/e54dbbc6-f221-45f3-ac39-b0a483796e71
++- PIT-005: actual@8cece04 packages/desktop-client/src/components/util/AmountInput.tsx; conversation de720aee-7716-4ecb-ba17-3a38c00ee07e/eb04ddcb-065d-465b-b2c5-93cc1726eaf9
 diff --git a/core/tech-stack-standards.md b/core/tech-stack-standards.md
-index fb1b938..9065d36 100644
+index e1fb391..f6d9b22 100644
 --- a/core/tech-stack-standards.md
 +++ b/core/tech-stack-standards.md
-@@ -1,10 +1,19 @@
+@@ -1,10 +1,23 @@
  # Tech Stack Standards
  
 -Status: empty template. No application or company facts have been admitted.
-+Status: generated entries from the first maintenance run. They require human review.
++Status: generated entries, pending human review.
  
- Use STACK IDs for evidence-backed entries, with explicit scope. Generated entries require human review. Implementation observations do not establish company policy.
+ Write STACK IDs as STACK, a hyphen, and three digits for evidence-backed entries, with explicit scope. Generated entries require human review. Implementation observations do not establish company policy.
  
  | ID | Decision or constraint | Scope | Rationale | Evidence |
  | --- | --- | --- | --- | --- |
-+| STACK-001 | Sync server modules import `fetch` from the `undici` package, never Node's global `fetch`. A dispatcher (such as the SimpleFIN SSRF-guarded undici Agent) must be paired with the same undici version's fetch. Do not add another HTTP client library (axios, node-fetch). Tests mock `undici`'s fetch, not the global one. | app:actual (packages/sync-server) | Passing an undici v8 Agent to Node's built-in global fetch, which bundles a different undici version, broke SimpleFIN bank sync. Developer: "I don't want another HTTP library on the server, and undici is what Node ships anyway." | Developer statement; commit 9c300f541fad |
-+| STACK-002 | The sync-server package declares `engines.node` as `>=22.19.0`, while the monorepo root stays at `>=22.18.0`. Different floors for root and package are accepted. Do not revert the sync-server floor. | app:actual (packages/sync-server) | Developer decision ("I'm fairly sure that's what we settled on"). The concrete reason was not stated, and no dependency or Node bug in the repo was found that requires 22.19.0. The undici change itself works on any Node 22. | Developer statement; `packages/sync-server/package.json` |
-+| STACK-003 | Report image export ("Download Snapshot") uses `@zumer/snapdom`, replacing `html-to-image`. `snapdom.toPng` returns an image element, so use `image.src` as the download href rather than assigning the element to `link.href`. | app:actual (packages/desktop-client) | html-to-image made Download Snapshot fail silently in Firefox. The developer chose snapdom because it is maintained and embeds fonts. The Firefox root cause (font embedding abort) is the developer's belief, not confirmed. | Developer statement; `packages/desktop-client/package.json` |
++| STACK-001 | Sync server code must import `fetch` from `undici` explicitly and must not use Node's global `fetch`. Tests mock `undici`'s `fetch`, not the global one. | app:actual (sync-server package) | The SimpleFIN SSRF dispatcher is an `Agent` from the installed undici package. Node's built-in global fetch bundles a different undici version, so the dispatcher and fetch must come from the same package. Nothing lints this rule, so a bare `fetch(` would still pass lint. | Developer: "server code imports fetch from undici explicitly and never relies on the global one"; commit 9c300f54 "Use undici's fetch throughout the sync server"; source `packages/sync-server/src/app-simplefin/app-simplefin.js:3` |
++| STACK-002 | The sync server uses undici as its only HTTP client library. Do not add axios, node-fetch or another HTTP library to it. | app:actual (sync-server package) | Developer: undici is what Node ships anyway, and another HTTP library on the server is unwanted. | Developer: "I don't want another HTTP library on the server, and undici is what Node ships anyway. Please keep it on undici." |
++| STACK-003 | The sync-server package declares `engines.node` as `>=22.19.0`. The root package.json floor (`>=22.18.0`) may differ, since package floors need not match the root. | app:actual (sync-server package) | The developer is fairly sure this is the agreed floor but gave no reason, and the agent found none in the repo. | Developer: "keep it at >=22.19.0 and don't revert it"; `packages/sync-server/package.json` engines; commit 9c300f54 "Raise the sync server Node floor to 22.19.0" |
++| STACK-004 | Report "Download Snapshot" uses `@zumer/snapdom` (`snapdom.toPng`, reading the returned image's `src` for the download link). `html-to-image` was removed. New dependencies in `packages/desktop-client` go under `devDependencies`, matching that package. | app:actual (desktop-client package) | html-to-image silently failed in Firefox (the developer believes it aborted during web font embedding); snapdom is maintained and embeds fonts itself. The Firefox fix has not been tested in a browser. | Developer: "i want to swap it for snapdom, it's maintained and has its own font embedding"; `packages/desktop-client/package.json:180` |
++| STACK-005 | Custom report intervals that AQL cannot group natively are handled by querying at a finer interval and rolling up client-side, as Weekly does from days. Quarterly queries by month and does not add `$quarter` to the AQL compiler. | app:actual | Developer chose a lower-risk path with no query engine change. | Developer: "client-side rollup sounds right, same as weekly. no aql changes." |
  
  Follow the [core maintenance guide](../maintenance/core.md).
 +
 +## Evidence
 +
-+- STACK-001: actual@8cece04 packages/sync-server/src/app-simplefin/app-simplefin.js; conversation 70de19bb-341e-4ca0-a42f-f4262eb59326/aeb3ca2c-cd97-49d0-8c21-cb2687b48a96
-+- STACK-002: actual@8cece04 packages/sync-server/package.json; conversation 70de19bb-341e-4ca0-a42f-f4262eb59326/56238ec1-3d78-4ec3-9516-6ffe31efe243
-+- STACK-003: actual@8cece04 packages/desktop-client/package.json; conversation d34fc234-ffeb-4f49-b9b7-9037b2a87b69/e72d768a-19f3-48f7-841b-fbefcd49a705
++- STACK-001: actual@8cece04 packages/sync-server/src/app-simplefin/app-simplefin.js; conversation 70de19bb-341e-4ca0-a42f-f4262eb59326/fe370a12-46b9-470c-8115-39752c432913
++- STACK-002: actual@8cece04 conversation 70de19bb-341e-4ca0-a42f-f4262eb59326/aeb3ca2c-cd97-49d0-8c21-cb2687b48a96
++- STACK-003: actual@8cece04 packages/sync-server/package.json; conversation 70de19bb-341e-4ca0-a42f-f4262eb59326/56238ec1-3d78-4ec3-9516-6ffe31efe243
++- STACK-004: actual@8cece04 packages/desktop-client/package.json; conversation d34fc234-ffeb-4f49-b9b7-9037b2a87b69/e72d768a-19f3-48f7-841b-fbefcd49a705
++- STACK-005: actual@8cece04 diff/commits.txt; conversation f57650bf-521a-4bd3-832c-4da4852a658e/4cf9a7e0-1937-444a-949e-5894db41ae31
 diff --git a/core/terminology.md b/core/terminology.md
-index cd970bd..e0bfdce 100644
+index 0a1718d..efc3d85 100644
 --- a/core/terminology.md
 +++ b/core/terminology.md
 @@ -1,10 +1,17 @@
  # Terminology
  
 -Status: empty template. No application or company facts have been admitted.
-+Status: generated entries from the first maintenance run. They require human review.
++Status: generated entries, pending human review.
  
- Use TERM IDs for evidence-backed entries, with explicit scope. Generated entries require human review. Implementation observations do not establish company policy.
+ Write TERM IDs as TERM, a hyphen, and three digits for evidence-backed entries, with explicit scope. Generated entries require human review. Implementation observations do not establish company policy.
  
  | ID | Term | Meaning | Scope | Evidence |
  | --- | --- | --- | --- | --- |
-+| TERM-001 | Stored amount scale (integer amount) | Monetary amounts are stored as integers scaled by 100 for every currency, including zero-decimal currencies: 1,500 yen is stored as 150000. A currency's decimal places (decimalPlaces) only affect display and input formatting, never the stored scale. Conversion helpers (amountToInteger, integerToAmount) always use 100. | app:actual | Developer statement; `packages/loot-core/src/shared/util.ts:539` |
-+| TERM-002 | Quarterly interval (custom reports) | A custom-report grouping interval. A quarter is keyed by its first month (Q3 2026 is 2026-07) and labelled Q3 '26. Quarters are queried by month and rolled up client-side, the way weeks are rolled up from days, so no AQL changes are needed. Budgeted reports sum the monthly budgeted amounts into the quarter. A From/To pick that is out of range falls back to four whole quarters. NetWorth, BalanceForecast and Spending do not use it. | app:actual | Developer statement; `packages/desktop-client/src/components/reports/reportRanges.ts:27` |
++| TERM-001 | Stored amount (integer amount) | A money value as persisted: the decimal amount multiplied by 100, for every currency. 1,500 yen is stored as 150000 and 15.00 USD as 1500. A currency's decimalPlaces only controls display and input formatting, never the stored scale. Amount helpers (`amountToInteger`, `integerToAmount`, `integerToCurrency`) therefore take no decimalPlaces argument. | app:actual | Developer definition, session de720aee-7716-4ecb-ba17-3a38c00ee07e; `packages/loot-core/src/shared/util.ts` |
++| TERM-002 | Quarter key (custom report Quarterly interval) | A quarter in custom reports is identified by its first month, as YYYY-MM: Q3 2026 is `2026-07`. It is labelled `Q3 '26`. Quarterly is an interval alongside Daily, Weekly, Monthly and Yearly; data is queried by month and rolled up client-side into the quarter key (no AQL quarter bucket). | app:actual | Developer definition, session f57650bf-521a-4bd3-832c-4da4852a658e; `packages/loot-core/src/shared/months.ts` |
  
  Follow the [core maintenance guide](../maintenance/core.md).
 +
 +## Evidence
 +
 +- TERM-001: actual@8cece04 packages/loot-core/src/shared/util.ts; conversation de720aee-7716-4ecb-ba17-3a38c00ee07e/d208a293-ba9d-4d21-bb27-8001a9983cc5
-+- TERM-002: actual@8cece04 packages/desktop-client/src/components/reports/reportRanges.ts; conversation f57650bf-521a-4bd3-832c-4da4852a658e/4cf9a7e0-1937-444a-949e-5894db41ae31
++- TERM-002: actual@8cece04 packages/loot-core/src/shared/months.ts; conversation f57650bf-521a-4bd3-832c-4da4852a658e/4cf9a7e0-1937-444a-949e-5894db41ae31
 diff --git a/log.md b/log.md
-index ba576fd..0d94491 100644
+index 3d8211a..666c6f0 100644
 --- a/log.md
 +++ b/log.md
-@@ -1,5 +1,11 @@
+@@ -1,5 +1,12 @@
  # Knowledge Change History
  
-+## 2026-11-05: Maintenance run 20261114-101450-8cece04-3374e54c (actual@8cece04)
++## 2026-11-05: Maintenance run 20261114-202710-8cece04-ab77e26d (actual@8cece04)
 +
-+- core/terminology.md: added TERM-001 (stored amount scale), TERM-002 (quarterly interval).
-+- core/tech-stack-standards.md: added STACK-001 (undici fetch), STACK-002 (sync-server Node floor), STACK-003 (snapdom export).
-+- core/pitfalls.md: added PIT001 (decimalPlaces scaling), PIT002 (AmountInput autoDecimals), PIT003 (undici Agent with global fetch), PIT004 (report range string comparison), PIT005 (snapdom toPng href).
++- core/terminology.md: added TERM-001 (stored amount is always x100), TERM-002 (quarter key is the first month).
++- core/tech-stack-standards.md: added STACK-001 to STACK-005 (undici fetch, undici as only server HTTP client, sync-server Node floor, snapdom for snapshots, client-side interval rollup).
++- core/naming-conventions.md: added NAME-001 ([AI] prefix), NAME-002 (release note files), NAME-003 (one component per file).
++- core/pitfalls.md: added PIT-001 to PIT-005 (decimalPlaces scaling, global fetch with undici dispatcher, shared mock calls, raw period key comparison, AmountInput autoDecimals for yen).
 +
  ## 2026-11-14: Initialize empty knowledge
  
- - Starting repository revision: `caf4bdbe5bdbd253c8999cad4960b5801885a3e1`.
+ - Starting repository revision: `b20f3f9d5042e893734b91557db62e08572b839c`.

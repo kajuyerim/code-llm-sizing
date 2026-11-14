@@ -25,7 +25,7 @@ A successful writer creates a local result branch. The command shows changed fil
 
 Follow [setup](setup.md) for the equivalent manual commands, authentication details, troubleshooting, and optional B execution. Installation and deterministic tests need no model account or inference; running maintenance uses your private Claude authentication.
 
-For an explanation of the system, read [How Our Knowledge Maintenance System Works](docs/walkthrough/README.md), or download the [interactive walkthrough](docs/walkthrough/index.html) and open it locally. These are historical evaluation evidence. The new first-run path has credential-free software checks and one recorded [live acceptance run](docs/first-run-acceptance.md#live-acceptance-record-14-november-2026).
+For an explanation of the system, read [How Our Knowledge Maintenance System Works](docs/walkthrough/README.md), or download the [interactive walkthrough](docs/walkthrough/index.html) and open it locally. These are historical evaluation evidence. The new first-run path has credential-free software checks and recorded [live acceptance runs](docs/first-run-acceptance.md#live-acceptance-record-2-14-november-2026-b20f3f9).
 
 To try the whole path without an application of your own, follow the [first-run demo](docs/demo/README.md). It rebuilds a public Actual Budget checkout, installs six shared development sessions, and turns empty knowledge into a populated local branch for about $1.
 

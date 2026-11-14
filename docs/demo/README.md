@@ -1,6 +1,6 @@
 # First-run demo: from empty knowledge to a populated branch
 
-This demo lets anyone run Context Ops end to end without private data. It starts from the empty knowledge that `contextops init` prepares, runs strategy A (sweeper first) on six real Claude Code development sessions for Actual Budget, and ends with learned knowledge committed on a local branch. The [acceptance record](../first-run-acceptance.md#live-acceptance-record-14-november-2026) lists what one run produced, with timing and cost.
+This demo lets anyone run Context Ops end to end without private data. It starts from the empty knowledge that `contextops init` prepares, runs strategy A (sweeper first) on six real Claude Code development sessions for Actual Budget, and ends with learned knowledge committed on a local branch. The [acceptance record](../first-run-acceptance.md#live-acceptance-record-2-14-november-2026-b20f3f9) lists what one run produced, with timing and cost.
 
 ## What is in this folder
 
@@ -59,10 +59,11 @@ The command prints the changed files, the report and patch, and the Git commands
 git diff knowledge/actual-demo contextops/sweeper-first/<run id>
 ```
 
-In the recorded run the empty core documents gained ten entries, for example:
+In the latest recorded run the empty core documents gained fifteen entries, for example:
 
-- `TERM-001` Stored amount scale: every currency is stored at x100, including yen; decimal places only affect display.
-- `STACK-001` Sync server modules import `fetch` from `undici`, never Node's global `fetch`.
-- `PIT004` Comparing a full From date with a bare month or year To key flips a same-period range.
+- `TERM-001` Stored amount: every currency is stored at x100, including yen; decimal places only affect display.
+- `STACK-001` Sync server code imports `fetch` from `undici`, never Node's global `fetch`.
+- `NAME-001` Every commit message and PR title starts with `[AI]`.
+- `PIT-004` Comparing a full From date with a bare month or year To key flips a same-period range.
 
 Each entry cites the session message or source line that supports it, and all of them still need human review.
