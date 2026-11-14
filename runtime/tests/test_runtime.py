@@ -391,6 +391,45 @@ class RuntimeTests(unittest.TestCase):
         self.assertTrue(handoff['children'])
         self.assertTrue(all(child['shares_cache_prefix'] for child in handoff['children']))
 
+    def test_export_and_import_session_round_trip_without_local_paths(self):
+        records = [
+            {'type': 'user', 'cwd': str(self.app), 'uuid': 'u1', 'sessionId': 'chosen-session',
+             'timestamp': (self.cutoff - timedelta(seconds=3)).isoformat(),
+             'message': {'role': 'user', 'content': f'Please edit {self.app}/README.md'}},
+            {'type': 'assistant', 'cwd': str(self.app), 'uuid': 'a1', 'sessionId': 'chosen-session',
+             'timestamp': (self.cutoff - timedelta(seconds=2)).isoformat(),
+             'message': {'role': 'assistant', 'content': [
+                 {'type': 'thinking', 'thinking': 'private reasoning'},
+                 {'type': 'text', 'text': 'Editing it now.'},
+                 {'type': 'tool_use', 'id': 't1', 'name': 'Edit', 'input': {'file_path': f'{self.app}/README.md'}}]}},
+            {'type': 'user', 'cwd': str(self.app), 'uuid': 'r1', 'sessionId': 'chosen-session',
+             'timestamp': (self.cutoff - timedelta(seconds=1)).isoformat(),
+             'message': {'role': 'user', 'content': [
+                 {'type': 'tool_result', 'tool_use_id': 't1', 'content': 'secret file body'}]}},
+            {'type': 'file-history-snapshot', 'snapshot': {'files': [str(self.app)]}},
+        ]
+        self.session_file.write_text(''.join(json.dumps(r) + '\n' for r in records))
+        exported = self.root / 'chosen-session.jsonl'
+        with contextlib.redirect_stdout(io.StringIO()):
+            main(['export-session', '--repo', str(self.app), '--session', 'chosen-session', '--out', str(exported)])
+        text = exported.read_text()
+        for leaked in (str(self.app), 'private reasoning', 'secret file body', 'file-history-snapshot'):
+            self.assertNotIn(leaked, text)
+        self.assertIn('{{APP}}/README.md', text)
+
+        other = self.root / 'other-checkout'
+        gitutil.git(self.root, 'clone', '-q', str(self.app), str(other))
+        with contextlib.redirect_stdout(io.StringIO()):
+            main(['import-session', '--repo', str(other), str(exported)])
+            main(['import-session', '--repo', str(other), str(exported)])  # identical re-import is a no-op
+        sessions = transcripts.load_sessions(other.resolve(), None, self.cutoff, selected=['chosen-session'])
+        self.assertEqual([m.uuid for m in sessions[0].messages], ['u1', 'a1'])
+        self.assertIn(f'{other.resolve()}/README.md', sessions[0].messages[1].text)
+
+        exported.write_text(text.replace('Editing it now.', 'Changed.'))
+        with self.assertRaisesRegex(ValueError, 'already exists'):
+            transcripts.import_session(exported, other.resolve())
+
     def test_sessions_lists_selectable_history_without_inference(self):
         out = io.StringIO()
         with contextlib.redirect_stdout(out):

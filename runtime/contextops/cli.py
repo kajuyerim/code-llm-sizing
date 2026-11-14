@@ -43,6 +43,15 @@ def main(argv: list[str] | None = None) -> None:
     sessions.add_argument("--repo", type=Path, default=Path.cwd())
     sessions.add_argument("--limit", type=int, default=20)
 
+    export = commands.add_parser("export-session", help="write a shareable copy of one session, with local paths replaced")
+    export.add_argument("--repo", type=Path, default=Path.cwd())
+    export.add_argument("--session", required=True)
+    export.add_argument("--out", type=Path, required=True)
+
+    imp = commands.add_parser("import-session", help="install exported sessions for an application checkout")
+    imp.add_argument("--repo", type=Path, default=Path.cwd())
+    imp.add_argument("files", type=Path, nargs="+")
+
     sweep = commands.add_parser("sweep", help="sweep a commit range by hand, without pushing")
     sweep.add_argument("--base", required=True)
     sweep.add_argument("--head", default="HEAD")
@@ -53,7 +62,8 @@ def main(argv: list[str] | None = None) -> None:
     sweep.add_argument("--cutoff", type=_cutoff, help="ISO 8601 timestamp with timezone; defaults to now")
 
     args = parser.parse_args(argv)
-    handlers = {"init": _init, "install": _install, "hook": _hook, "run": _run, "sweep": _sweep, "sessions": _sessions}
+    handlers = {"init": _init, "install": _install, "hook": _hook, "run": _run, "sweep": _sweep, "sessions": _sessions,
+                "export-session": _export_session, "import-session": _import_session}
     try:
         handlers[args.command](args)
     except (ValueError, FileNotFoundError, subprocess.CalledProcessError) as exc:
@@ -142,6 +152,25 @@ def _sessions(args: argparse.Namespace) -> None:
     for s in found[: args.limit]:
         print(f"{s.session_id:36}  {s.last[:19].replace('T', ' '):19}  {s.user_messages:>4}  {s.agent_messages:>5}  {s.opening}")
     print(f"\nPass the ones you want as --session ID (repeat for several). {len(found)} session(s) found.")
+
+
+def _export_session(args: argparse.Namespace) -> None:
+    from contextops import transcripts
+
+    app = gitutil.repo_root(args.repo).resolve()
+    lines = transcripts.export_session(app, args.session)
+    args.out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"Wrote {len(lines)} records to {args.out}. Thinking and tool results were dropped and local paths "
+          "replaced; message text is unchanged, so review it before sharing.")
+
+
+def _import_session(args: argparse.Namespace) -> None:
+    from contextops import transcripts
+
+    app = gitutil.repo_root(args.repo).resolve()
+    for source in args.files:
+        target = transcripts.import_session(source, app)
+        print(f"{target.stem}  ->  {target}")
 
 
 def _sweep(args: argparse.Namespace) -> None:

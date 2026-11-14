@@ -96,6 +96,93 @@ def list_sessions(app_root: Path, include_sidechains: bool = False) -> list[Sess
     return sorted(found, key=lambda s: s.last, reverse=True)
 
 
+APP_PLACEHOLDER = "{{APP}}"
+HOME_PLACEHOLDER = "{{HOME}}"
+_SESSION_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
+_KEPT_FIELDS = ("type", "uuid", "parentUuid", "timestamp", "sessionId", "gitBranch", "isSidechain", "cwd")
+
+
+def export_session(app_root: Path, session_id: str) -> list[str]:
+    """A shareable copy of one session: only what maintenance reads, with local paths replaced.
+
+    Keeps developer and agent messages, text, and tool calls. Drops thinking, tool results, images,
+    and every other record type. The application root becomes {{APP}} and the home directory
+    {{HOME}}. Message text is otherwise unchanged, so review the output before sharing it.
+    """
+    if not _SESSION_ID.fullmatch(session_id):
+        raise ValueError("Invalid session ID")
+    files = [d / f"{session_id}.jsonl" for d in _project_dirs(app_root) if (d / f"{session_id}.jsonl").is_file()]
+    if len(files) != 1:
+        raise ValueError("Session not found for this application" if not files else "Ambiguous session ID")
+    replacements = [(str(app_root), APP_PLACEHOLDER), (str(Path.home()), HOME_PLACEHOLDER)]
+    lines = []
+    for line in files[0].read_text(encoding="utf-8").splitlines():
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if record.get("type") not in ("user", "assistant") or record.get("isMeta"):
+            continue
+        if not _inside(record.get("cwd"), app_root):
+            continue
+        message = record.get("message") or {}
+        content = message.get("content")
+        if isinstance(content, list):
+            kept = []
+            for block in content:
+                kind = block.get("type")
+                if kind == "text":
+                    kept.append({"type": "text", "text": block.get("text", "")})
+                elif kind == "tool_use":
+                    kept.append({"type": "tool_use", "id": block.get("id"), "name": block.get("name"),
+                                 "input": block.get("input") or {}})
+                elif kind == "tool_result":
+                    kept.append({"type": "tool_result", "tool_use_id": block.get("tool_use_id"),
+                                 "content": "[omitted from export]"})
+            if not kept:
+                continue
+            content = kept
+        elif not isinstance(content, str):
+            continue
+        out = {key: record[key] for key in _KEPT_FIELDS if key in record}
+        out["message"] = {"role": message.get("role", record["type"]), "content": content}
+        lines.append(_replace_strings(out, replacements))
+    if not lines:
+        raise ValueError("Session has no developer or agent messages in this application")
+    return [json.dumps(record, ensure_ascii=False) for record in lines]
+
+
+def import_session(source: Path, app_root: Path) -> Path:
+    """Install an exported session for app_root so `sessions` and `--session` can select it."""
+    records = [json.loads(line) for line in source.read_text(encoding="utf-8").splitlines() if line.strip()]
+    ids = {r.get("sessionId") for r in records if r.get("sessionId")} or {source.stem}
+    if len(ids) != 1 or not _SESSION_ID.fullmatch(next(iter(ids))):
+        raise ValueError("Exported session must carry exactly one valid session ID")
+    session_id = ids.pop()
+    replacements = [(APP_PLACEHOLDER, str(app_root)), (HOME_PLACEHOLDER, str(Path.home()))]
+    text = "".join(json.dumps(_replace_strings(r, replacements), ensure_ascii=False) + "\n" for r in records)
+    target = PROJECTS_DIR / encode_project(app_root) / f"{session_id}.jsonl"
+    if target.exists():
+        if target.read_text(encoding="utf-8") == text:
+            return target
+        raise ValueError(f"Session {session_id} already exists for this application")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(text, encoding="utf-8")
+    return target
+
+
+def _replace_strings(value, replacements: list[tuple[str, str]]):
+    if isinstance(value, str):
+        for old, new in replacements:
+            value = value.replace(old, new)
+        return value
+    if isinstance(value, list):
+        return [_replace_strings(v, replacements) for v in value]
+    if isinstance(value, dict):
+        return {k: _replace_strings(v, replacements) for k, v in value.items()}
+    return value
+
+
 def to_markdown(session: Session, max_chars: int) -> tuple[str, set[str]]:
     """Render a session for agents. Keeps the newest messages when it is too long."""
     blocks = [f"[msg:{m.uuid}] {m.role} @ {m.timestamp}\n{m.text}\n" for m in session.messages]
