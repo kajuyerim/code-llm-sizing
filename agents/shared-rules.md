@@ -31,11 +31,11 @@ Every record except NO_CHANGE needs at least one locator. The run rejects record
 | Kind | Fields | Notes |
 | --- | --- | --- |
 | `conversation` | `session`, `message`, `quote` | Session is the file name without `.md`; message is the uuid from the `[msg:...]` tag |
-| `diff` | `path`, `quote` | Path exactly as listed in `diff/files.txt` |
+| `diff` | `path`, `quote` | Path exactly as listed in `diff/files.txt`, or `diff/commits.txt` for a commit message |
 | `source` | `path`, `line`, `quote` | Path relative to the application root, existing at the pushed head |
 | `memory` | `path`, `quote` | Path relative to the pack, such as `memory/auto/feedback.md` |
 
-Quotes are short and verbatim. Never invent a locator.
+Quotes are short and verbatim. Never invent a locator. A locator that does not resolve is dropped from the record and reported; a record left without any resolving locator is rejected.
 
 ## Records
 

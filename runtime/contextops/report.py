@@ -24,6 +24,7 @@ class Outcome:
     proposals: dict | None = None
     publication: Publication | None = None
     writer_output: dict | None = None
+    handoff_pass: list[dict] | None = None
 
 
 def render_report(
@@ -55,6 +56,15 @@ def render_report(
     ])
     lines += _section("Handoffs to other owners", [
         f"to `{h['to']}` from {h['from']}: {h['note']}" for h in review.handoffs
+    ])
+    lines += _section("Handoff pass", [
+        f"{h['to']} received {h['handoffs']} from {', '.join(h['from'])}: {h.get('status')}"
+        + (f", {h['records_added']} record(s) added" if "records_added" in h else "")
+        for h in outcome.handoff_pass or []
+    ])
+    lines += _section("Dropped evidence locators", [
+        f"{_record(r)}: " + "; ".join(d["issue"] for d in r["dropped_locators"])
+        for r in review.accepted + review.deferred if r.get("dropped_locators")
     ])
     lines += _proposals(outcome.proposals)
     lines += _workers_table(outcome.workers, ledger)

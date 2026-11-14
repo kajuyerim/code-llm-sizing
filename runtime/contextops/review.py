@@ -31,6 +31,9 @@ SECRET_PATTERNS = [
 ]
 
 
+COMMIT_LOG = {"diff/commits.txt", "commits.txt"}
+
+
 @dataclass
 class Review:
     accepted: list[dict] = field(default_factory=list)
@@ -88,10 +91,16 @@ def _problem(record: dict, owns: str, ctx: RunContext, evidence: Evidence) -> st
         return "scope must be company, app:<name>, or tool:<name>"
     if not record["evidence"]:
         return "no evidence"
-    for item in record["evidence"]:
-        issue = _locator_issue(item, ctx, evidence)
-        if issue:
-            return issue
+    # Keep a record whose evidence partly resolves; drop and report only the locators that do not.
+    # One bad locator used to discard a supported record together with its valid evidence.
+    issues = [(item, _locator_issue(item, ctx, evidence)) for item in record["evidence"]]
+    valid = [item for item, issue in issues if not issue]
+    if not valid:
+        return issues[0][1]
+    dropped = [{"locator": item, "issue": issue} for item, issue in issues if issue]
+    if dropped:
+        record["evidence"] = valid
+        record["dropped_locators"] = dropped
 
     text = " ".join(
         [record["text"], record["reason"]] + [item.get("quote", "") for item in record["evidence"]]
@@ -111,6 +120,8 @@ def _locator_issue(item: dict, ctx: RunContext, evidence: Evidence) -> str | Non
             return f"message {item.get('message')} is not in session {session}"
     elif kind == "diff":
         path = _relative(item.get("path", ""), ctx.app_snapshot)
+        if path in COMMIT_LOG:
+            return None  # commit messages are part of the frozen diff evidence
         if path not in evidence.changed_files:
             return f"{path} is not part of the diff"
     elif kind == "source":

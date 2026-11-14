@@ -1,5 +1,11 @@
 # Knowledge Change History
 
+## 2026-11-14: Deliver handoffs, keep partly supported records, state the ID format
+
+- The live first-run acceptance lost a supported `[AI]` commit convention: one of its three locators pointed at `diff/commits.txt`, and review rejected the whole record. Review now drops only unresolvable locators, rejects a record only when none resolve, and accepts `diff/commits.txt`.
+- Handoffs between parallel specialists were reported but never acted on. Each receiver now gets one extra turn on a fork of its own session with the handoffs it received; `handoffs.json` records the pass.
+- The writer produced both `STACK-001` and `PIT001`. Run notes and empty templates now state the format: prefix, hyphen, three digits.
+
 ## 2026-11-05: Run maintenance agents without MCP servers; list sessions
 
 - A live A run showed forks reading the inherited history from the prompt cache on their first call and re-writing all of it on the second. Claude.ai connectors tied to the login were attached to every agent and connected asynchronously, which changed the tool list between calls. Maintenance agents now run with no MCP servers (`strict_mcp_config`, connectors disabled). After the change, every fork call read the full inherited history from the cache.

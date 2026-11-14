@@ -35,6 +35,7 @@ Subscription mode uses the user's private Claude Code authentication and removes
 | --- | --- |
 | `run.json`, `conversation.json` | Frozen selections and normalized conversation with integrity hash |
 | `pack/manifest.json`, `pack/diff/`, `pack/conversation/` | Evidence, source refs, selected sessions, and filtering notes |
+| `handoffs.json` | The handoff pass: which specialist received handoffs from whom, its status, cost, and records added |
 | `workers/`, `review.json` | Raw specialist responses and accepted/deferred/rejected decisions |
 | `proposals.json` | Optional cartographer suggestions, never automatically applied |
 | `knowledge.patch` | Candidate or committed knowledge changes; inspect writer status |

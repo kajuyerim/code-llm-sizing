@@ -38,6 +38,8 @@ class AgentRun:
     model_usage: dict | None = None
     output: dict | None = None
     error: str | None = None
+    # Cost the SDK reported for the whole session; cost_usd may later hold only the increment.
+    session_cost_usd: float | None = None
 
 
 class Ledger:
@@ -140,6 +142,7 @@ async def run_agent(
                 run.status = message.subtype
                 run.session_id = message.session_id
                 run.cost_usd = message.total_cost_usd or 0.0
+                run.session_cost_usd = run.cost_usd
                 run.num_turns = message.num_turns
                 run.duration_ms = message.duration_ms
                 run.model_usage = getattr(message, "model_usage", None)

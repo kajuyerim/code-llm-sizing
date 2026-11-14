@@ -18,6 +18,7 @@ import yaml
 from contextops import access, frontmatter, gitutil, transcripts
 from contextops.agents import AgentRun, Ledger, load_agent, run_agent
 from contextops.cli import main
+from contextops.strategies import deliver_handoffs
 from contextops.config import load_config
 from contextops.evidence import build_pack
 from contextops.initializer import Worker, plan_workers
@@ -184,6 +185,54 @@ class RuntimeTests(unittest.TestCase):
             output={'records':[{**record,'target':target,'scope':scope}],'handoffs':[],'unowned':[]}
             review=review_results([WorkerResult(worker,AgentRun(worker.label,output=output))],ctx,evidence)
             self.assertEqual(len(review.rejected),1)
+
+    def test_review_drops_only_unresolved_locators_and_accepts_commit_log(self):
+        ctx = self.prepare(); config = load_config(self.kb); evidence = build_pack(ctx, config)
+        worker = plan_workers(config, evidence)[0][0]
+        good = {'kind': 'conversation', 'session': 'chosen-session', 'message': 'message-1'}
+        bad = {'kind': 'diff', 'path': 'not/changed.txt'}
+        commits = {'kind': 'diff', 'path': 'diff/commits.txt', 'quote': 'Deterministic test checkpoint'}
+        base = {'op': 'ADD', 'fact_id': 'TERM-999', 'target': worker.owns, 'text': 'Supported definition',
+                'scope': 'app:test', 'reason': 'Developer decision'}
+        def review(*items):
+            output = {'records': [{**base, 'evidence': list(items)}], 'handoffs': [], 'unowned': []}
+            return review_results([WorkerResult(worker, AgentRun(worker.label, output=output))], ctx, evidence)
+        mixed = review(good, bad)
+        self.assertEqual(len(mixed.accepted), 1)
+        self.assertEqual(mixed.accepted[0]['evidence'], [good])
+        self.assertIn('not part of the diff', mixed.accepted[0]['dropped_locators'][0]['issue'])
+        self.assertEqual(len(review(bad).rejected), 1)
+        only_commits = review(commits)
+        self.assertEqual(len(only_commits.accepted), 1)
+        self.assertNotIn('dropped_locators', only_commits.accepted[0])
+
+    def test_handoffs_reach_their_owner_once_on_a_fork_of_its_session(self):
+        ctx = self.prepare(); config = load_config(self.kb); evidence = build_pack(ctx, config)
+        workers = plan_workers(config, evidence)[0]
+        sender, receiver = workers[0], workers[1]
+        note = {'to': receiver.owns, 'note': 'A definition for you', 'evidence': []}
+        def first(worker, handoffs=()):
+            output = {'records': [], 'findings': [], 'handoffs': list(handoffs), 'unowned': [],
+                      'contradictions': [], 'unresolved': [], 'coverage': {'sessions_read': [], 'files_read': [], 'notes': ''}}
+            return WorkerResult(worker, AgentRun(worker.label, status='success', session_id=f'{worker.label}-s',
+                                                 cost_usd=0.10, session_cost_usd=0.50, output=output))
+        results = [first(sender, [note]), first(receiver)] + [first(w) for w in workers[2:]]
+        added = {'op': 'ADD', 'fact_id': 'X-001', 'target': receiver.owns, 'text': 't', 'scope': 'app:test',
+                 'reason': 'r', 'evidence': [{'kind': 'conversation', 'session': 'chosen-session', 'message': 'message-1'}]}
+        async def fake(spec, **kw):
+            return AgentRun(kw['label'], status='success', session_id='child', cost_usd=0.65,
+                            output={'records': [added], 'handoffs': [note], 'unowned': []})
+        ledger = Ledger(10)
+        with patch('contextops.strategies.run_agent', side_effect=fake) as call:
+            log = asyncio.run(deliver_handoffs(results, ctx, config, ledger))
+        self.assertEqual(call.call_count, 1)
+        kwargs = call.call_args.kwargs
+        self.assertEqual((kwargs['resume'], kwargs['fork']), (f'{receiver.label}-s', True))
+        self.assertIn('A definition for you', kwargs['prompt'])
+        self.assertEqual(results[1].run.output['records'], [added])
+        self.assertEqual(log[0]['records_added'], 1)
+        self.assertAlmostEqual(ledger.spent, 0.15)  # only the increment over the receiver's session
+        self.assertTrue((ctx.run_dir / 'handoffs.json').is_file())
 
     def test_shared_pipeline_no_network_or_source_writes(self):
         ctx=self.prepare(); before=gitutil.rev_parse(self.app,'HEAD')

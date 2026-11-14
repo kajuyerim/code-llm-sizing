@@ -63,7 +63,7 @@ def initialize_knowledge(kb: Path, branch: str) -> list[str]:
         bodies[kb / "core" / name] = (
             f"# {title}\n\n"
             "Status: empty template. No application or company facts have been admitted.\n\n"
-            f"Use {prefix} IDs for evidence-backed entries, with explicit scope. "
+            f"Write {prefix} IDs as {prefix}, a hyphen, and three digits for evidence-backed entries, with explicit scope. "
             "Generated entries require human review. Implementation observations do not "
             "establish company policy.\n\n"
             f"{table}\n{separator}\n\n"

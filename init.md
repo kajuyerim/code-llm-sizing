@@ -59,5 +59,5 @@ These notes are added to the instructions of every agent in a maintenance run.
 - Your proposals and applied changes are retained locally for human inspection. Publication is disabled by default. When support or authority is unclear, NEEDS_REVIEW is the right answer, not a confident guess.
 - Knowledge here must stay useful to developers and agents who never saw this conversation. Write each entry so it stands on its own.
 - Historical walkthroughs and evaluation documents describe other runs. They are not evidence about the selected source application; use this run's frozen source, diff, and conversation for learned facts.
-- Write in English and use no em dashes. Preserve existing fact IDs; use TERM, STACK, NAME, and PIT prefixes followed by three digits for new core entries.
+- Write in English and use no em dashes. Preserve existing fact IDs; write new core IDs as a prefix, a hyphen, and three digits (`TERM-001`, `STACK-001`, `NAME-001`, `PIT-001`), continuing from the highest existing number.
 - Use descriptive Markdown titles and relative links. Use lowercase file/folder names with hyphens, preserving conventional entry points such as README.md. Put tool-specific knowledge under its lowercase tools folder. These are bundle formatting rules, not application conventions.
