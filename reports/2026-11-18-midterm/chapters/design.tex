@@ -1,0 +1,167 @@
+\chapter{DESIGN}
+
+\section{Information Structure}
+
+Figure~\ref{fig:er} shows the main entities. A \emph{knowledge repository} holds \emph{documents} (four core documents and one README per tool folder). Each document holds \emph{facts} with a stable identifier and a scope. A \emph{run} is prepared from an application range and a set of \emph{sessions} made of \emph{messages}; it produces \emph{change records}, each with one or more \emph{evidence} locators that point to messages, diff paths, or source lines. The writer turns accepted records into a \emph{knowledge commit} on a run branch.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[ent/.style={draw, rectangle, fill=boxfill, font=\small, align=left, inner sep=4pt},
+  rel/.style={thin}, card/.style={font=\scriptsize, text=inkN}]
+  \node[ent] (kr) at (0,0) {\textbf{KnowledgeRepo}\\baseline commit\\branch};
+  \node[ent] (doc) at (4.2,0) {\textbf{Document}\\path, kind\\frontmatter};
+  \node[ent] (fact) at (8.6,0) {\textbf{Fact}\\id (TERM-102)\\text, scope};
+  \node[ent] (run) at (0,-3.2) {\textbf{Run}\\strategy, base, head\\cutoff, budget};
+  \node[ent] (rec) at (4.2,-3.2) {\textbf{ChangeRecord}\\op, target, fact\_id\\text, scope, reason\\status};
+  \node[ent] (ev) at (8.6,-3.2) {\textbf{Evidence}\\kind, quote\\locator};
+  \node[ent] (ses) at (0,-6.2) {\textbf{Session}\\id, branch\\hash};
+  \node[ent] (msg) at (4.2,-6.2) {\textbf{Message}\\uuid, role\\timestamp, text};
+  \node[ent] (com) at (8.6,-6.2) {\textbf{KnowledgeCommit}\\branch, patch};
+  \draw[rel] (kr) -- node[card, above]{1 \quad n} (doc);
+  \draw[rel] (doc) -- node[card, above]{1 \quad n} (fact);
+  \draw[rel] (run) -- node[card, left]{n} (kr);
+  \draw[rel] (run) -- node[card, above]{1 \quad n} (rec);
+  \draw[rel] (rec) -- node[card, above]{1 \quad n} (ev);
+  \draw[rel] (rec) -- node[card, right, pos=0.3]{0..1} (fact);
+  \draw[rel] (run) -- node[card, left]{n \quad m} (ses);
+  \draw[rel] (ses) -- node[card, above]{1 \quad n} (msg);
+  \draw[rel] (ev) -- node[card, above, sloped]{0..1} (msg);
+  \draw[rel] (run) -- node[card, below, sloped, pos=0.85]{0..1} (com);
+\end{tikzpicture}
+\caption{Entities of a maintenance run and the knowledge repository.}
+\label{fig:er}
+\end{figure}
+
+On disk the knowledge repository is plain Markdown under Git. Core documents are tables with one row per fact. Tool READMEs carry YAML frontmatter with \code{fileMatchPattern} and \code{keywords} hints. Each run directory contains \code{run.json} (frozen inputs), the evidence pack, one JSON output per agent, \code{review.json}, \code{knowledge.patch}, \code{metrics.json}, and \code{report.md}.
+
+\section{Information Flow}
+
+Figure~\ref{fig:flow} shows the flow of one run and where the two strategies diverge. Figure~\ref{fig:seq} shows the messages exchanged in strategy A, including the session forks.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=0.55cm]
+  \node[box, minimum width=9cm] (in) {Application range (base, head) \;+\; explicit diff \;+\; selected sessions};
+  \node[box, below=of in, minimum width=9cm] (col) {Collection: freeze refs, hash conversation, build evidence pack};
+  \node[box, below=of col, minimum width=9cm] (ini) {Initializer: 4 core specialists + relevant tool specialists};
+  \node[box, below left=0.7cm and -2.6cm of ini, text width=4.6cm, draw=inkA] (a) {\textbf{A}: sweeper reads all evidence\\$\downarrow$\\one fork per specialist\\(inherits context and cache)};
+  \node[box, below right=0.7cm and -2.6cm of ini, text width=4.6cm, draw=inkB] (b) {\textbf{B}: fresh specialists\\$\downarrow$\\each reads evidence\\independently};
+  \node[box, below=4.1cm of ini, minimum width=9cm] (hand) {Handoff pass: receivers act on findings handed to them};
+  \node[box, below=of hand, minimum width=9cm] (rev) {Review: locators resolve, ownership, operations};
+  \node[box, below=of rev, minimum width=9cm] (car) {Cartographer (optional): new documents or tool folders};
+  \node[box, below=of car, minimum width=9cm] (wr) {Writer: apply accepted records on a new local branch};
+  \node[box, below=of wr, minimum width=9cm] (out) {Report, patch, metrics; human review};
+  \draw[arr] (in) -- (col); \draw[arr] (col) -- (ini);
+  \draw[arr] (ini) -- (a); \draw[arr] (ini) -- (b);
+  \draw[arr] (a) -- (hand); \draw[arr] (b) -- (hand); \draw[arr] (hand) -- (rev);
+  \draw[arr] (rev) -- (car); \draw[arr] (car) -- (wr); \draw[arr] (wr) -- (out);
+\end{tikzpicture}
+\caption{Activity flow of a maintenance run.}
+\label{fig:flow}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[x=2.25cm, y=-0.62cm, lane/.style={draw, fill=boxfill, font=\small, minimum width=1.9cm, align=center}]
+  \foreach \x/\n in {0/CLI, 1/Orchestrator, 2/Sweeper, 3/Fork\textsubscript{i}, 4/Review, 5/Writer} {
+    \node[lane] (h\x) at (\x,0) {\n};
+    \draw[densely dashed, inkN] (\x,0.7) -- (\x,13.5);
+  }
+  \newcommand{\msg}[4]{\draw[arr] (#1,#3) -- node[above, font=\scriptsize, fill=white, inner sep=1pt]{#4} (#2,#3);}
+  \msg{0}{1}{1.5}{sweep(range, sessions)}
+  \draw[arr] (1,2.2) -- (1.25,2.2) -- (1.25,2.9) -- (1,2.9);
+  \node[font=\scriptsize, right] at (1.27,2.55) {freeze + evidence pack};
+  \msg{1}{2}{3.8}{query(shared prompt, role)}
+  \msg{2}{1}{5.0}{findings, session id}
+  \msg{1}{3}{6.2}{resume + fork (role$_i$)}
+  \node[font=\scriptsize, align=center, text=inkA] at (3,7.1) {cache read of\\inherited history};
+  \msg{3}{1}{8.2}{change records}
+  \msg{1}{4}{9.3}{all records}
+  \msg{4}{1}{10.4}{accepted / deferred / rejected}
+  \msg{1}{5}{11.5}{accepted records}
+  \msg{5}{1}{12.6}{commit on run branch}
+  \msg{1}{0}{13.3}{completion summary}
+\end{tikzpicture}
+\caption{Sequence diagram of a strategy A run. In strategy B the orchestrator starts each specialist with a fresh query instead of a fork.}
+\label{fig:seq}
+\end{figure}
+
+\paragraph{The loop in daily use.} Figure~\ref{fig:loop} shows how a run fits into a team's work after setup. The knowledge repository is an ordinary Git repository on the team's GitHub or GitLab. It serves either a team's applications (\code{scope: team}) or one application (\code{scope: repository}). Each developer clones it next to their applications and runs \code{contextops attach} once per application. From then on, the coding agent in the application reads the knowledge at the start of every task, a push starts maintenance in the background, and the run's result arrives as a pull or merge request on the knowledge repository. Merging stays a human decision; the next session reads the merged knowledge. Development and maintenance are separate processes that meet only through reviewed Git changes.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=0.5cm and 1.1cm]
+  \node[box, text width=3.6cm] (dev) {Developer and\\coding agent work\\in the application};
+  \node[box, text width=3.6cm, right=of dev] (push) {\code{git push}\\(pre-push hook)};
+  \node[box, text width=3.6cm, right=of push] (run) {Maintenance run (A):\\pushed range and\\sessions since the last run};
+  \node[box, text width=3.6cm, below=1.1cm of run] (pr) {Pull or merge\\request on the\\knowledge repository};
+  \node[box, text width=3.6cm, left=of pr] (merge) {Teammate reviews\\and merges};
+  \node[box, text width=3.6cm, left=of merge] (read) {Next session\\refreshes and reads\\the knowledge};
+  \draw[arr] (dev) -- (push); \draw[arr] (push) -- (run); \draw[arr] (run) -- (pr);
+  \draw[arr] (pr) -- (merge); \draw[arr] (merge) -- (read); \draw[arr] (read) -- (dev);
+\end{tikzpicture}
+\caption{The Context Ops loop after \code{contextops attach}.}
+\label{fig:loop}
+\end{figure}
+
+\paragraph{What the knowledge keeps.}
+\label{sec:admission}
+A shared knowledge repository is only useful if agents and reviewers can afford to read it, so it keeps what a developer or agent cannot learn from the repository in front of them and what costs time or causes harm when missed: how the team provisions and deploys (for example, infrastructure only through Terraform, never by console or CLI), how it uses tools and internal services, security and compliance rules, rejected approaches with their reasons, decisions that replace an earlier way of working, contracts between repositories, and team-specific terms. UI and styling conventions, patterns that the code or linters already show, and task-specific instructions stay out; maintenance agents return NO\_CHANGE for them. The list is part of the run notes in \code{init.md}, so each team can tune it, and a team-scoped repository is the recommended setup because decisions made in one repository then reach agents working in another.
+
+\section{System Design}
+
+The runtime is one Python package, \code{contextops}, organized as in Figure~\ref{fig:modules}. Strategy-specific code is confined to \code{strategies.py}; everything else is shared, which keeps the A/B comparison fair.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[m/.style={draw, fill=boxfill, font=\footnotesize\ttfamily, minimum width=2.4cm, minimum height=0.55cm},
+  x=3.35cm, y=1cm]
+  \node[m] (onb) at (-1.5,0) {onboarding};
+  \node[m] (cli) at (-0.5,0) {cli};
+  \node[m] (att) at (0.5,0) {attach};
+  \node[m] (pub) at (0.5,-1.3) {publish};
+  \node[m] (orch) at (-0.5,-1.3) {orchestrator};
+  \node[m] (run) at (-1.5,-2.5) {run};
+  \node[m] (ev) at (-1.5,-3.5) {evidence};
+  \node[m] (tr) at (-1.5,-4.5) {transcripts};
+  \node[m] (git) at (-1.5,-5.5) {gitutil};
+  \node[m] (str) at (-0.5,-2.5) {strategies};
+  \node[m] (ag) at (-0.5,-3.5) {agents};
+  \node[m] (acc) at (-0.5,-4.5) {access};
+  \node[m] (sch) at (-0.5,-5.5) {schemas};
+  \node[m] (ini) at (0.5,-2.5) {initializer};
+  \node[m] (cfg) at (0.5,-3.5) {config};
+  \node[m] (fm) at (0.5,-4.5) {frontmatter};
+  \node[m] (rv) at (1.5,-2.5) {review};
+  \node[m] (cart) at (1.5,-3.5) {cartographer};
+  \node[m] (wr) at (1.5,-4.5) {writer};
+  \node[m] (rep) at (1.5,-5.5) {report};
+  \draw[arr] (cli) -- (onb); \draw[arr] (cli) -- (orch); \draw[arr] (cli) -- (att); \draw[arr] (orch) -- (pub);
+  \draw[arr] (orch) -- (run); \draw[arr] (orch) -- (str); \draw[arr] (orch) -- (ini); \draw[arr] (orch) -- (rv);
+  \draw[arr] (run) -- (ev); \draw[arr] (ev) -- (tr); \draw[arr] (tr) -- (git);
+  \draw[arr] (str) -- (ag); \draw[arr] (ag) -- (acc); \draw[arr] (acc) -- (sch);
+  \draw[arr] (ini) -- (cfg); \draw[arr] (cfg) -- (fm);
+  \draw[arr] (rv) -- (cart); \draw[arr] (cart) -- (wr); \draw[arr] (wr) -- (rep);
+  \node[note, anchor=north] at (1.5,-6.05) {run stages after investigation};
+  \node[note, anchor=north] at (-0.5,-6.05) {agent execution};
+  \node[note, anchor=north] at (-1.5,-6.05) {evidence};
+  \node[note, anchor=north] at (0.5,-5.05) {configuration};
+\end{tikzpicture}
+\caption{Module diagram of the \code{contextops} package (arrows: ``uses'').}
+\label{fig:modules}
+\end{figure}
+
+\begin{sloppypar}\begin{itemize}[nosep]
+  \item \code{cli}: commands \code{init}, \code{attach}, \code{refresh}, \code{sessions}, \code{export-session}, \code{import-session}, \code{sweep}, \code{run}, \code{install}, and \code{hook}.
+  \item \code{attach}: connects an application checkout to the knowledge (reading pointer, read permission, session-start refresh, pre-push hook). \code{publish}: pushes a committed result branch and opens a GitHub pull request or GitLab merge request.
+  \item \code{run} and \code{evidence}: prepare and freeze a run; build the evidence pack. \code{transcripts} isolates all knowledge of Claude Code's session format.
+  \item \code{initializer} and \code{config}: parse \code{init.md} and select specialists from relevance hints.
+  \item \code{strategies}: the registry of A and B and the shared handoff pass. Both build prompts with the shared system prompt and send the role as a user message.
+  \item \code{agents}: wraps the Claude Agent SDK, enforces budgets, and records cost, tokens, and turns. \code{access} implements the pre-tool permission checks.
+  \item \code{review}, \code{cartographer}, \code{writer}, \code{report}: validation, structure proposals, writing, and reporting.
+  \item \code{onboarding}: prepares empty knowledge on a new branch for a first run.
+\end{itemize}\end{sloppypar}
+
+\section{User Interface Design}
+
+Context Ops has no graphical interface by design; its users are developers and their agents, and its review interface is the team's existing pull or merge request page. The command line prints a completion summary with the actual changed files, the report and patch paths, the estimated spend, and the Git commands to review and open the result branch. The README contains a prompt that a developer can give to any coding agent, which then follows the setup skill step by step. For evaluation we produce self-contained HTML reports: the v2 report shows each simulated conversation in a messaging layout and, for every expected fact, the message that should have produced it, the expected knowledge row, and what each condition proposed.

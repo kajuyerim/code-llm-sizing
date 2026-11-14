@@ -1,0 +1,78 @@
+\chapter{DOWNSTREAM TASKS AND HIDDEN CHECKS}
+\label{app:tasks}
+
+The prompts below were sent verbatim to the development agent. The checks were hidden from the agent and written before any measured run; the judge saw the check text but not the basis column.
+
+\input{generated/appendix_tasks}
+
+\chapter{FEATURE CHAINS AND TEAM DECISIONS}
+\label{app:loop}
+
+Prompts of the feature-sequence experiment, sent verbatim, with the number of hidden checks of each kind, followed by each application's team decisions as the judge's checks state them. The full check texts are in the experiment's \code{tasks.yaml}.
+
+{\sloppy\input{generated/appendix_loop}\par}
+
+\chapter{REPRODUCING THE FIRST-RUN DEMO}
+\label{app:demo}
+
+The commands below rebuild the demo application from public inputs, prepare empty knowledge, and run strategy A. They are taken from \code{docs/demo/README.md} in the repository; the last command makes real model calls (about \$1).
+
+\begin{lstlisting}
+# Knowledge checkout, installed and tested (no model calls)
+git clone https://github.com/kajuyerim/code-llm-sizing.git knowledge
+cd knowledge
+python3 -m venv .venv && . .venv/bin/activate
+python -m pip install -r runtime/requirements-lock.txt
+python -m pip install --no-deps -e runtime
+python -m unittest discover -s runtime/tests
+DEMO="$PWD/docs/demo/actual"
+
+# Application: upstream commit plus the demo history
+cd .. && git init actual && cd actual
+git fetch --depth 1 https://github.com/actualbudget/actual.git \
+  d9d15c12fa41a0bb8380fab09519e0180333e146
+git checkout -b demo FETCH_HEAD
+git -c user.name="Context Ops Demo" -c user.email=demo@example.invalid \
+  am --keep-non-patch --committer-date-is-author-date "$DEMO/actual-demo.patch"
+APP="$PWD"
+
+# Empty knowledge on a new branch, committed as the baseline
+cd ../knowledge
+contextops init --kb . --branch knowledge/actual-demo
+git add -A && git commit -m "Initialize empty knowledge for the actual demo"
+
+# Shared sessions for this checkout
+contextops import-session --repo "$APP" "$DEMO"/sessions/*.jsonl
+contextops sessions --repo "$APP"
+
+# Maintenance with strategy A (real model calls)
+contextops sweep --repo "$APP" --kb . \
+  --base "$(git -C "$APP" rev-parse HEAD~7)" \
+  --head "$(git -C "$APP" rev-parse HEAD)" \
+  --strategy sweeper-first --cutoff 2026-11-05T18:40:03Z \
+  $(for f in "$DEMO"/sessions/*.jsonl; do
+      printf -- '--session %s ' "$(basename "$f" .jsonl)"; done)
+\end{lstlisting}
+
+\chapter{REPORT AND ARTIFACT INDEX}
+\label{app:index}
+
+\begin{table}[htbp]
+\centering
+\caption{Reports and evidence produced so far.}
+\small
+\begin{tabularx}{\linewidth}{@{}l l >{\raggedright\arraybackslash}X@{}}
+\toprule
+Date & Artifact & Content \\
+\midrule
+29 Oct 2026 & Pilot report (HTML) & October pilot: 60 maintenance outputs, Claude and GPT, A and B. \\
+30 Oct 2026 & Walkthrough (\code{docs/walkthrough}) & One case (Actual Budget P3) followed from conversation to written knowledge. \\
+5 Nov 2026 & v2 report (HTML) & Experiment v2: conversations in a messaging view, per-fact proposals of four conditions, cost and time, analysis. \\
+5 Nov 2026 & \code{docs/evaluation.md} & Written summary of the pilot and v2 with denominators and limits. \\
+14 Nov 2026 & \code{docs/first-run-acceptance.md} & Live acceptance record of the first-run demo. \\
+18 Nov 2026 & This report & Midterm report. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The repository's \code{reports/} folder indexes these reports with their dates and versions. The evaluation harnesses, raw run directories, and full simulated conversations remain in the team's private evaluation workspace.

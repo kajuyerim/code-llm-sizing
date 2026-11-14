@@ -1,0 +1,75 @@
+\subsection*{\code{maybe-knowledge} (knowledge)}
+\begin{quote}\small\itshape hey, can you add a little status badge to the account page header? it should show whether the account is active, draft, disabled or pending deletion. make it reusable, we'll want the same badge on the accounts list later. please add a lookbook preview for it too. commit when you're done\end{quote}
+\begin{small}\begin{tabularx}{\linewidth}{@{}>{\ttfamily}l >{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}X@{}}
+\toprule \normalfont Check & Basis & Hidden review check \\ \midrule
+ds-namespace & code, maintained; seed contradicts & The badge is a design system component named DS::<Name> in app/components/DS/<name>.rb (with its template next to it). The class name has no Component suffix and is not a flat app/components/*\_component.rb file. \\
+ds-base & code, maintained & The new component class inherits DesignSystemComponent (not ApplicationComponent or ViewComponent::Base directly). \\
+preview-path & code, maintained; seed contradicts & The Lookbook preview lives in test/components/previews/ds/ and is named <name>\_preview.rb (no \_component\_preview suffix). \\
+tokens & unstated & Colors use the app's functional design tokens (for example text-primary, text-secondary, bg-container, bg-surface, text-success, bg-success/10 style token classes) rather than raw Tailwind palette colors such as text-gray-500, bg-green-100 or text-red-600. \\
+header-wired & code & The badge is rendered in the account page header (app/views/accounts/show/\_header.html.erb or the partial that renders it). \\
+all-states & code & All four states (active, draft, disabled, pending\_deletion) render a distinct, readable label. \\
+\bottomrule\end{tabularx}\end{small}
+
+\subsection*{\code{maybe-routine} (routine)}
+\begin{quote}\small\itshape in the account activity tab, next to each date can you show how many entries happened that day, like "3 entries"? small grey text is fine. commit when you're done\end{quote}
+\begin{small}\begin{tabularx}{\linewidth}{@{}>{\ttfamily}l >{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}X@{}}
+\toprule \normalfont Check & Basis & Hidden review check \\ \midrule
+model-computes & code, maintained & The count is provided by the model-side object for the day (Account::DailyActivity or the data object passed to the component); the view component only renders it and does not query the database itself. \\
+ui-component & code & The change is made in the existing UI::Account activity components (for example UI::Account::ActivityDate) rather than a new flat partial or helper that duplicates them. \\
+root-constant & maintained & Inside UI:: classes, any new reference to the Account model or its nested classes uses a leading :: (for example ::Account::DailyActivity). Mark not\_applicable if the diff adds no such reference. \\
+tokens & unstated & The grey text uses a functional token such as text-secondary or text-subdued, not a raw Tailwind color such as text-gray-500. \\
+pluralize & code & The label is pluralized correctly (1 entry / 2 entries), through Rails pluralization or i18n. \\
+test & code & A test covers the new count (model or component test). \\
+\bottomrule\end{tabularx}\end{small}
+
+\subsection*{\code{actual-knowledge} (knowledge)}
+\begin{quote}\small\itshape can we add a half-year option to the interval dropdown in custom reports? so H1/H2 buckets. commit when you're done\end{quote}
+\begin{small}\begin{tabularx}{\linewidth}{@{}>{\ttfamily}l >{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}X@{}}
+\toprule \normalfont Check & Basis & Hidden review check \\ \midrule
+rollup & code, maintained & Half-year buckets are rolled up client-side from monthly data in the same way the existing Quarterly interval is (query by month, then re-key), not by adding a new server or database query mode. \\
+key-format & maintained & A half-year is keyed by its first month in yyyy-MM form (2026-01 for H1, 2026-07 for H2), consistent with the quarter key, and labelled in a short form such as H1 '26. \\
+excluded-reports & maintained & The new interval is kept out of the reports where Quarterly is not offered (Net Worth, Balance Forecast, Spending), or the diff shows it reuses the existing Quarterly gating so it inherits that exclusion. \\
+range-compare & code, maintained & Range validation for the new interval compares normalized full dates and does not compare a full From date with a shorter To key as strings. \\
+release-note & code & A release note is added under upcoming-release-notes/. \\
+ai-prefix & code, maintained & The commit message starts with the [AI] prefix. \\
+i18n & seed & New user-facing labels go through the i18n helpers (t() or Trans), not hard-coded English strings. \\
+types & maintained & New or changed TypeScript does not add // @ts-strict-ignore and does not introduce new \texttt{as} casts where \texttt{satisfies} or proper typing would work. \\
+\bottomrule\end{tabularx}\end{small}
+
+\subsection*{\code{actual-routine} (routine)}
+\begin{quote}\small\itshape on the sync server, could we ping a webhook whenever a budget file gets uploaded? the admin sets the url through the server config / env. just POST the file id and a timestamp as json, and the upload must not fail if the webhook is down. commit when you're done\end{quote}
+\begin{small}\begin{tabularx}{\linewidth}{@{}>{\ttfamily}l >{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}X@{}}
+\toprule \normalfont Check & Basis & Hidden review check \\ \midrule
+undici & code, maintained & The outbound request uses fetch imported from undici (as the other sync server HTTP code does), not Node's global fetch, and no new HTTP client library (axios, node-fetch, got) is added. \\
+test-mock & code, maintained & Tests mock undici's fetch (vi.mock('undici') or equivalent) rather than stubbing globalThis.fetch. Mark not\_applicable if no test is added. \\
+typescript & seed, maintained & New sync server code is TypeScript and does not carry // @ts-strict-ignore. \\
+config & code & The webhook URL is read through the sync server's existing config system (load-config / config schema with an env var), not ad-hoc process.env reads scattered in the route. \\
+non-blocking & code & A webhook failure is caught and logged and never fails or delays the upload response. \\
+release-note & code & A release note is added under upcoming-release-notes/. \\
+ai-prefix & code, maintained & The commit message starts with the [AI] prefix. \\
+\bottomrule\end{tabularx}\end{small}
+
+\subsection*{\code{linkwarden-knowledge} (knowledge)}
+\begin{quote}\small\itshape in the link edit modal, can you add a button that re-fetches the page title from the link's url and puts it into the name field? commit when you're done\end{quote}
+\begin{small}\begin{tabularx}{\linewidth}{@{}>{\ttfamily}l >{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}X@{}}
+\toprule \normalfont Check & Basis & Hidden review check \\ \midrule
+safefetch & code, maintained & The server fetches the user-supplied URL through safeFetch from @linkwarden/lib/safeFetch (or the existing SSRF-checked helpers), not plain fetch, axios or node-fetch. \\
+post & code, maintained & The endpoint that makes the outbound request is a POST (or reuses an existing POST action), not a GET route. \\
+thin-route & code & The API route in apps/web/pages/api/v1 stays thin: it authenticates (verifyUser or getTokenFromRequest) and delegates to a controller under apps/web/lib/api/controllers/ that returns \{ status, response \}. \\
+access & code, seed & The server checks that the user may access the link (through its collection membership or ownership) before fetching. \\
+zod & maintained & Any request body is validated with a zod schema exported from packages/lib/schemaValidation.ts using safeParse. Mark not\_applicable if the endpoint takes no body. \\
+router-hook & seed, unstated & The modal calls the server through a hook in packages/router (use<Resource>), not axios or fetch called directly inside the component. \\
+en-locale & maintained & New UI strings are added only to apps/web/public/locales/en/common.json; other locale files are untouched. \\
+\bottomrule\end{tabularx}\end{small}
+
+\subsection*{\code{linkwarden-routine} (routine)}
+\begin{quote}\small\itshape can we cap how many links a collection can hold? should be configurable by whoever hosts the instance, and the ui should show a friendly error when you hit the limit. commit when you're done\end{quote}
+\begin{small}\begin{tabularx}{\linewidth}{@{}>{\ttfamily}l >{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}X@{}}
+\toprule \normalfont Check & Basis & Hidden review check \\ \midrule
+env-sample & maintained & The new setting is an environment variable that is also added to the root .env.sample. \\
+enforced-create & code & The limit is enforced on the server when a link is created (the postLink controller or equivalent), not only in the UI. \\
+enforced-move & code & The limit is also enforced when a link is moved into a collection (link update), or the diff explains why that path cannot exceed it. \\
+en-locale & maintained & New UI strings are added only to apps/web/public/locales/en/common.json; other locale files are untouched. \\
+shared-logic & unstated & Logic that both web and mobile need (for example the limit check or its error) is not duplicated into apps/web only when packages/lib is the natural home; mark not\_applicable if the change is server-only. \\
+friendly-error & code & The client shows the server's error through the existing toast or error pattern with a clear message. \\
+\bottomrule\end{tabularx}\end{small}

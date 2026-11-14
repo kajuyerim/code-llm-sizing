@@ -1,0 +1,54 @@
+\chapter{CONCLUSION}
+\label{ch:conclusion}
+
+At the midterm point Context Ops is a working, tested, and reproducible system. The runtime implements two context-acquisition strategies behind one shared pipeline, keeps every result local and reviewable, and can be set up by a coding agent from a README prompt. We have run three maintenance evaluations (the pilot, v2, and its rerun), four downstream evaluations, and a live first run from empty knowledge. The knowledge repository now works as a team's shared repository or as one application's: developers attach their applications once, their agents read the knowledge, and every push opens a review request on it.
+
+\section{Findings So Far}
+
+\begin{enumerate}[nosep]
+  \item \textbf{Reading everything once beats reading selectively.} On long multi-task pushes, the sweeper-first strategy found 17 of 21 required facts with Sonnet against 10 for fresh specialists. The difference comes from coverage: every sweeper read all six sessions, fresh specialists read about a third of them.
+  \item \textbf{Forks are cheap only when the cache prefix is shared.} Two invisible differences, a role-specific system prompt and asynchronously connected tools, made every fork re-write the inherited history. After removing both, forks became cheaper than fresh specialists, and A became cheaper than B per fact found.
+  \item \textbf{A cheaper model does not make A cheaper.} With Haiku the sweeper's long reading multiplied every fork's per-turn cost, and A-Haiku cost 2.7 times B-Haiku.
+  \item \textbf{Downstream effect.} \DSConclusionText
+  \item \textbf{The loop carries decisions across sessions.} When developers stated team decisions while working, later features in fresh sessions followed all of them with push-triggered maintenance and merged knowledge, against 72\% without knowledge ($p<0.001$, 81 features). The lost decisions were the ones the code shows weakly. A knowledge repository shared by three applications worked as well as one per application, kept every entry scoped to its application, and leaked no application's rule into another. A maintenance run per push cost about \$0.40 and 100 seconds in the background.
+  \item \textbf{Knowledge helps where the code is silent, and only there.} Rerun on the v2 inputs, maintenance kept its ranking and became cleaner (A with Sonnet: 16 of 21 required facts, no traps, fewer noise records). On six new persona-driven tasks, however, no knowledge base beat no knowledge, because the code already showed most answers and the hardest rule had never been said in the conversations. Agents also skim the knowledge; a session-start digest made them cite it more often but did not change these results. A person reviewing the diff closed most gaps in every condition.
+  \item \textbf{Team knowledge crosses repositories.} Decisions a tech lead stated while working in Linkwarden were stored as team-wide entries and reached agents working in Actual Budget and Maybe: 88\% of decision checks at the first commit against 60\% without the knowledge ($p<0.001$), with fewer review rounds. Most of the gain came from the commit convention, which the other repositories' code contradicts.
+  \item \textbf{The template-to-populated path works.} From a clean clone and empty knowledge, the documented run produced evidence-backed entries in about four minutes for \$0.7 to \$1.4. The first run exposed a validation rule that discarded correct facts, inconsistent identifiers, unhandled handoffs, and inconsistent scopes; after the fixes the same run filled all four core documents with fifteen entries.
+\end{enumerate}
+
+\section{Status of the Success Criteria}
+
+Table~\ref{tab:criteria} compares the evidence collected so far with the success criteria of Section~2.2.2.
+
+\begin{table}[H]
+\centering
+\caption{Success criteria at the midterm.}
+\label{tab:criteria}
+\small
+\begin{tabularx}{\linewidth}{@{}l >{\raggedright\arraybackslash}X l@{}}
+\toprule
+Criterion & Evidence so far & Status \\
+\midrule
+Coverage $\geq$ 75\%, traps $\leq$ 5\% & A-Sonnet v3: 76\% of required facts (16 of 21) and 0 of 19 traps (v2: 81\%, 1 trap); one run per application & Met \\
+Cost $<$ \$2 per push & A-Sonnet \$1.42, B-Sonnet \$0.92 (v3); \$0.40 per push in the feature sequence & Met \\
+Downstream benefit & +8 points with A's knowledge ($p=0.02$); feature sequence 100\% against 72\%; across repositories 88\% against 60\% (both $p<0.001$); persona tasks whose answers the code shows: no difference & Met where the code is silent \\
+Reproducibility & Public demo from a clean clone recorded four times; fixes verified live; PR \#13 and follow-ups not yet merged & Met, in review \\
+Safety & Credential and path scans pass; result branches reach the team only as review requests; no automatic merge & Met \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Next Steps}
+
+\begin{enumerate}[nosep]
+  \item \textbf{Repetitions and a human audit.} Repeat the v3 maintenance runs at least three times per condition and have both team members audit a sample of the judge's verdicts.
+  \item \textbf{Cheaper A.} Try a Haiku writer, pre-loaded evidence for the sweeper to shorten its reading, more parallel forks, and a middle strategy (``C'') in which specialists share a cached evidence prefix without a sweeper.
+  \item \textbf{Cumulative maintenance.} Run maintenance over several consecutive pushes on the same knowledge, including updates, merges, and retirements of facts that become stale.
+  \item \textbf{Decisions that the code does not show.} Test the kinds of knowledge the admission policy keeps, where a missing decision is costly: infrastructure changed only through Terraform while the agent works in an application repository (with recording stand-ins for \code{gcloud}, \code{kubectl}, and \code{terraform}), a decision that replaces a pattern most of the existing code still uses, a rejected approach that leaves no trace in the code, and security rules such as keeping personal data out of logs. A decision stated in one repository and needed in another is where team knowledge should outperform per-repository knowledge.
+  \item \textbf{Harder feature sequences.} The feature-sequence experiment reached the ceiling with two decisions per prompt and one short session per push. Next: longer chains, several developers per push, decisions that are revised or contradict each other, a human reviewer who rejects or edits requests, and a hosted GitHub or GitLab remote.
+  \item \textbf{Publication.} Release the simulated conversations, tasks, hidden checks, and protocol as a dataset with instructions to reproduce every number in this report.
+\end{enumerate}
+
+\section{Future Work}
+
+Beyond this semester, the approach could support other coding agents (a Codex backend is tracked as a separate issue), semantic storage with synonyms and consolidation, and real teams' conversations collected with consent. We plan to make the repository and dataset public so that others can compare maintenance strategies on the same inputs and improve them.

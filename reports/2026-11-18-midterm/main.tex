@@ -1,0 +1,59 @@
+\documentclass[12pt,a4paper,oneside]{report}
+\input{preamble}
+\IfFileExists{generated/ds_macros.tex}{\input{generated/ds_macros}}{}
+\IfFileExists{generated/ds_text.tex}{\input{generated/ds_text}}{}
+\input{generated/placeholders}
+
+\begin{document}
+
+% ---------------------------------------------------------------- title page
+\begin{titlepage}
+\centering
+\vspace*{7cm}
+{\Large CMPE 492\par}
+\vspace{0.6cm}
+{\Large Context Ops: Maintaining Shared Knowledge\\[0.2em] for Coding Agents\par}
+\vspace{0.8cm}
+{\large Midterm Report\par}
+\vspace{1.6cm}
+{\large Kerem Haktan Kurt\par}
+\vspace{0.3cm}
+{\large Bar\i{}\c{s} \"{O}ks\"{u}z\par}
+\vspace{1.4cm}
+{\large Advisor:\par}
+\vspace{0.3cm}
+{\large Assoc.\ Prof.\ Atay \"{O}zg\"{o}vde\par}
+\vfill
+{\large November 2026\par}
+\end{titlepage}
+
+\pagenumbering{roman}
+\setcounter{page}{1}
+\tableofcontents
+\clearpage
+\listoffigures
+\clearpage
+\listoftables
+\clearpage
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+\input{chapters/introduction}
+\input{chapters/definition}
+\input{chapters/related}
+\input{chapters/methodology}
+\input{chapters/requirements}
+\input{chapters/design}
+\input{chapters/implementation}
+\input{chapters/results}
+\input{chapters/conclusion}
+
+\input{chapters/references}
+
+\appendix
+\addtocontents{toc}{\protect\renewcommand{\protect\cftchappresnum}{APPENDIX }\protect\renewcommand{\protect\cftchapaftersnum}{:}\protect\setlength{\protect\cftchapnumwidth}{7.2em}}
+\renewcommand{\thechapter}{\Alph{chapter}}
+\titleformat{\chapter}[block]{\centering\bfseries\large}{APPENDIX \thechapter:\hspace{0.6em}}{0pt}{\MakeUppercase}
+\input{chapters/appendix}
+
+\end{document}

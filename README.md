@@ -59,7 +59,8 @@ Both **A, `sweeper-first`**, and **B, `fresh-specialists`**, are available throu
 | `maintenance/` | Procedures for maintaining core and tool knowledge |
 | `agents/` | Shared role definitions, assignments, sweeper, and writer |
 | `skills/` | Reusable setup and issue-creation procedures |
-| `docs/` | Walkthrough, architecture, evaluation, and provenance |
+| `docs/` | Walkthrough, architecture, evaluation, provenance, and the first-run demo |
+| `reports/` | Dated project reports: pilot, v2, and the midterm report |
 | `runtime/` | Shared Claude runtime, operational guide, and tests |
 | `init.md` | Common run settings and instructions |
 
@@ -68,6 +69,8 @@ Both **A, `sweeper-first`**, and **B, `fresh-specialists`**, are available throu
 `tools/` replaces the former `products/` folder. These are knowledge areas, not executable agent tools. Application sources, evaluation fixtures, and private run artifacts stay outside this repository. Firebase/Dataform folders do not imply application usage or company policy.
 
 ## Evidence and current status
+
+All project reports, current and previous, are listed with their dates in [reports](reports/README.md). The latest experiment ran the whole loop (attach, push, review request, merge) over three consecutive features per application. Decisions developers stated in earlier sessions were followed every time with team or repository knowledge, against 72% without. Decisions a lead stated in one repository reached agents in two others through the team knowledge (88% of checks against 60%). On tasks whose answers the code already shows, knowledge made no difference. See [evaluation](docs/evaluation.md) and the [results page](reports/2026-11-15-results/context-ops-results.html). The midterm report is [here](reports/2026-11-18-midterm/context-ops-midterm.pdf).
 
 Both strategies and the shared runtime are merged into `master` through [PR #7](https://github.com/kajuyerim/code-llm-sizing/pull/7) and [PR #8](https://github.com/kajuyerim/code-llm-sizing/pull/8). [PR #9](https://github.com/kajuyerim/code-llm-sizing/pull/9) adds fork cache reuse, MCP-free maintenance execution, conversation-session discovery, and the v2 evaluation summary.
 

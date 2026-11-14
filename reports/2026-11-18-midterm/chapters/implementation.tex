@@ -1,0 +1,79 @@
+\chapter{IMPLEMENTATION AND TESTING}
+
+\section{Implementation}
+
+The runtime is about 2{,}400 lines of Python in the \code{contextops} package, built on the Claude Agent SDK. The agents' behavior is defined in Markdown, not in code: shared rules, one definition per role, and maintenance guides (about 430 lines in total), so that prompts can be reviewed and versioned like the knowledge itself. The configuration file \code{init.md} lists the specialists, their targets, budgets, and output settings.
+
+\paragraph{Agent execution.} Every agent call goes through one function that builds the SDK options: the shared system prompt, the role as the first user message, the structured output schema, the allowed tools, a turn limit, and a budget. Specialists can use only Read, Grep, and Glob; only the writer can use Edit and Write. A pre-tool hook (\code{access.py}) resolves every path and refuses reads outside the evidence pack, the application snapshot, and the knowledge snapshot, refuses credential files and repository internals, and refuses writes outside Markdown in \code{core/} and \code{tools/}. Maintenance agents run with an empty MCP server list and with login connectors disabled, which keeps the tool list, and therefore the prompt-cache prefix, identical across calls.
+
+\paragraph{Strategy A.} After the sweeper finishes, each specialist is started with \code{resume} set to the sweeper's session and \code{fork\_session} enabled. The fork prompt states that the sweeper phase is over and gives the new role. The runtime records a fingerprint of the sweeper's cache prefix and checks that each fork shares it (\code{shares\_cache\_prefix} in \code{sweeper.json}); this was true for every fork in all twelve v2 runs.
+
+\paragraph{Evidence and review.} The transcript reader is the only module that knows Claude Code's JSONL format. It keeps user and assistant messages inside the application directory, renders tool calls as one line with their target, and drops tool results and thinking. The review step resolves every locator against the frozen pack: conversation locators must name an existing message, diff locators a path listed in the diff or the commit log, and source locators an existing line at the pushed head. A locator that does not resolve is dropped and reported; a record is rejected only when none of its locators resolve.
+
+\paragraph{Handoff pass.} Specialists run in parallel, so a finding that one of them hands to another document's owner arrives after the owner has finished. After the strategy completes, every specialist that received handoffs gets one extra turn on a fork of its own session, with the handoffs as its next message. It keeps its reading and its cache prefix, so the pass is cheap (\$0.03 in the live run). Both strategies run this pass in the same way.
+
+\paragraph{First run and sharing.} \code{contextops init} (PR \#13) validates that the knowledge checkout is clean, creates a new branch, and replaces every learned document with an empty template that keeps tool relevance hints. For this report we added \code{export-session} and \code{import-session}, which make development sessions shareable: export keeps messages, text, and tool calls, drops thinking and tool results, and replaces the application root and home directory with placeholders; import restores the paths for another checkout.
+
+\begin{sloppypar}\noindent\textbf{Attach, push, review.} \code{contextops attach} connects an application without changing any tracked file. It writes a marked block into the application's \code{CLAUDE.local.md} that names the knowledge checkout and asks the agent to read its index before a task, adds the checkout to \code{permissions.additionalDirectories} in \code{.claude/settings.local.json} so it can be read without prompts, registers a \code{SessionStart} hook that fast-forwards the checkout and prints a digest of the entries (one line each, under 9{,}000 characters) that Claude Code adds to the session's context, excludes these files through \code{.git/info/exclude}, and installs the pre-push hook. The pointer is plain text with an absolute path rather than an \code{@} import, which would need an approval dialog for a path outside the project. On push, the hook refreshes the knowledge checkout and prepares a run from the pushed range and every session of the application with a message since the last run; the run continues in the background and never blocks the push. With \code{open\_pr: true}, \code{publish.py} pushes the result branch and opens a request: \code{gh pr create} on GitHub, \code{glab mr create} or Git push options on GitLab, the branch alone elsewhere. The \code{scope} setting reaches every specialist as an instruction: in a team knowledge base, facts are scoped to the application they came from and other applications' entries are left alone; a repository knowledge base can be bound to one application name.\end{sloppypar}
+
+\paragraph{Evaluation tooling.} The simulation harness (persona model, task briefs, episode driver, scoring and HTML report builders) and the downstream harness (\code{ds.py} with \code{tasks.yaml} and a frozen protocol) live in a separate evaluation workspace, because application sources and raw conversations must not enter the knowledge repository.
+
+\section{Testing}
+
+The repository has 51 deterministic tests in four suites. They create disposable application and knowledge repositories in a temporary directory and replace the model with fake agents, so they need no account and make no model calls; a guard fails any test that tries live inference. They cover:
+\begin{itemize}[nosep]
+  \item explicit selection of strategy, sessions, refs, and cutoff, and failure before any artifact is written when an input is missing;
+  \item frozen conversations and their integrity hash;
+  \item the shared cache prefix of sweeper, forks, and B specialists, and the MCP-free SDK options;
+  \item access checks against traversal, symlinks, credentials, and writes outside the allowed paths;
+  \item review of locators, writer failure (no commit, candidate patch kept), budget exhaustion, and no-change runs;
+  \item the complete first-run path with \code{init} for A and B, and the export and import round trip;
+  \item partial locator handling, the commit log as evidence, the handoff pass and its cost accounting, and the application scope label;
+  \item \code{attach} (only untracked local files change, idempotent, refusals), automatic session selection, push-triggered runs that push a review branch to a local remote, GitHub requests through a fake \code{gh}, GitLab merge requests through push options, \code{refresh} and the session-start digest, and repository scope binding.
+\end{itemize}
+
+Continuous integration runs the tests on Python 3.11 and 3.14, a Markdown link and frontmatter check, and a credential-pattern scan of all files and the full Git history, including decoded data inside the walkthrough HTML (Figure~\ref{fig:ci}).
+
+Live behavior is verified separately and recorded with its inputs: the cache fix with live forks, the twelve v2 runs, the 120 downstream development runs, the live first-run acceptance runs (Section~\ref{sec:demo}), and the feature-sequence experiment, which ran the attach, push, and review path end to end against local remotes (Section~\ref{sec:loop}).
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=0.4cm]
+  \node[box] (push) {push or\\pull request};
+  \node[box, right=of push] (inst) {install from\\lock file};
+  \node[box, right=of inst] (tests) {51 tests\\(fake agents)};
+  \node[box, right=of tests] (docs) {Markdown\\checks};
+  \node[box, right=of docs] (pub) {credential scan\\files + history};
+  \draw[arr] (push) -- (inst); \draw[arr] (inst) -- (tests); \draw[arr] (tests) -- (docs); \draw[arr] (docs) -- (pub);
+  \node[note, below=0.3cm of tests] {Python 3.11 and 3.14};
+\end{tikzpicture}
+\caption{Continuous integration pipeline.}
+\label{fig:ci}
+\end{figure}
+
+\section{Deployment}
+
+Context Ops is a local command line tool; there is no server to deploy. Figure~\ref{fig:deploy} shows where each part runs. The developer clones the knowledge repository next to the application, installs the runtime in a virtual environment from the lock file, and authenticates privately with a Claude login or an API key. Maintenance agents call the Claude service; all files stay on the developer's machine. Development agents reach the knowledge through the pointer that \code{attach} writes into the application's \code{CLAUDE.local.md}. A push in the application starts a run, and the result branch goes to the team's knowledge remote as a pull or merge request; nothing is merged without review.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=0.5cm and 0.8cm]
+  \node[draw, dashed, rounded corners, minimum width=11.2cm, minimum height=5.2cm, label={[font=\small]above left:Developer machine}] (m) at (0,0) {};
+  \node[box] (app) at (-3.6,1.4) {Application\\checkout};
+  \node[box] (hist) at (-3.6,-1.2) {Claude Code\\history (JSONL)};
+  \node[box] (rt) at (0,0.1) {\code{contextops}\\runtime (venv)};
+  \node[box] (kb) at (3.6,1.4) {Knowledge\\checkout};
+  \node[box] (runs) at (3.6,-1.2) {Run directory\\\code{\textasciitilde/.contextops/runs}};
+  \node[box] (claude) at (0,-4.0) {Claude service\\(Agent SDK)};
+  \node[box] (gh) at (6.9,-4.0) {Team Git remote\\(pull/merge request)};
+  \draw[arr] (app) -- (rt); \draw[arr] (hist) -- (rt);
+  \draw[arr] (rt) -- (kb); \draw[arr] (rt) -- (runs);
+  \draw[arr, <->] (rt) -- (claude);
+  \draw[arr, dashed] (kb.east) -| (gh.north);
+  \draw[arr, dotted] (kb.north) to[bend right=25] node[above, font=\scriptsize]{\code{CLAUDE.local.md} pointer} (app.north);
+\end{tikzpicture}
+\caption{Deployment diagram.}
+\label{fig:deploy}
+\end{figure}
+
+The README gives a prompt that a developer can hand to any coding agent; the agent then follows the setup skill: install, test, initialize empty knowledge on a new branch, select the committed range and sessions, run strategy A, and show the resulting diff. The equivalent manual commands are in \code{setup.md}, and Appendix~\ref{app:demo} gives the full command sequence of the public demo.

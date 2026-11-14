@@ -1,0 +1,371 @@
+\chapter{RESULTS}
+\label{ch:results}
+
+This chapter reports the October pilot (Section~\ref{sec:pilot}), experiment v2 (Section~\ref{sec:v2}) and its rerun with the current runtime (Section~\ref{sec:v3}) for RQ1; the downstream comparison (Section~\ref{sec:downstream}), the feature-sequence experiment (Section~\ref{sec:loop}), persona-driven development (Section~\ref{sec:v3-dev}) and team decisions across repositories (Section~\ref{sec:v4}) for RQ2; and the live first-run demonstration (Section~\ref{sec:demo}). The pilot and v2 used different inputs and configurations, so v2 is not a controlled rerun of the pilot. All costs are client-side list-price estimates reported by the SDK, not invoices.
+
+\section{October Pilot}
+\label{sec:pilot}
+
+The pilot ran three applications (Maybe, Actual Budget, Linkwarden) with five checkpoints each. Each checkpoint had one development task with a single simulated developer, and each was maintained by Claude and by GPT under strategies A and B, giving 60 outputs. Knowledge was reset to the baseline at every checkpoint. A model judge scored the outputs against 20 required facts.
+
+\begin{table}[htbp]
+\centering
+\caption{October pilot: required facts captured (out of 20).}
+\label{tab:pilot}
+\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Condition & Proposal hits & Partial & Applied hits & Optional (of 6) \\
+\midrule
+Claude A & 10 & 5 & 11 & 4 \\
+Claude B & 9 & 4 & 9 & 2 \\
+GPT A & 5 & 6 & 5 & 1 \\
+GPT B & 5 & 8 & 3 & 1 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Claude found about twice as many required facts as GPT, and A was slightly ahead of B for both providers (Table~\ref{tab:pilot}). Nine GPT runs had writer tool-routing failures, which lowered their applied results. With Claude, A cost \$1.22 per run against \$0.56 for B. The difference was traced to the forks re-writing the inherited history to the prompt cache, which motivated the cache fix described in Section~\ref{sec:strategies}.
+
+\section{Experiment v2: Longer Conversations and the Cache Fix}
+\label{sec:v2}
+
+In v2 each application's five tasks were replayed back to back as one push by three teammate personas, giving six development sessions and 53{,}000 to 96{,}000 characters of conversation per push, two to three times the pilot's total per application. Every condition received identical frozen inputs. A and B were run with Sonnet 5.5 and Haiku 5.5, one run per condition and application. A blind judge scored accepted records against 21 required facts (two Maybe facts were excluded because the persona never delivered them) and 19 decoys.
+
+\begin{table}[htbp]
+\centering
+\caption{Experiment v2: maintenance quality, cost, and time (one run per application and condition).}
+\label{tab:v2}
+\small
+\begin{tabular}{@{}lccccrr@{}}
+\toprule
+Condition & Required & Partial & Optional & Traps & Cost/run & Time/run \\
+\midrule
+A, Sonnet & \textbf{17} / 21 & 1 & 3 / 7 & 1 / 19 & \$1.40 & 233 s \\
+B, Sonnet & 10 / 21 & 1 & 1 / 7 & 0 / 19 & \$1.09 & 115 s \\
+A, Haiku & 13 / 21 & 6 & 3 / 7 & 4 / 19 & \$0.99 & 597 s \\
+B, Haiku & 11 / 21 & 2 & 3 / 7 & 3 / 19 & \$0.37 & 338 s \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.92\linewidth, height=6.2cm,
+  xlabel={Cost per run (USD)}, ylabel={Required facts found (of 21)},
+  xmin=0.2, xmax=1.6, ymin=8, ymax=19,
+  grid=major, grid style={gray!25},
+  every node near coord/.append style={font=\footnotesize},
+  nodes near coords, point meta=explicit symbolic,
+]
+\addplot[only marks, mark=*, mark size=3pt, color=inkA, nodes near coords align={anchor=south west}]
+  coordinates {(1.40,17)[A, Sonnet] (0.99,13)[A, Haiku]};
+\addplot[only marks, mark=square*, mark size=3pt, color=inkB, nodes near coords align={anchor=north west}]
+  coordinates {(1.09,10)[B, Sonnet] (0.37,11)[B, Haiku]};
+\end{axis}
+\end{tikzpicture}
+\caption{Quality against cost in v2. Strategy A in blue circles, strategy B in brown squares.}
+\label{fig:v2scatter}
+\end{figure}
+
+With Sonnet, A found 17 of 21 required facts against 10 for B, at 28\% higher cost (Table~\ref{tab:v2}, Figure~\ref{fig:v2scatter}). Measured per required fact found, A was cheaper: \$0.25 against \$0.33. The cache fix worked as intended. Forked specialists averaged \$0.11 each against \$0.16 for fresh ones, because they read the inherited history from the cache and needed 3 to 6 turns instead of 12 to 15. A's remaining extra cost is the sweeper itself, which averaged \$0.54 per run. The cost gap between A and B with Sonnet fell from +118\% in the pilot to +28\%.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  xbar stacked, width=0.85\linewidth, height=4.2cm, bar width=12pt,
+  xlabel={Average cost per run (USD)}, xmin=0, xmax=1.5,
+  symbolic y coords={B Sonnet, A Sonnet}, ytick=data,
+  legend style={at={(0.5,-0.42)}, anchor=north, legend columns=4, font=\footnotesize, draw=none},
+  enlarge y limits=0.45,
+]
+\addplot[fill=inkA!70, draw=none] coordinates {(0.54,A Sonnet) (0,B Sonnet)};
+\addplot[fill=inkA!35, draw=none] coordinates {(0.65,A Sonnet) (0,B Sonnet)};
+\addplot[fill=inkB!45, draw=none] coordinates {(0,A Sonnet) (0.89,B Sonnet)};
+\addplot[fill=gray!40, draw=none] coordinates {(0.21,A Sonnet) (0.20,B Sonnet)};
+\legend{Sweeper, Forked specialists, Fresh specialists, Writer and other}
+\end{axis}
+\end{tikzpicture}
+\caption{Where the money goes with Sonnet in v2 (averages over three applications; the B split between specialists and writer is approximate).}
+\label{fig:v2split}
+\end{figure}
+
+The quality difference comes from reading. Every fact that B-Sonnet missed was stated in the conversation. Every sweeper read all six sessions, while B-Sonnet specialists read 2.2 of six sessions on average, and six of eighteen specialists read none. A fresh specialist decides from the diff and the session openings which sessions look relevant to its own document, but in a multi-task push a decision about the stack is often stated in a session whose task is about something else. The sweeper does not make this choice: it reads everything once and every fork inherits it.
+
+With Haiku the picture changes. The Haiku sweeper read the raw sessions for 40 to 75 turns, and each fork then re-read that long history on every one of its own turns, so A-Haiku cost 2.7 times as much as B-Haiku and admitted the most decoys. A cheaper model is therefore not automatically a cheaper A: the sweeper's length multiplies every fork's per-turn cost.
+
+\paragraph{Limitations of v2.} There is one run per condition and application, the judge is a model, the developers are simulated, and the writer's fidelity to accepted records was not scored. The results show a consistent direction across three applications but do not establish a general winner.
+
+\section{Downstream Comparison}
+\label{sec:downstream}
+
+All \DSRuns{} development runs finished and all \DSJudged{} were judged (Table~\ref{tab:ds}).
+
+\begin{table}[htbp]
+\centering
+\caption{Downstream comparison by knowledge condition (five runs per task and condition, six tasks; Maintained (B) was added later, see the text). Pass rate is over applicable hidden checks; completion is the judge's 0--3 rating.}
+\label{tab:ds}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrrrrrrrrr@{}}
+\toprule
+& & \multicolumn{3}{c}{Check pass rate} & & & & & \\
+\cmidrule(lr){3-5}
+Condition & Runs & All & Knowl. & Routine & Compl. & Cost & Time (s) & Turns & Follow-ups \\
+\midrule
+\inputrows{generated/ds_summary_rows.tex}
+\bottomrule
+\end{tabular}
+\end{table}
+
+\DSResultsText
+
+\begin{table}[htbp]
+\centering
+\caption{Pass rate by where a check's answer can be learned (number of applicable check verdicts in parentheses).}
+\label{tab:dscat}
+\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Check basis & None & Seed & Maint.\ (A) & Maint.\ (B) \\
+\midrule
+\inputrows{generated/ds_category_rows.tex}
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\caption{Pass rate per task; cost (USD) and time (s) as none / seed / maintained (A) / maintained (B).}
+\label{tab:dstask}
+\small
+\setlength{\tabcolsep}{4pt}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+Task & None & Seed & M (A) & M (B) & Cost & Time \\
+\midrule
+\inputrows{generated/ds_task_rows.tex}
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\DSDiscussionText
+
+\section{Feature-Sequence Experiment}
+\label{sec:loop}
+
+All 81 features finished, each with a commit by the agent; no clarification reply was needed. All 36 maintenance runs completed and every result branch was merged without conflict. Table~\ref{tab:loop} summarizes the three conditions.
+
+\begin{table}[htbp]
+\centering
+\caption{Feature-sequence experiment: three applications, three features each, three repetitions per condition. Pass rates are over applicable hidden checks (verdicts in parentheses). Costs are per feature for development and per push for maintenance.}
+\label{tab:loop}
+\small
+\begin{tabular}{@{}lccc@{}}
+\toprule
+& None & Repo knowledge & Team knowledge \\
+\midrule
+Carried decisions (F2, F3) & 72\% (43/60) & 100\% (58/58) & 100\% (60/60) \\
+\quad in F2 & 71\% (15/21) & 100\% (19/19) & 100\% (21/21) \\
+\quad in F3 & 72\% (28/39) & 100\% (39/39) & 100\% (39/39) \\
+Decisions stated in the same prompt & 100\% (34/34) & 100\% (37/37) & 100\% (39/39) \\
+Code-based checks & 91\% (89/98) & 92\% (94/102) & 90\% (95/105) \\
+No leak of Linkwarden's commit rule & 100\% (12/12) & 100\% (11/11) & 100\% (12/12) \\
+All checks & 87\% & 96\% & 95\% \\
+Completion (0--3) & 2.44 & 2.74 & 2.78 \\
+\midrule
+Development cost per feature & \$0.164 & \$0.190 & \$0.196 \\
+Median development time & 47 s & 50 s & 53 s \\
+Knowledge tool calls per feature & 0 & 2.8 & 2.7 \\
+Maintenance per push (cost, time) & -- & \$0.41, 106 s & \$0.39, 98 s \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Decisions carried over.} Every decision a developer stated in F1 or F2 was followed in every later feature where it applied, in both knowledge conditions. Without knowledge, later features followed 72\% of them. Shuffling condition labels within each application and feature, both knowledge conditions improved on none by 29 points (repo $p=0.0001$, team $p<0.001$). The 72\% is not a floor: the none agents saw the code of the earlier features and copied what it showed, such as Linkwarden's Conventional Commits subjects and Actual Budget's use of synced preferences (both 100\% without knowledge). The decisions that leave a weak trace in the code were lost: Maybe's rule that every new \code{UI::} component gets a Lookbook preview (0 of 6 without knowledge), Linkwarden's optional mobile \code{auth} argument for new router hooks (1 of 6), and Maybe's rule that totals across days live in the model (1 of 3). Decisions stated in the same prompt were followed 100\% of the time in all conditions, so the gap is the agent's missing memory across sessions, not its willingness to follow a rule.
+
+\paragraph{Team versus repository knowledge.} Sharing one knowledge repository among the three applications made no difference to any check kind. After the last round, the three team repositories held 16 to 19 entries and the per-application repositories 5 to 11. Every entry was scoped to the application it came from (\code{app:actual}, \code{app:linkwarden}, \code{app:maybe}); no run promoted a rule to \code{company}. Linkwarden's commit convention did not leak: all Actual Budget commits in the team condition kept the repository's \code{[AI]} prefix, and no Maybe commit used a Conventional Commits prefix.
+
+\paragraph{Cost and time.} Reading the knowledge cost about 3 cents and 3 to 6 seconds per feature (16\% to 19\% more development cost). A maintenance run after a push took about 100 seconds in the background and cost \$0.39 to \$0.41, less than the \$1.35 of the first-run demo, most likely because each push carried one short session and usually one commit instead of six sessions and seven commits. Including maintenance after two of every three features, a feature cost about \$0.46 with the loop against \$0.16 without it. Over the whole experiment, development cost \$14.82, maintenance \$14.35, and judging \$5.46.
+
+\paragraph{Limitations.} The treatment conditions reached the ceiling, so the experiment cannot rank repo against team knowledge or detect harm from extra entries. The decisions, features, and checks were designed by an agent working for us from the code, and the judge is a single model that sees only the diff. The reviewer merged every request unchanged, the remotes were local, and each push carried one short session. In the pilot chain, one decision was written into two documents (naming conventions and stack standards), which a human reviewer would have asked to merge. Most decisions in this experiment were conventions inside one application (UI components, preference keys, router hooks). After the experiment we adopted an admission policy that keeps such conventions out of the shared knowledge (Section~\ref{sec:admission}), so the experiment shows that the loop carries decisions across sessions, not that these particular decisions belong in it.
+
+\section{Maintenance Rerun (v3)}
+\label{sec:v3}
+
+All twelve runs completed. Table~\ref{tab:v3maint} shows the joint blind scoring. The judge scored the v2 runs within one required fact of the v2 report's own numbers for every condition, so the two judges agree closely.
+
+\begin{table}[htbp]
+\centering
+\caption{v2 and v3 maintenance on identical inputs, scored together by one blind judge (three applications per row).}
+\label{tab:v3maint}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrrrrrrr@{}}
+\toprule
+Run & Required & Partly & Optional & Traps & Supported & Noise & Cost/run \\
+\midrule
+v2 A Sonnet & 16/21 & 2 & 3/7 & 1/19 & 13 & 6 & \$1.40 \\
+v3 A Sonnet & 16/21 & 3 & 2/7 & 0/19 & 8 & 2 & \$1.42 \\
+v2 B Sonnet & 9/21 & 1 & 1/7 & 0/19 & 8 & 2 & \$1.09 \\
+v3 B Sonnet & 8/21 & 3 & 2/7 & 0/19 & 8 & 0 & \$0.92 \\
+v2 A Haiku & 13/21 & 5 & 3/7 & 3/19 & 38 & 12 & \$0.99 \\
+v3 A Haiku & 15/21 & 4 & 3/7 & 1/19 & 31 & 5 & \$1.09 \\
+v2 B Haiku & 10/21 & 3 & 3/7 & 2/19 & 22 & 9 & \$0.37 \\
+v3 B Haiku & 11/21 & 5 & 2/7 & 3/19 & 22 & 11 & \$0.54 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The ranking of v2 holds: A finds about twice as many required facts as B with Sonnet (16 against 8), and A with Haiku now comes close to A with Sonnet (15). The v3 runs propose fewer records that are noise or unsupported (A Sonnet: 2 against 6; A Haiku: 5 against 12) and A with Sonnet fell into no trap. The admission policy cost a few facts on purpose: v3 A with Sonnet left out UI conventions such as Maybe's design tokens and tooltip component, which its v2 run had recorded. Linkwarden gained the most: A with Sonnet now records thin API routes, router hooks for client calls, and shared web and mobile logic, which no v2 run had fully recorded.
+
+\section{Persona-Driven Development}
+\label{sec:v3-dev}
+
+All 126 sessions committed; none timed out. Table~\ref{tab:v3dev} summarizes them.
+
+\begin{table}[htbp]
+\centering
+\caption{Persona-driven development on the v3 knowledge bases (six tasks, three repetitions). Fact checks are those tied to facts from the v2 conversations. The digest conditions were added after the first analysis.}
+\label{tab:v3dev}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+Knowledge & First commit & Final & Review rounds & Facts told & Dev cost & vs none ($p$) \\
+\midrule
+None & 71\% & 94\% & 0.50 & 1.17 & \$0.195 & -- \\
+A Sonnet & 68\% & 93\% & 0.50 & 1.00 & \$0.198 & $-4.4$ (0.26) \\
+B Sonnet & 73\% & 93\% & 0.39 & 0.83 & \$0.215 & $+0.7$ (0.85) \\
+A Haiku & 67\% & 92\% & 0.44 & 0.94 & \$0.206 & $-5.1$ (0.20) \\
+B Haiku & 70\% & 92\% & 0.33 & 0.72 & \$0.207 & $-1.9$ (0.82) \\
+A Sonnet + digest & 73\% & 92\% & 0.44 & 1.11 & \$0.228 & $-1.9$ (0.65) \\
+B Sonnet + digest & 64\% & 90\% & 0.39 & 0.94 & \$0.206 & $-7.0$ (0.05) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{No condition beat no knowledge.} At the first commit the knowledge conditions passed 64\% to 73\% of fact checks against 71\% without knowledge; no difference is significant. The reason is visible per check: most fact checks were passed in every repetition of every condition, because the code showed the answer (Linkwarden's \code{safeFetch} next to the route, Actual Budget's \code{snapdom} in the current export code). The rest failed in every condition.
+
+\paragraph{Why the hard checks failed.} We looked up, for every fact check, whether the blind maintenance scoring found the fact in that condition's knowledge and whether the agent opened the document holding it before its first commit (Table~\ref{tab:v3gap}). Without help, agents always read \code{index.md} and then one or two core documents; an entry in another document had no effect. We therefore added a session-start digest to \code{attach} (one line per entry, printed by the \code{SessionStart} hook into the session's context). With it, agents cited knowledge entries in 22 of 36 sessions instead of 29 of 72, but the hard checks still failed. The clearest case is Maybe's backfill task. The knowledge recorded what the developer had said in v2 (backfills are \code{data\_migration} rake tasks, not Sidekiq jobs or schema migrations). Agents with the digest read that entry and cited it, then ran the rake task automatically at container start. The teammate's real rule, that backfills stay manual, had never been said in the conversations the knowledge was learned from. Actual Budget's release-note convention was missing from every knowledge base, in v2 and in v3, and its check passed in only 6 of 14 first commits across the first five conditions.
+
+\begin{table}[htbp]
+\centering
+\caption{First-commit fact checks by where the knowledge stood.}
+\label{tab:v3gap}
+\small
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Situation & All fact checks & Hard checks\textsuperscript{a} \\
+\midrule
+No knowledge base & 71\% (41/58) & 15\% (3/20) \\
+Fact missing from the knowledge & 67\% (39/58) & 47\% (17/36) \\
+Fact present, document not opened & 56\% (35/62) & 0\% (0/27) \\
+Fact present, document opened & 77\% (99/128) & 0\% (0/21) \\
+Fact present, digest in context & 70\% (64/92) & 4\% (1/23) \\
+\bottomrule
+\end{tabular}
+
+\smallskip
+{\footnotesize \textsuperscript{a} Checks that the agent without knowledge failed at least once.}
+\end{table}
+
+\paragraph{Review closes the gap.} After at most two review rounds every condition reached 90\% to 94\% of fact checks. The teammate had to state about one fact per session in every condition, so on these tasks the knowledge did not reduce the reviewer's work measurably.
+
+\paragraph{What this adds to the other two experiments.} Knowledge helped when the deciding information existed only in an earlier conversation and was stated clearly (downstream: +8 points; feature sequence: +29 points). It did not help when the code already showed the answer, or when the decisive part of a rule had never been said. This is the reason for the admission policy, and it points future experiments at decisions the code does not show: decisions made in one repository and needed in another, and decisions that replace a pattern most of the code still uses.
+
+\paragraph{Limitations.} The tasks were designed by agents around facts from simulated conversations, and most turned out to be visible in the code; the digest conditions were added after seeing the first results; the persona and judge are models; three repetitions per condition. One judge verdict (Maybe's self-hosted limit display) relied on the judge's recollection of code outside the diff and is unreliable.
+
+\section{Team Decisions Across Repositories}
+\label{sec:v4}
+
+All three learning sessions ended with a merged knowledge change (\$0.31 per maintenance run on average). The team knowledge then held all four decisions with \code{company} scope, plus one Linkwarden-only pitfall scoped \code{app:linkwarden}. All 40 test sessions committed. Table~\ref{tab:v4} gives the results.
+
+\begin{table}[htbp]
+\centering
+\caption{Team decisions stated in Linkwarden and tested in three repositories (five tasks, four repetitions per condition).}
+\label{tab:v4}
+\small
+\begin{tabular}{@{}lccr@{}}
+\toprule
+& No knowledge & Team knowledge & Difference ($p$) \\
+\midrule
+Decision checks, first commit & 60\% (29/48) & 88\% (42/48) & $+30$ (0.0002) \\
+\quad TD1 no new package & 100\% (8/8) & 100\% (8/8) & \\
+\quad TD2 no personal data in logs & 92\% (11/12) & 100\% (12/12) & \\
+\quad TD3 timeout, failure isolated & 50\% (6/12) & 50\% (6/12) & \\
+\quad TD4 Conventional Commits & 25\% (4/16) & 100\% (16/16) & \\
+Decision checks, final & 71\% (34/48) & 88\% (42/48) & $+18$ (0.005) \\
+Code checks, first commit & 80\% (67/84) & 74\% (62/84) & $-7$ (0.25) \\
+Review rounds per session & 0.25 & 0.05 & \\
+Decisions the teammate had to state & 0.20 & 0 & \\
+Development cost per session & \$0.17 & \$0.18 & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+With the team knowledge, agents in other repositories followed the team's decisions at their first commit in 88\% of checks against 60\% without it ($p=0.0002$). The teammates asked for fewer fixes (0.05 review rounds per session against 0.25) and never had to restate a rule. Code-quality checks did not differ significantly.
+
+Most of the difference comes from one decision. Without knowledge, agents copied each repository's own commit style (Actual Budget's \code{[AI]} prefix, Maybe's plain subjects) and followed Conventional Commits in 4 of 16 commits; with the knowledge, in all 16. Two decisions needed no knowledge: agents already avoided new packages and kept personal data out of the logs they wrote. The timeout decision did not change on its checks, but the checks were stricter than the rule. Every session with the team knowledge set an explicit timeout; the failing ones did not treat a non-2xx response as a failure or allowed retries beyond 10 seconds. Without knowledge, no Maybe exchange-rate client set a timeout at all.
+
+\paragraph{Limitations.} Five tasks, four repetitions, one learning repository, and decisions designed by an agent for this test; the result rests mainly on one decision. Agents without knowledge could have followed Conventional Commits only by guessing, so this is the intended contrast: a team rule that the repository in front of the agent does not show.
+
+\section{Live First-Run Demonstration}
+\label{sec:demo}
+
+We followed the documented first run from a clean clone four times on the public Actual Budget demo inputs (seven development commits, six sessions), each time starting from the empty knowledge that \code{contextops init} prepares and using the checked-in Sonnet configuration (Table~\ref{tab:demoruns}). The first run tested Kerem's first-run implementation (PR~\#13) as submitted; the problems it exposed were fixed, and the later runs verify the fixes.
+
+\begin{table}[H]
+\centering
+\caption{Live first-run runs from empty knowledge on the Actual Budget demo.}
+\label{tab:demoruns}
+\small
+\begin{tabular}{@{}llrrrrl@{}}
+\toprule
+Revision & Strategy & Accepted & Rejected & Cost & Time & Documents written \\
+\midrule
+\code{caf4bdb} (PR \#13) & A & 10 & 1 & \$1.01 & 3:59 & terms, stack, pitfalls \\
+\code{43888a7} (fixes) & A & 14 & 0 & \$0.72 & 3:10 & all four \\
+\code{43888a7} (fixes) & B & 3 & 0 & \$0.50 & 1:16 & terms, pitfalls \\
+\code{b20f3f9} (final) & A & 15 & 0 & \$1.35 & 4:58 & all four \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{First run.} The first run wrote ten correct entries, for example that amounts are stored at $\times$100 for every currency including yen, that the sync server must import \code{fetch} from \code{undici}, and that report range validation must compare normalized dates. It also exposed three problems. A correct convention was lost: the conventions specialist proposed that commit messages start with \code{[AI]}, citing two developer messages and the commit log, but review rejected the whole record because the commit log was not accepted as a locator. The writer used inconsistent identifiers (\code{STACK-001} but \code{PIT001}) because the empty templates showed no example. And the conventions specialist handed typing rules to the stack document, but forks run in parallel and handoffs were only reported, so nobody acted on them.
+
+\paragraph{Fixes.} We changed review so that it drops only unresolvable locators and rejects a record only when none of its locators resolve, and accepted the commit log as evidence. We added a handoff pass in which each receiver gets one extra turn on a fork of its own session. We stated the identifier format in the run notes and templates. A further run showed facts scoped as \code{app:actual-budget}, \code{app:desktop-client}, and \code{app:sync-server} for the same application, so specialists are now told to use \code{app:<checkout folder name>}. Three deterministic tests cover the new behavior (42 in total).
+
+\paragraph{After the fixes.} At the final revision the same run wrote fifteen entries into all four core documents (Table~\ref{tab:demo}). The naming document now holds the \code{[AI]} prefix, the release-note requirement, and one component per file; all entries use \code{app:actual} and hyphenated identifiers. Two of the naming records had cited a non-diff path; review dropped that locator and kept them on their conversation evidence, where the old rule would have rejected them. In the intermediate run the handoff pass added the \code{ts-strict-ignore} rule to the stack document for \$0.03. From the same empty baseline, strategy B wrote only three entries, which mirrors the A/B coverage difference of v2.
+
+\begin{table}[htbp]
+\centering
+\caption{Knowledge written by the final live run (revision \code{b20f3f9}), starting from empty documents.}
+\label{tab:demo}
+\small
+\begin{tabularx}{\linewidth}{@{}l >{\raggedright\arraybackslash}X@{}}
+\toprule
+ID & Entry (shortened) \\
+\midrule
+TERM-001 & Stored amount: the value times 100 for every currency (1{,}500 yen is 150000); decimal places only affect display. \\
+TERM-002 & Quarter key: a quarter is identified by its first month (\code{2026-07}) and labelled Q3 '26. \\
+STACK-001 & Sync server code imports \code{fetch} from \code{undici}, never the global \code{fetch}; tests mock undici. \\
+STACK-002 & undici is the only HTTP client of the sync server; no axios or node-fetch. \\
+STACK-003 & The sync server requires Node \code{>=22.19.0}; the root floor may differ. \\
+STACK-004 & Report snapshots use \code{@zumer/snapdom}; use the returned image's \code{src}. \\
+STACK-005 & Intervals AQL cannot group are queried finer and rolled up client-side. \\
+NAME-001 & Commit messages and PR titles start with \code{[AI]}. \\
+NAME-002 & Every change adds a release note under \code{upcoming-release-notes/} with a descriptive slug. \\
+NAME-003 & One React component per file; a shared props type gets its own file. \\
+PIT-001 & Scaling stored amounts by the currency's decimal places shows yen 100 times off. \\
+PIT-002 & Passing an undici dispatcher to Node's global \code{fetch} mixes undici versions. \\
+PIT-003 & A shared module-level \code{vi.fn()} mock keeps calls across tests unless cleared. \\
+PIT-004 & Comparing a full From date with a bare month or year To key flips a same-period range. \\
+PIT-005 & The legacy amount input with auto-decimals turns typed yen into hundredths. \\
+\bottomrule
+\end{tabularx}
+\end{table}
