@@ -25,7 +25,7 @@ from contextops.initializer import Worker, plan_workers
 from contextops.orchestrator import orchestrate
 from contextops.review import review_results
 from contextops.run import create_run, frozen_sessions, load_run, record_cutoff, last_cutoff
-from contextops.strategies import WorkerResult, fresh_specialists
+from contextops.strategies import WorkerResult, fresh_specialists, worker_prompt
 from contextops.writer import _revert_outside_scope
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -205,6 +205,11 @@ class RuntimeTests(unittest.TestCase):
         only_commits = review(commits)
         self.assertEqual(len(only_commits.accepted), 1)
         self.assertNotIn('dropped_locators', only_commits.accepted[0])
+
+    def test_worker_prompt_names_the_application_scope(self):
+        ctx = self.prepare(); config = load_config(self.kb); evidence = build_pack(ctx, config)
+        worker = plan_workers(config, evidence)[0][0]
+        self.assertIn(f'`app:{self.app.name.lower()}`', worker_prompt(worker, ctx))
 
     def test_handoffs_reach_their_owner_once_on_a_fork_of_its_session(self):
         ctx = self.prepare(); config = load_config(self.kb); evidence = build_pack(ctx, config)

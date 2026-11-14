@@ -30,6 +30,11 @@ class WorkerResult:
     run: AgentRun
 
 
+def app_name(ctx: RunContext) -> str:
+    """The scope label for this application: its checkout's folder name, lowercased."""
+    return ctx.app_root.name.lower()
+
+
 def worker_prompt(worker: Worker, ctx: RunContext) -> str:
     lines = [
         f"Assignment: {worker.label}",
@@ -46,6 +51,8 @@ def worker_prompt(worker: Worker, ctx: RunContext) -> str:
         "",
         f"Source application, read-only, checked out at {ctx.head_sha}: {ctx.app_snapshot}",
         f"Knowledge base at baseline {ctx.kb_baseline[:7]}: {ctx.kb_snapshot}",
+        "",
+        f"Scope facts about this application as `app:{app_name(ctx)}`, not a package or product name.",
         "",
         "Sweep the evidence for your assignment, compare it with the current knowledge, "
         "and return your change records. When nothing applies, return a single NO_CHANGE "

@@ -5,6 +5,7 @@
 - The live first-run acceptance lost a supported `[AI]` commit convention: one of its three locators pointed at `diff/commits.txt`, and review rejected the whole record. Review now drops only unresolvable locators, rejects a record only when none resolve, and accepts `diff/commits.txt`.
 - Handoffs between parallel specialists were reported but never acted on. Each receiver now gets one extra turn on a fork of its own session with the handoffs it received; `handoffs.json` records the pass.
 - The writer produced both `STACK-001` and `PIT001`. Run notes and empty templates now state the format: prefix, hyphen, three digits.
+- Without the application's name, one run scoped its facts as `app:actual-budget`, `app:desktop-client`, and `app:sync-server`. Specialists are now told to use `app:<checkout folder name>`.
 
 ## 2026-11-05: Run maintenance agents without MCP servers; list sessions
 
