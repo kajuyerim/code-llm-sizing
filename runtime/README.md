@@ -9,6 +9,8 @@ Start with [setup](../setup.md) for installation and tests without credentials. 
 | `contextops init --kb PATH --branch knowledge/APP_NAME` | Prepare blank knowledge on a new local branch, without committing or inference. |
 | `contextops sweep --repo PATH --kb PATH --base REF --head REF --strategy MODE --session ID [--session ID] [--cutoff ISO_TIME]` | Freeze selected evidence and run locally. Real model calls occur. |
 | `contextops sessions --repo PATH [--limit N]` | List the application's Claude Code sessions (ID, last message, opening line) to choose `--session` values. No model calls. |
+| `contextops export-session --repo PATH --session ID --out FILE` | Write a shareable copy of one session: developer and agent messages, text, and tool calls, with the application root and home directory replaced by placeholders. Thinking, tool results, and other records are dropped. Message text is unchanged, so review it before sharing. |
+| `contextops import-session --repo PATH FILE...` | Install exported sessions for another checkout of the application so `sessions` lists them and `--session` can select them. Refuses to overwrite a different session with the same ID. |
 | `contextops run RUN_DIR` | Execute an unattempted prepared run with its recorded inputs. |
 | `contextops install --kb PATH --repo PATH` | Explicitly install the experimental application pre-push hook. |
 | `contextops hook REMOTE [URL]` | Internal experimental hook entry point. |

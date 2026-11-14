@@ -46,7 +46,7 @@ Choose an explicit cutoff after the relevant development messages, using ISO 860
 python -c 'from datetime import datetime, timezone; print(datetime.now(timezone.utc).isoformat())'
 ```
 
-The collector requires local Claude Code JSONL history for this application. Arbitrary exports and Codex history are not accepted. Missing or ambiguous sessions fail before inference. Selected sessions include their complete retained history through the cutoff, not just messages newer than the base commit. Tool results and thinking are omitted, sidechains are excluded by default, and truncation is reported. Your setup conversation is not a substitute for the development conversation.
+The collector requires local Claude Code JSONL history for this application. Sessions exported with `contextops export-session` can be installed for another checkout with `contextops import-session`; other exports and Codex history are not accepted. Missing or ambiguous sessions fail before inference. Selected sessions include their complete retained history through the cutoff, not just messages newer than the base commit. Tool results and thinking are omitted, sidechains are excluded by default, and truncation is reported. Your setup conversation is not a substitute for the development conversation.
 
 ## 4. Prepare a blank knowledge branch
 

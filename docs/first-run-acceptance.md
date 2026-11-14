@@ -1,6 +1,6 @@
 # First-run acceptance
 
-Status: implementation and credential-free verification are reviewable; live acceptance is pending. This is a verification checklist, not a completed experiment or a published user run.
+Status: implementation and credential-free verification are reviewable. One live acceptance run on the public [first-run demo](demo/README.md) is recorded below; it used simulated development conversations, so acceptance on a team's own application and sessions is still open.
 
 ## Software verification
 
@@ -8,7 +8,7 @@ The first-run tests initialize blank knowledge in disposable repositories, exerc
 
 Run the checks in [setup](../setup.md#2-test-without-credentials). These checks use no private history or inference and do not establish live model quality or production hook behavior.
 
-## Live acceptance, pending
+## Live acceptance checklist
 
 Use a clean clone of the implementation revision and a separately selected application that already has committed development changes and real local Claude Code development sessions. Obtain authorization for this specific live run and its model/budget. Follow the README prompt and [setup skill](../skills/setup-shared-knowledge/SKILL.md) without unpublished team-only instructions.
 
@@ -24,3 +24,30 @@ Record:
 Acceptance requires supported knowledge to appear in the actual committed documents for a relevant selected development change. A legitimate no-change run is valid runtime behavior but does not demonstrate the requested template-to-populated result. Preserve it and choose any additional run deliberately, without inventing facts or silently discarding failures.
 
 Keep application sources, raw conversations, credentials, and full run directories outside the knowledge repository. Share only explicitly selected, sanitized evidence. Mark generated knowledge as awaiting human review. Do not claim this checklist is complete until the evidence exists.
+
+## Live acceptance record (14 November 2026)
+
+| Item | Value |
+| --- | --- |
+| Implementation | Branch `feat/first-run-demo` at `caf4bdb` (PR #13 at `7976024` plus `export-session` and `import-session`), cloned from a local checkout before it was pushed |
+| Platform | macOS 27.0.1 on arm64, Python 3.13.14, Claude Agent SDK from `runtime/requirements-lock.txt` |
+| Installation and checks | Lock-file install succeeded; 39 deterministic tests passed |
+| Application | [Demo inputs](demo/README.md): upstream actualbudget/actual `d9d15c12` plus the eight demo commits. The run applied them from a Git bundle; the published patch series reproduces the same head tree (`f53804376c1c`), with different commit IDs |
+| Source range | base `c9ec8e97da4d8eb96630fee0f7716389c8a061f5`, head `8cece049fa39354313e70b8719c958b5d16755d8` (seven development commits) |
+| Knowledge baseline | `2451dfaada532b3b43fba95eac0ae26d86f237fa`: `contextops init --branch knowledge/actual-demo`, committed without edits |
+| Sessions | Six imported sessions (`6866729d`, `70de19bb`, `b44d114c`, `d34fc234`, `de720aee`, `f57650bf`), cutoff `2026-11-05T18:40:03Z`, conversation SHA-256 `9a747bce1dd33368579c427c203e23ef3e3eda788c4535cda6009baa76001720` |
+| Model and limits | `claude-sonnet-5-5`; checked-in budgets (1.5 USD per agent, 10 USD per run, 30 turns, 3 parallel) |
+| Roster | Sweeper, then forks for terminology, stack, conventions, and pitfalls; Firebase and Dataform maintainers skipped as irrelevant; writer |
+| Wall clock | 10:14:50 to 10:18:49 UTC, 3 min 59 s |
+| Estimated cost | $1.01 (sweeper $0.44, four forks $0.41, writer $0.16) |
+| Outcome | Knowledge committed on `contextops/sweeper-first/20261114-101450-8cece04-3374e54c`; 10 accepted, 0 deferred, 1 rejected |
+| Written documents | `core/terminology.md` (2 entries), `core/tech-stack-standards.md` (3), `core/pitfalls.md` (5), `log.md`; the actual patch is [result.patch](demo/actual/result.patch) |
+
+What the run learned matches decisions stated in the sessions: amounts are stored at x100 for every currency, the sync server imports `fetch` from `undici`, report range validation compares normalized dates, snapdom replaced html-to-image, and the quarter key is the quarter's first month.
+
+Discrepancies and limitations found in this run:
+
+- A supported convention was lost. The conventions maintainer proposed that commit messages start with `[AI]`, citing two developer messages and `diff/commits.txt`. Review rejects a record when any locator fails to resolve, and `diff/commits.txt` is not accepted as a diff path, so the whole record was rejected and `core/naming-conventions.md` stayed empty.
+- Fact IDs are inconsistent: the writer used `STACK-001` and `TERM-001` but `PIT001`. The empty template shows the prefix but no example, and the run notes do not state the hyphen.
+- Handoffs are reported but not acted on. The conventions maintainer handed typing rules (`satisfies` over `as`, no `@ts-strict-ignore`) and the release note requirement to the stack document, but forks run in parallel, so no specialist picked them up.
+- The developer side of the sessions was simulated, and this is a single run.
