@@ -34,7 +34,7 @@ def render_report(
     lines = [
         f"# ContextOps run {ctx.run_id}",
         "",
-        f"- Application: `{ctx.app_root.name}` {ctx.ref} `{ctx.base_sha[:7]}..{ctx.head_sha[:7]}`",
+        f"- Application: `{ctx.app_label}` {ctx.ref} `{ctx.base_sha[:7]}..{ctx.head_sha[:7]}`",
         f"- Knowledge baseline: `{ctx.kb_baseline[:7]}`",
         f"- Mode: `{config.mode}`",
         f"- Conversation window: {_when(ctx.since)} to {_when(ctx.cutoff)}",
@@ -114,6 +114,10 @@ def render_completion(ctx: RunContext, outcome: Outcome, ledger: Ledger) -> str:
     lines += [f"Failure: {failure}" for failure in review.failures]
     if publication and publication.note:
         lines += [publication.note]
+    if publication and publication.published:
+        lines += [f"Review request: {publication.published}"]
+        if publication.pr_url:
+            lines += [f"  {publication.pr_url}"]
     if committed:
         lines += [f"Result branch: {ctx.branch}", "Review the actual changes:",
                   shlex.join(["git", "-C", str(ctx.kb_root), "diff", ctx.kb_baseline, ctx.branch]),

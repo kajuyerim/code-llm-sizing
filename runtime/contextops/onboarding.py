@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
@@ -24,7 +25,8 @@ CORE = {
 }
 
 
-def initialize_knowledge(kb: Path, branch: str) -> list[str]:
+def initialize_knowledge(kb: Path, branch: str, scope: str | None = None,
+                         application: str | None = None) -> list[str]:
     """Reset knowledge content on a new branch; leave edits uncommitted for setup."""
     kb = gitutil.repo_root(kb.expanduser()).resolve()
     if gitutil.status(kb):
@@ -36,6 +38,16 @@ def initialize_knowledge(kb: Path, branch: str) -> list[str]:
     if gitutil.succeeds(kb, "show-ref", "--verify", f"refs/heads/{branch}"):
         raise ValueError("Knowledge branch already exists; reuse it without initialization")
     load_config(kb)
+    if scope not in (None, "team", "repository"):
+        raise ValueError("Scope must be team or repository")
+    if application is not None and (scope != "repository" or not re.fullmatch(r"[a-z0-9][a-z0-9._-]*", application)):
+        raise ValueError("Name an application (lowercase, e.g. my-app) only with --scope repository")
+    settings = (kb / "init.md").read_text(encoding="utf-8")
+    if scope:
+        settings, found = re.subn(r"(?m)^scope: *\S+", f"scope: {scope}", settings, count=1)
+        if not found:
+            raise ValueError("init.md has no scope setting to change")
+        settings = re.sub(r"(?m)^application: *\S+", f"application: {application or 'null'}", settings, count=1)
     baseline = gitutil.rev_parse(kb, "HEAD")
 
     # Validate every target before switching branches or modifying a file.
@@ -115,9 +127,13 @@ def initialize_knowledge(kb: Path, branch: str) -> list[str]:
         replacements[path] = original[:len(original) - len(old_body)] + body
 
     gitutil.git(kb, "-c", "core.hooksPath=/dev/null", "switch", "-c", branch)
+    if scope:
+        (kb / "init.md").write_text(settings, encoding="utf-8")
+        load_config(kb)
     for path in paths:
         if path in replacements:
             path.write_text(replacements[path], encoding="utf-8")
         else:
             path.unlink()  # Additional learned documents survive on the original branch.
-    return sorted(path.relative_to(kb).as_posix() for path in paths)
+    changed = sorted(path.relative_to(kb).as_posix() for path in paths)
+    return changed + (["init.md"] if scope else [])

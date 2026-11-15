@@ -31,8 +31,21 @@ class WorkerResult:
 
 
 def app_name(ctx: RunContext) -> str:
-    """The scope label for this application: its checkout's folder name, lowercased."""
-    return ctx.app_root.name.lower()
+    """The scope label for this application: its configured name, else its checkout's folder name."""
+    return ctx.app_label
+
+
+def scope_line(ctx: RunContext) -> str:
+    app = app_name(ctx)
+    if ctx.scope == "repository":
+        return (f"This knowledge base serves one application, {app}. Scope facts about it as `app:{app}`, "
+                "not a package or product name. Use `company` only for rules a developer states for the "
+                "whole organization.")
+    return (f"This knowledge base is shared by a team's applications; this run observed {app}. Scope facts "
+            f"about it as `app:{app}`, not a package or product name. Use `company` (the team that owns this "
+            "knowledge) only when a developer states that a rule applies across the team's applications. "
+            "Existing entries scoped to other applications describe those applications: do not change them "
+            "from this evidence.")
 
 
 def worker_prompt(worker: Worker, ctx: RunContext) -> str:
@@ -52,7 +65,7 @@ def worker_prompt(worker: Worker, ctx: RunContext) -> str:
         f"Source application, read-only, checked out at {ctx.head_sha}: {ctx.app_snapshot}",
         f"Knowledge base at baseline {ctx.kb_baseline[:7]}: {ctx.kb_snapshot}",
         "",
-        f"Scope facts about this application as `app:{app_name(ctx)}`, not a package or product name.",
+        scope_line(ctx),
         "",
         "Sweep the evidence for your assignment, compare it with the current knowledge, "
         "and return your change records. When nothing applies, return a single NO_CHANGE "
@@ -118,6 +131,8 @@ def sweeper_prompt(spec: AgentSpec, workers: list[Worker], ctx: RunContext) -> s
         "",
         f"Source application, read-only, checked out at {ctx.head_sha}: {ctx.app_snapshot}",
         f"Knowledge base at baseline {ctx.kb_baseline[:7]}: {ctx.kb_snapshot}",
+        "",
+        scope_line(ctx),
         "",
         "Specialists that will continue from your session:",
         roster,

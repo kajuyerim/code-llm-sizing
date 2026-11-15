@@ -137,7 +137,7 @@ class FirstRunTests(unittest.TestCase):
         with patch('contextops.strategies.run_agent', self.specialist()), \
              patch('contextops.writer.run_agent', self.writer), \
              patch('contextops.orchestrator._prepare_auth'), \
-             patch('contextops.orchestrator.open_pr', side_effect=AssertionError('Publication forbidden')):
+             patch('contextops.orchestrator.publish', side_effect=AssertionError('Publication forbidden')):
             summary = self.sweep()
             a_dir = next((self.root / 'runs/sweeper-first').glob('*/run.json')).parent
             a = load_run(a_dir)

@@ -2,6 +2,8 @@
 # Read by the initializer in runtime/contextops/initializer.py.
 version: 0.1
 mode: null                    # choose explicitly with --strategy
+scope: team                   # team: shared by a team's applications; repository: one application
+application: null             # with scope repository, the only application name accepted
 auth: subscription             # subscription (Claude Code login) or api-key
 model: claude-sonnet-5-5                  # default for agents whose definition sets no model
 shared_rules: agents/shared-rules.md
@@ -47,7 +49,10 @@ budget:
 output:
   runs_dir: ~/.contextops/runs
   branch: contextops/{strategy}/{run_id}
-  open_pr: false
+  open_pr: false               # true: push the result branch and open a pull or merge request
+  remote: origin               # the knowledge repository's shared remote
+  target_branch: null          # null: the remote's default branch
+  forge: auto                  # auto (from the remote URL), github, gitlab, or none (push only)
 ---
 
 # Run Notes

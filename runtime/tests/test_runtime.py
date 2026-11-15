@@ -252,7 +252,7 @@ class RuntimeTests(unittest.TestCase):
             path=kw['cwd']/'core/terminology.md'
             path.write_text(path.read_text()+'\nTERM-999: Test definition.\n')
             return AgentRun('writer',status='success',output={'applied':[],'skipped':[],'log_entry':''})
-        with patch('contextops.strategies.run_agent',specialist), patch('contextops.writer.run_agent',writer), patch('contextops.orchestrator._prepare_auth'), patch('contextops.orchestrator.open_pr',side_effect=AssertionError('Publication forbidden')):
+        with patch('contextops.strategies.run_agent',specialist), patch('contextops.writer.run_agent',writer), patch('contextops.orchestrator._prepare_auth'), patch('contextops.orchestrator.publish',side_effect=AssertionError('Publication forbidden')):
             report=asyncio.run(orchestrate(ctx.run_dir))
         self.assertTrue(report.exists())
         self.assertTrue(gitutil.succeeds(self.kb,'rev-parse','--verify',ctx.branch))

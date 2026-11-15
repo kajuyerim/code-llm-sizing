@@ -32,6 +32,13 @@ class RunContext:
     strategy: str | None = None
     sessions: list[str] = field(default_factory=list)
     conversation_sha256: str | None = None
+    scope: str = "team"
+    app: str | None = None
+
+    @property
+    def app_label(self) -> str:
+        """The application's scope name: configured, else its checkout folder name."""
+        return self.app or self.app_root.name.lower()
 
     @property
     def pack(self) -> Path:
@@ -53,7 +60,7 @@ class RunContext:
 def create_run(
     app_root: Path, kb_root: Path, remote: str, ref: str, local_sha: str, remote_sha: str,
     *, strategy: str | None = None, sessions: list[str] | None = None,
-    cutoff: datetime | None = None,
+    cutoff: datetime | None = None, app_name: str | None = None, auto_select: bool = False,
 ) -> RunContext | None:
     from contextops.strategies import STRATEGIES
 
@@ -67,9 +74,15 @@ def create_run(
     strategy = strategy or config.mode
     if strategy not in STRATEGIES:
         raise ValueError("Choose an implemented strategy explicitly: " + ", ".join(STRATEGIES))
-    if not sessions or any(not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", s) for s in sessions):
+    app = app_name or gitutil.config_get(app_root, "contextops.app") or app_root.name.lower()
+    if not re.fullmatch(r"[a-z0-9][a-z0-9._-]*", app):
+        raise ValueError("Application names are lowercase letters, digits, dots, hyphens and underscores")
+    if config.scope == "repository" and config.application and app != config.application:
+        raise ValueError(f"This knowledge base serves only the application '{config.application}' (scope: repository)")
+    if auto_select:
+        sessions = None
+    elif not sessions or any(not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", s) for s in sessions):
         raise ValueError("Select at least one Claude Code session ID with --session")
-    sessions = sorted(set(sessions))
     head = gitutil.rev_parse(app_root, local_sha)
     base = (gitutil.rev_parse(app_root, remote_sha) if ref == "manual"
             else gitutil.push_base(app_root, head, remote_sha, remote))
@@ -80,6 +93,9 @@ def create_run(
     if cutoff.tzinfo is None or cutoff > now:
         raise ValueError("Cutoff must include a timezone and must not be in the future")
     cutoff = cutoff.astimezone(timezone.utc)
+    if auto_select:
+        sessions = select_sessions(app_root, config, strategy, base, cutoff)
+    sessions = sorted(set(sessions))
     # Explicit sessions include their complete retained history up to the cutoff.
     selected = transcripts.load_sessions(app_root, None, cutoff,
                                         config.conversation.include_sidechains, selected=sessions)
@@ -98,6 +114,7 @@ def create_run(
                                           date=f"{now:%Y-%m-%d}", short_sha=head[:7]),
         since=None, cutoff=cutoff, strategy=strategy, sessions=sessions,
         conversation_sha256=hashlib.sha256(frozen).hexdigest(),
+        scope=config.scope, app=app,
     )
     if not gitutil.succeeds(kb_root, "check-ref-format", "--branch", ctx.branch):
         raise ValueError("init.md: output.branch produces an invalid Git branch")
@@ -107,6 +124,17 @@ def create_run(
     (ctx.run_dir / "conversation.json").write_bytes(frozen)
     (ctx.run_dir / MANIFEST).write_text(json.dumps(_to_json(ctx), indent=2), encoding="utf-8")
     return ctx
+
+
+def select_sessions(app_root: Path, config, strategy: str, base: str, cutoff: datetime) -> list[str]:
+    """Sessions in this application with a message since the last run (or the pushed base commit)."""
+    since = last_cutoff(config.output.runs_dir / strategy, app_root) or gitutil.commit_time(app_root, base)
+    chosen = [s.session_id for s in transcripts.list_sessions(app_root, config.conversation.include_sidechains)
+              if since is None or datetime.fromisoformat(s.last.replace("Z", "+00:00")) > since]
+    chosen = [s for s in chosen if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", s)]
+    if not chosen:
+        raise ValueError("No Claude Code session in this application has messages since the last run")
+    return chosen
 
 
 def load_run(run_dir: Path) -> RunContext:
@@ -138,6 +166,7 @@ def last_cutoff(runs_dir: Path, app_root: Path) -> datetime | None:
 def record_cutoff(runs_dir: Path, app_root: Path, cutoff: datetime) -> None:
     state = _read_state(runs_dir)
     state[str(app_root)] = cutoff.isoformat()
+    runs_dir.mkdir(parents=True, exist_ok=True)
     (runs_dir / STATE).write_text(json.dumps(state, indent=2), encoding="utf-8")
 
 

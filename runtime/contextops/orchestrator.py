@@ -20,7 +20,8 @@ from contextops.report import Outcome, render_report, render_completion
 from contextops.review import review_results
 from contextops.run import RunContext, load_run, record_cutoff, frozen_sessions
 from contextops.strategies import STRATEGIES, deliver_handoffs
-from contextops.writer import open_pr, write_changes
+from contextops.publish import publish
+from contextops.writer import write_changes
 
 
 async def orchestrate(run_dir: Path) -> Path:
@@ -73,9 +74,11 @@ async def orchestrate(run_dir: Path) -> Path:
 
         report = render_report(ctx, config, outcome, ledger, evidence)
         if committed and config.output.open_pr:
-            outcome.publication.pr_url = open_pr(ctx, report)
-            if outcome.publication.pr_url:
-                report += f"\nPull request: {outcome.publication.pr_url}\n"
+            published = publish(ctx, config, report)
+            outcome.publication.pr_url = published.url
+            outcome.publication.published = published.note
+            report += f"\n## Review request\n\n- {published.note}\n" + (
+                f"- {published.url}\n" if published.url else "")
 
         _write_metrics(ctx, config, ledger)
         report_path = ctx.run_dir / "report.md"

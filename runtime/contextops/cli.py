@@ -12,11 +12,7 @@ from datetime import datetime
 from contextops import gitutil
 from contextops.run import create_run
 
-HOOK = """#!/bin/sh
-# Installed by contextops. Sweeps the pushed work in the background; never blocks the push.
-"{python}" -m contextops hook "$@" || true
-exit 0
-"""
+from contextops.attach import HOOK
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -26,6 +22,24 @@ def main(argv: list[str] | None = None) -> None:
     initialize = commands.add_parser("init", help="prepare empty knowledge on a new local branch")
     initialize.add_argument("--kb", type=Path, required=True)
     initialize.add_argument("--branch", required=True)
+    initialize.add_argument("--scope", choices=["team", "repository"],
+                            help="team: shared by a team's applications; repository: one application")
+    initialize.add_argument("--application", help="with --scope repository, the application's name")
+
+    attach = commands.add_parser("attach", help="connect an application so its coding agent reads this knowledge "
+                                 "and its pushes start maintenance")
+    attach.add_argument("--repo", type=Path, default=Path.cwd(), help="the application checkout")
+    attach.add_argument("--kb", type=Path, required=True, help="the knowledge checkout")
+    attach.add_argument("--strategy", choices=["fresh-specialists", "sweeper-first"],
+                        help="strategy for push-triggered runs (required unless --no-hook)")
+    attach.add_argument("--name", help="application name used in scopes; defaults to the folder name")
+    attach.add_argument("--no-hook", action="store_true", help="only wire reading, no push-triggered maintenance")
+    attach.add_argument("--no-refresh", action="store_true", help="do not fast-forward knowledge at session start")
+    attach.add_argument("--force", action="store_true", help="replace an existing pre-push hook")
+
+    refresh = commands.add_parser("refresh", help="fast-forward a clean knowledge checkout to its upstream")
+    refresh.add_argument("--kb", type=Path, required=True)
+    refresh.add_argument("--verbose", action="store_true")
 
     install = commands.add_parser("install", help="install the pre-push hook in an application repo")
     install.add_argument("--kb", type=Path, required=True, help="path to the knowledge base checkout")
@@ -62,7 +76,7 @@ def main(argv: list[str] | None = None) -> None:
     sweep.add_argument("--cutoff", type=_cutoff, help="ISO 8601 timestamp with timezone; defaults to now")
 
     args = parser.parse_args(argv)
-    handlers = {"init": _init, "install": _install, "hook": _hook, "run": _run, "sweep": _sweep, "sessions": _sessions,
+    handlers = {"init": _init, "attach": _attach, "refresh": _refresh, "install": _install, "hook": _hook, "run": _run, "sweep": _sweep, "sessions": _sessions,
                 "export-session": _export_session, "import-session": _import_session}
     try:
         handlers[args.command](args)
@@ -85,11 +99,31 @@ def _cutoff(value: str) -> datetime:
 def _init(args: argparse.Namespace) -> None:
     from contextops.onboarding import initialize_knowledge
 
-    changed = initialize_knowledge(args.kb, args.branch)
-    print(f"Prepared empty knowledge on {args.branch} (no model calls).")
+    changed = initialize_knowledge(args.kb, args.branch, args.scope, args.application)
+    print(f"Prepared empty knowledge on {args.branch} (no model calls)."
+          + (f" Scope: {args.scope}." if args.scope else ""))
     print("Files reset:\n" + "\n".join(f"  {name}" for name in changed))
     print("Review init.md, configure your run, and commit the baseline before sweeping.")
     print("For subsequent runs, reuse the accepted knowledge branch without running init again.")
+
+
+def _attach(args: argparse.Namespace) -> None:
+    from contextops.attach import attach
+
+    done = attach(args.repo, args.kb, args.strategy, args.name, hook=not args.no_hook,
+                  refresh=not args.no_refresh, force=args.force)
+    print("Attached:\n" + "\n".join(f"  {item}" for item in done))
+    print("These files are local to this checkout and excluded from Git. New Claude Code sessions in the "
+          "application read the knowledge; pushes start maintenance in the background when a hook is installed.")
+
+
+def _refresh(args: argparse.Namespace) -> None:
+    from contextops.attach import refresh
+
+    message = refresh(args.kb)
+    # Session-start output becomes agent context, so stay silent unless something is wrong.
+    if args.verbose or not message.startswith("knowledge checkout at"):
+        print(f"contextops: {message}")
 
 
 def _install(args: argparse.Namespace) -> None:
@@ -109,10 +143,18 @@ def _install(args: argparse.Namespace) -> None:
 
 
 def _hook(args: argparse.Namespace) -> None:
+    from contextops.attach import refresh
+
     app = gitutil.repo_root(Path.cwd())
     kb = gitutil.config_get(app, "contextops.kb")
     if not kb or Path(kb).resolve() == app.resolve():
         return  # not configured, or a push of the knowledge base itself
+    strategy = gitutil.config_get(app, "contextops.strategy")
+    selected = gitutil.config_get(app, "contextops.sessions")
+    # Start from the latest merged knowledge so the review request applies cleanly.
+    note = refresh(Path(kb))
+    if not note.startswith("knowledge checkout at"):
+        print(f"contextops: {note}", file=sys.stderr)
 
     # git sends one line per ref: <local ref> <local sha> <remote ref> <remote sha>
     for line in sys.stdin:
@@ -121,10 +163,9 @@ def _hook(args: argparse.Namespace) -> None:
             continue  # malformed, or a branch deletion
         local_ref, local_sha, _, remote_sha = fields
         try:
-            # Explicit selection is required even for this experimental adapter.
-            selected = gitutil.config_get(app, "contextops.sessions")
-            ctx = create_run(app, Path(kb), args.remote, local_ref, local_sha, remote_sha,
-                             sessions=selected.split() if selected else None)
+            # Pinned sessions win; otherwise every session active since the last run is evidence.
+            ctx = create_run(app, Path(kb), args.remote, local_ref, local_sha, remote_sha, strategy=strategy,
+                             sessions=selected.split() if selected else None, auto_select=not selected)
         except Exception as exc:  # the push must go through whatever happens here
             print(f"contextops: skipped ({exc})", file=sys.stderr)
             continue

@@ -21,14 +21,14 @@ async def run_cartographer(
     backlog = ctx.runs_dir / BACKLOG
     with backlog.open("a", encoding="utf-8") as out:
         for item in review.unowned:
-            out.write(json.dumps({**item, "run": ctx.run_id, "app": ctx.app_root.name}) + "\n")
+            out.write(json.dumps({**item, "run": ctx.run_id, "app": ctx.app_label}) + "\n")
 
     recent = backlog.read_text(encoding="utf-8").splitlines()[-BACKLOG_WINDOW:]
     (ctx.run_dir / "unowned-backlog.jsonl").write_text("\n".join(recent) + "\n", encoding="utf-8")
 
     spec = load_agent(config.cartographer, config.default_model)
     prompt = "\n".join([
-        f"Run: {ctx.run_id}, application {ctx.app_root.name} at {ctx.head_sha[:7]}",
+        f"Run: {ctx.run_id}, application {ctx.app_label} at {ctx.head_sha[:7]}",
         f"Unowned findings, newest last: {ctx.run_dir / 'unowned-backlog.jsonl'}",
         f"This run's evidence pack: {ctx.pack}",
         f"Knowledge base at baseline: {ctx.kb_snapshot} (start with index.md and init.md)",
