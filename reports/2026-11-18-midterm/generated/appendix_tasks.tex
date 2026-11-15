@@ -1,4 +1,4 @@
-\subsection*{\code{maybe-knowledge} (knowledge)}
+\section{\code{maybe-knowledge} (knowledge)}
 \begin{quote}\small\itshape hey, can you add a little status badge to the account page header? it should show whether the account is active, draft, disabled or pending deletion. make it reusable, we'll want the same badge on the accounts list later. please add a lookbook preview for it too. commit when you're done\end{quote}
 \begin{small}\begin{tabularx}{\linewidth}{@{}>{\ttfamily}l >{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}X@{}}
 \toprule \normalfont Check & Basis & Hidden review check \\ \midrule
@@ -10,7 +10,7 @@ header-wired & code & The badge is rendered in the account page header (app/view
 all-states & code & All four states (active, draft, disabled, pending\_deletion) render a distinct, readable label. \\
 \bottomrule\end{tabularx}\end{small}
 
-\subsection*{\code{maybe-routine} (routine)}
+\section{\code{maybe-routine} (routine)}
 \begin{quote}\small\itshape in the account activity tab, next to each date can you show how many entries happened that day, like "3 entries"? small grey text is fine. commit when you're done\end{quote}
 \begin{small}\begin{tabularx}{\linewidth}{@{}>{\ttfamily}l >{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}X@{}}
 \toprule \normalfont Check & Basis & Hidden review check \\ \midrule
@@ -22,7 +22,7 @@ pluralize & code & The label is pluralized correctly (1 entry / 2 entries), thro
 test & code & A test covers the new count (model or component test). \\
 \bottomrule\end{tabularx}\end{small}
 
-\subsection*{\code{actual-knowledge} (knowledge)}
+\section{\code{actual-knowledge} (knowledge)}
 \begin{quote}\small\itshape can we add a half-year option to the interval dropdown in custom reports? so H1/H2 buckets. commit when you're done\end{quote}
 \begin{small}\begin{tabularx}{\linewidth}{@{}>{\ttfamily}l >{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}X@{}}
 \toprule \normalfont Check & Basis & Hidden review check \\ \midrule
@@ -36,7 +36,7 @@ i18n & seed & New user-facing labels go through the i18n helpers (t() or Trans),
 types & maintained & New or changed TypeScript does not add // @ts-strict-ignore and does not introduce new \texttt{as} casts where \texttt{satisfies} or proper typing would work. \\
 \bottomrule\end{tabularx}\end{small}
 
-\subsection*{\code{actual-routine} (routine)}
+\section{\code{actual-routine} (routine)}
 \begin{quote}\small\itshape on the sync server, could we ping a webhook whenever a budget file gets uploaded? the admin sets the url through the server config / env. just POST the file id and a timestamp as json, and the upload must not fail if the webhook is down. commit when you're done\end{quote}
 \begin{small}\begin{tabularx}{\linewidth}{@{}>{\ttfamily}l >{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}X@{}}
 \toprule \normalfont Check & Basis & Hidden review check \\ \midrule
@@ -49,7 +49,7 @@ release-note & code & A release note is added under upcoming-release-notes/. \\
 ai-prefix & code, maintained & The commit message starts with the [AI] prefix. \\
 \bottomrule\end{tabularx}\end{small}
 
-\subsection*{\code{linkwarden-knowledge} (knowledge)}
+\section{\code{linkwarden-knowledge} (knowledge)}
 \begin{quote}\small\itshape in the link edit modal, can you add a button that re-fetches the page title from the link's url and puts it into the name field? commit when you're done\end{quote}
 \begin{small}\begin{tabularx}{\linewidth}{@{}>{\ttfamily}l >{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}X@{}}
 \toprule \normalfont Check & Basis & Hidden review check \\ \midrule
@@ -62,7 +62,7 @@ router-hook & seed, unstated & The modal calls the server through a hook in pack
 en-locale & maintained & New UI strings are added only to apps/web/public/locales/en/common.json; other locale files are untouched. \\
 \bottomrule\end{tabularx}\end{small}
 
-\subsection*{\code{linkwarden-routine} (routine)}
+\section{\code{linkwarden-routine} (routine)}
 \begin{quote}\small\itshape can we cap how many links a collection can hold? should be configurable by whoever hosts the instance, and the ui should show a friendly error when you hit the limit. commit when you're done\end{quote}
 \begin{small}\begin{tabularx}{\linewidth}{@{}>{\ttfamily}l >{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}X@{}}
 \toprule \normalfont Check & Basis & Hidden review check \\ \midrule

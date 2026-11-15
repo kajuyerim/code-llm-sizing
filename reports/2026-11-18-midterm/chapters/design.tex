@@ -2,7 +2,7 @@
 
 \section{Information Structure}
 
-Figure~\ref{fig:er} shows the main entities. A \emph{knowledge repository} holds \emph{documents} (four core documents and one README per tool folder). Each document holds \emph{facts} with a stable identifier and a scope. A \emph{run} is prepared from an application range and a set of \emph{sessions} made of \emph{messages}; it produces \emph{change records}, each with one or more \emph{evidence} locators that point to messages, diff paths, or source lines. The writer turns accepted records into a \emph{knowledge commit} on a run branch.
+Figure~\ref{fig:er} shows the main entities. A \emph{knowledge repository} holds \emph{documents} (four core documents and one README per tool folder). Each document holds \emph{facts} with a stable identifier and a scope. A \emph{run} is prepared from an application range and a set of \emph{sessions} made of \emph{messages}; it produces \emph{change records}, each with one or more \emph{evidence} locators that point to messages, diff paths, or source paths; a source path check does not validate line numbers. The writer turns accepted records into a \emph{knowledge commit} on a run branch.
 
 \begin{figure}[htbp]
 \centering
@@ -26,7 +26,7 @@ Figure~\ref{fig:er} shows the main entities. A \emph{knowledge repository} holds
   \draw[rel] (run) -- node[card, left]{n \quad m} (ses);
   \draw[rel] (ses) -- node[card, above]{1 \quad n} (msg);
   \draw[rel] (ev) -- node[card, above, sloped]{0..1} (msg);
-  \draw[rel] (run) -- node[card, below, sloped, pos=0.85]{0..1} (com);
+  \draw[rel] (run.south east) -- (1.95,-4.85) -- (8.6,-4.85) -- node[card, right]{0..1} (com.north);
 \end{tikzpicture}
 \caption{Entities of a maintenance run and the knowledge repository.}
 \label{fig:er}
@@ -40,13 +40,15 @@ Figure~\ref{fig:flow} shows the flow of one run and where the two strategies div
 
 \begin{figure}[htbp]
 \centering
+{\linespread{1}\selectfont
 \begin{tikzpicture}[node distance=0.55cm]
   \node[box, minimum width=9cm] (in) {Application range (base, head) \;+\; explicit diff \;+\; selected sessions};
   \node[box, below=of in, minimum width=9cm] (col) {Collection: freeze refs, hash conversation, build evidence pack};
   \node[box, below=of col, minimum width=9cm] (ini) {Initializer: 4 core specialists + relevant tool specialists};
   \node[box, below left=0.7cm and -2.6cm of ini, text width=4.6cm, draw=inkA] (a) {\textbf{A}: sweeper reads all evidence\\$\downarrow$\\one fork per specialist\\(inherits context and cache)};
   \node[box, below right=0.7cm and -2.6cm of ini, text width=4.6cm, draw=inkB] (b) {\textbf{B}: fresh specialists\\$\downarrow$\\each reads evidence\\independently};
-  \node[box, below=4.1cm of ini, minimum width=9cm] (hand) {Handoff pass: receivers act on findings handed to them};
+  \node[fit=(a)(b), inner sep=0pt] (branches) {};
+  \node[box, below=of branches, minimum width=9cm] (hand) {Handoff pass: receivers act on findings handed to them};
   \node[box, below=of hand, minimum width=9cm] (rev) {Review: locators resolve, ownership, operations};
   \node[box, below=of rev, minimum width=9cm] (car) {Cartographer (optional): new documents or tool folders};
   \node[box, below=of car, minimum width=9cm] (wr) {Writer: apply accepted records on a new local branch};
@@ -55,7 +57,7 @@ Figure~\ref{fig:flow} shows the flow of one run and where the two strategies div
   \draw[arr] (ini) -- (a); \draw[arr] (ini) -- (b);
   \draw[arr] (a) -- (hand); \draw[arr] (b) -- (hand); \draw[arr] (hand) -- (rev);
   \draw[arr] (rev) -- (car); \draw[arr] (car) -- (wr); \draw[arr] (wr) -- (out);
-\end{tikzpicture}
+\end{tikzpicture}}
 \caption{Activity flow of a maintenance run.}
 \label{fig:flow}
 \end{figure}
@@ -86,13 +88,13 @@ Figure~\ref{fig:flow} shows the flow of one run and where the two strategies div
 \label{fig:seq}
 \end{figure}
 
-\paragraph{The loop in daily use.} Figure~\ref{fig:loop} shows how a run fits into a team's work after setup. The knowledge repository is an ordinary Git repository on the team's GitHub or GitLab. It serves either a team's applications (\code{scope: team}) or one application (\code{scope: repository}). Each developer clones it next to their applications and runs \code{contextops attach} once per application. From then on, the coding agent in the application reads the knowledge at the start of every task, a push starts maintenance in the background, and the run's result arrives as a pull or merge request on the knowledge repository. Merging stays a human decision; the next session reads the merged knowledge. Development and maintenance are separate processes that meet only through reviewed Git changes.
+\paragraph{The loop in daily use} Figure~\ref{fig:loop} shows how a run fits into a team's work after setup. The knowledge repository is an ordinary Git repository on the team's GitHub or GitLab. It serves either a team's applications (\code{scope: team}) or one application (\code{scope: repository}). Each developer clones it next to their applications and runs \code{contextops attach} once per application. The coding agent can read the knowledge at session start. A configured pre-push hook prepares maintenance in the background after a synchronous refresh; the fetch has no timeout and can block a push. The default result stays local; a remote branch and pull or merge request require \code{open\_pr: true}. Merging stays a human decision, and the next session reads the merged knowledge. Development and maintenance are separate processes that meet only through reviewed Git changes.
 
 \begin{figure}[htbp]
 \centering
 \begin{tikzpicture}[node distance=0.5cm and 1.1cm]
   \node[box, text width=3.6cm] (dev) {Developer and\\coding agent work\\in the application};
-  \node[box, text width=3.6cm, right=of dev] (push) {\code{git push}\\(pre-push hook)};
+  \node[box, text width=3.6cm, right=of dev] (push) {\code{git push}\\(pre-push hook; synchronous refresh)};
   \node[box, text width=3.6cm, right=of push] (run) {Maintenance run (A):\\pushed range and\\sessions since the last run};
   \node[box, text width=3.6cm, below=1.1cm of run] (pr) {Pull or merge\\request on the\\knowledge repository};
   \node[box, text width=3.6cm, left=of pr] (merge) {Teammate reviews\\and merges};
@@ -100,13 +102,13 @@ Figure~\ref{fig:flow} shows the flow of one run and where the two strategies div
   \draw[arr] (dev) -- (push); \draw[arr] (push) -- (run); \draw[arr] (run) -- (pr);
   \draw[arr] (pr) -- (merge); \draw[arr] (merge) -- (read); \draw[arr] (read) -- (dev);
 \end{tikzpicture}
-\caption{The Context Ops loop after \code{contextops attach}.}
+\caption{The configured Context Ops loop after \code{contextops attach}. Remote publication is optional.}
 \label{fig:loop}
 \end{figure}
 
-\paragraph{What the knowledge keeps.}
+\paragraph{What the knowledge keeps}
 \label{sec:admission}
-A shared knowledge repository is only useful if agents and reviewers can afford to read it, so it keeps what a developer or agent cannot learn from the repository in front of them and what costs time or causes harm when missed: how the team provisions and deploys (for example, infrastructure only through Terraform, never by console or CLI), how it uses tools and internal services, security and compliance rules, rejected approaches with their reasons, decisions that replace an earlier way of working, contracts between repositories, and team-specific terms. UI and styling conventions, patterns that the code or linters already show, and task-specific instructions stay out; maintenance agents return NO\_CHANGE for them. The list is part of the run notes in \code{init.md}, so each team can tune it, and a team-scoped repository is the recommended setup because decisions made in one repository then reach agents working in another.
+A shared knowledge repository is only useful if agents and reviewers can afford to read it, so it keeps what a developer or agent cannot learn from the repository in front of them and what costs time or causes harm when missed: how the team provisions and deploys (for example, infrastructure only through Terraform, never by console or CLI), how it uses tools and internal services, security and compliance rules, rejected approaches with their reasons, decisions that replace an earlier way of working, contracts between repositories, and team-specific terms. UI and styling conventions, patterns that the code or linters already show, and task-specific instructions stay out; maintenance agents return NO\_CHANGE for them. The list is part of the run notes in \code{init.md}, so each team can tune it. Excluding UI conventions is a later configurable policy choice; the experiments do not establish it as a universal rule.
 
 \section{System Design}
 

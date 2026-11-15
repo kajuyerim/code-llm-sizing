@@ -13,13 +13,13 @@ The project scope includes:
   \item a downstream evaluation that measures whether the maintained knowledge helps development, including across consecutive features;
   \item a reproducible first-run path that lets an outside user start from an empty template.
 \end{itemize}
-Out of scope are developing the applications themselves, automatic merging or publication of knowledge, and production deployment of the optional Git pre-push hook, which remains experimental.
+Out of scope are developing the applications themselves, automatic merging, and production deployment of the optional Git pre-push hook, which remains experimental. Remote publication is configurable and disabled by default.
 
 \section{Project Planning}
 
 \subsection{Project Time and Resource Estimation}
 
-Table~\ref{tab:timeline} lists the completed milestones and the plan for the rest of the semester. The team consists of two students who meet the advisor weekly; each student works roughly 10 to 15 hours per week on the project.
+Table~\ref{tab:timeline} lists the completed milestones and the plan for the rest of the semester. The team consists of two students who meet the advisor weekly. Work-hour estimates are not reported.
 
 \begin{table}[!htbp]
 \centering
@@ -108,4 +108,4 @@ Private data leaks into the public repository. & Application sources and raw run
 
 \subsection{Team Work}
 
-Kerem Haktan Kurt designed and implemented the sweeper-first strategy (A), integrated both strategies into the shared runtime with continuous integration and credential checks, wrote the architecture documentation, and implemented the agent-guided first-run path (\code{contextops init}). Bar\i{}\c{s} \"{O}ks\"{u}z implemented the fresh-specialist strategy (B), built the development simulation harness and the persona model, ran experiment v2, found and fixed the prompt-cache problem in forks, and designed and ran the downstream comparison and the first-run demonstration. The October pilot, the knowledge taxonomy, and this report are joint work. All work is tracked through GitHub issues and reviewed pull requests.
+Kerem Haktan Kurt designed and implemented the sweeper-first strategy (A), integrated both strategies into the shared runtime with continuous integration and credential checks, wrote the architecture documentation, and implemented the agent-guided first-run path (\code{contextops init}). Bar\i{}\c{s} \"{O}ks\"{u}z implemented the fresh-specialist strategy (B), built the development simulation harness and the persona model, ran experiment v2, found and fixed the prompt-cache problem in forks, and designed and ran the downstream comparison and the first-run demonstration. The October pilot, the knowledge taxonomy, and this report are joint work. Work is tracked through GitHub issues and pull requests; human review and end-to-end validation remain in progress.

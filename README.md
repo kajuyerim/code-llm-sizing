@@ -25,7 +25,7 @@ A successful writer creates a local result branch. The command shows changed fil
 
 Follow [setup](setup.md) for the equivalent manual commands, authentication details, troubleshooting, and optional B execution. Installation and deterministic tests need no model account or inference; running maintenance uses your private Claude authentication.
 
-For an explanation of the system, read [How Our Knowledge Maintenance System Works](docs/walkthrough/README.md), or download the [interactive walkthrough](docs/walkthrough/index.html) and open it locally. These are historical evaluation evidence. The new first-run path has credential-free software checks and recorded [live acceptance runs](docs/first-run-acceptance.md#live-acceptance-record-2-14-november-2026-b20f3f9).
+For an explanation of the system, read [How Our Knowledge Maintenance System Works](docs/walkthrough/README.md), or download the [interactive walkthrough](docs/walkthrough/index.html) and open it locally. These are historical evaluation evidence. The first-run path has credential-free software checks and recorded [live acceptance runs](docs/first-run-acceptance.md#live-acceptance-record-2-14-november-2026-b20f3f9). The final recorded acceptance revision predates the current team-scope and admission-policy changes.
 
 To try the whole path without an application of your own, follow the [first-run demo](docs/demo/README.md). It rebuilds a public Actual Budget checkout, installs six shared development sessions, and turns empty knowledge into a populated local branch for about $1.
 
@@ -35,7 +35,7 @@ The knowledge repository is a team's shared Git repository: one place for the de
 
 - Claude Code sessions in the application read the knowledge before a task, and the knowledge checkout is refreshed at session start.
 - `git push` in the application starts maintenance in the background on the pushed commits and recent sessions.
-- The run opens a pull request (GitHub) or merge request (GitLab) on the knowledge repository. A person reviews and merges it.
+- With `open_pr: true` and a supported remote, the run publishes a result branch and opens a pull request (GitHub) or merge request (GitLab) on the knowledge repository for human review. The default configuration keeps the result local.
 
 See [setup, step 8](setup.md#8-use-it-day-to-day-attach-your-application).
 
@@ -70,7 +70,7 @@ Both **A, `sweeper-first`**, and **B, `fresh-specialists`**, are available throu
 
 ## Evidence and current status
 
-All project reports, current and previous, are listed with their dates in [reports](reports/README.md). The latest experiment ran the whole loop (attach, push, review request, merge) over three consecutive features per application. Decisions developers stated in earlier sessions were followed every time with team or repository knowledge, against 72% without. Decisions a lead stated in one repository reached agents in two others through the team knowledge (88% of checks against 60%). On tasks whose answers the code already shows, knowledge made no difference. See [evaluation](docs/evaluation.md) and the [results page](reports/2026-11-15-results/context-ops-results.html). The midterm report is [here](reports/2026-11-18-midterm/context-ops-midterm.pdf).
+All project reports, current and previous, are listed with their dates in [reports](reports/README.md). In the three-feature sequence, team knowledge passed all 60 carried-decision checks, repository knowledge passed all 58 judged checks with two unjudged (96.7%-100% sensitivity bounds), and no knowledge passed 43/60. The separate team-rule study improved pooled first-commit decision checks from 29/48 to 42/48 across all three repositories, including the learning repository; 12 of the 13 additional passes concerned commit-message conventions. The persona study did not demonstrate a development-quality improvement on its tasks. Nine incomplete judge files affect the feature and persona studies; the reports disclose their missing checks without rescoring. See [evaluation](docs/evaluation.md) and the [results page](reports/2026-11-15-results/context-ops-results.html). The midterm report is [here](reports/2026-11-18-midterm/context-ops-midterm.pdf).
 
 Both strategies and the shared runtime are merged into `master` through [PR #7](https://github.com/kajuyerim/code-llm-sizing/pull/7) and [PR #8](https://github.com/kajuyerim/code-llm-sizing/pull/8). [PR #9](https://github.com/kajuyerim/code-llm-sizing/pull/9) adds fork cache reuse, MCP-free maintenance execution, conversation-session discovery, and the v2 evaluation summary.
 

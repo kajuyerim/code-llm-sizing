@@ -93,23 +93,23 @@ With Sonnet, A found 17 of 21 required facts against 10 for B, at 28\% higher co
 \label{fig:v2split}
 \end{figure}
 
-The quality difference comes from reading. Every fact that B-Sonnet missed was stated in the conversation. Every sweeper read all six sessions, while B-Sonnet specialists read 2.2 of six sessions on average, and six of eighteen specialists read none. A fresh specialist decides from the diff and the session openings which sessions look relevant to its own document, but in a multi-task push a decision about the stack is often stated in a session whose task is about something else. The sweeper does not make this choice: it reads everything once and every fork inherits it.
+Differences in reading coverage are a plausible contributor to the observed quality difference. Every fact that B-Sonnet missed was stated in the conversation. Every sweeper read all six sessions, while B-Sonnet specialists read 2.2 of six sessions on average, and six of eighteen specialists read none. A fresh specialist decides from the diff and the session openings which sessions look relevant to its own document, but in a multi-task push a decision about the stack is often stated in a session whose task is about something else. The sweeper does not make this choice: it reads everything once and every fork inherits it. These access traces do not isolate reading coverage as the cause of the score difference.
 
 With Haiku the picture changes. The Haiku sweeper read the raw sessions for 40 to 75 turns, and each fork then re-read that long history on every one of its own turns, so A-Haiku cost 2.7 times as much as B-Haiku and admitted the most decoys. A cheaper model is therefore not automatically a cheaper A: the sweeper's length multiplies every fork's per-turn cost.
 
-\paragraph{Limitations of v2.} There is one run per condition and application, the judge is a model, the developers are simulated, and the writer's fidelity to accepted records was not scored. The results show a consistent direction across three applications but do not establish a general winner.
+\paragraph{Limitations of v2} There is one run per condition and application, the judge is a model, the developers are simulated, and the writer's fidelity to accepted records was not scored. The results show a consistent direction across three applications but do not establish a general winner.
 
 \section{Downstream Comparison}
 \label{sec:downstream}
 
-All \DSRuns{} development runs finished and all \DSJudged{} were judged (Table~\ref{tab:ds}).
+All \DSRuns{} development runs finished and all \DSJudged{} were judged. Coverage was complete. This ready-made downstream study contains three original conditions and a fourth, post hoc B condition (Table~\ref{tab:ds}).
 
 \begin{table}[htbp]
 \centering
-\caption{Downstream comparison by knowledge condition (five runs per task and condition, six tasks; Maintained (B) was added later, see the text). Pass rate is over applicable hidden checks; completion is the judge's 0--3 rating.}
+\caption[Downstream comparison by knowledge condition.]{Downstream comparison by knowledge condition (five runs per task and condition, six tasks; three original conditions plus post hoc Maintained (B)). Coverage is complete. Cost is mean client-side list-price estimate; time is mean unless otherwise stated.}
 \label{tab:ds}
 \small
-\setlength{\tabcolsep}{4pt}
+\setlength{\tabcolsep}{3pt}
 \begin{tabular}{@{}lrrrrrrrrr@{}}
 \toprule
 & & \multicolumn{3}{c}{Check pass rate} & & & & & \\
@@ -162,20 +162,21 @@ All 81 features finished, each with a commit by the agent; no clarification repl
 
 \begin{table}[htbp]
 \centering
-\caption{Feature-sequence experiment: three applications, three features each, three repetitions per condition. Pass rates are over applicable hidden checks (verdicts in parentheses). Costs are per feature for development and per push for maintenance.}
+\caption[Feature-sequence outcomes and costs.]{Feature-sequence experiment: three applications, three features each, three repetitions per condition. Cells show observed passes and judged-applicable denominators; U denotes Unjudged checks. Explicit Not applicable checks are absent in this study. Bounds for affected rows are worst and best cases for missing judgments, not confidence intervals. Costs are per feature for development and per push for maintenance.}
 \label{tab:loop}
 \small
-\begin{tabular}{@{}lccc@{}}
+\setlength{\tabcolsep}{4pt}
+\begin{tabularx}{\linewidth}{@{}YYYY@{}}
 \toprule
 & None & Repo knowledge & Team knowledge \\
 \midrule
-Carried decisions (F2, F3) & 72\% (43/60) & 100\% (58/58) & 100\% (60/60) \\
-\quad in F2 & 71\% (15/21) & 100\% (19/19) & 100\% (21/21) \\
-\quad in F3 & 72\% (28/39) & 100\% (39/39) & 100\% (39/39) \\
-Decisions stated in the same prompt & 100\% (34/34) & 100\% (37/37) & 100\% (39/39) \\
-Code-based checks & 91\% (89/98) & 92\% (94/102) & 90\% (95/105) \\
-No leak of Linkwarden's commit rule & 100\% (12/12) & 100\% (11/11) & 100\% (12/12) \\
-All checks & 87\% & 96\% & 95\% \\
+Carried decisions (F2, F3) & 71.7\% (43/60), 0 U & 100\% (58/58), 2 U & 100\% (60/60), 0 U \\
+\quad in F2 & 71.4\% (15/21) & 100\% (19/19), 2 U & 100\% (21/21) \\
+\quad in F3 & 71.8\% (28/39) & 100\% (39/39), 0 U & 100\% (39/39), 0 U \\
+Decisions stated in the same prompt & 100\% (34/34 judged), 5 U & 100\% (37/37 judged), 2 U & 100\% (39/39), 0 U \\
+Code-based checks & 90.8\% (89/98),\newline 7 U; bound 84.8--91.4\% & 92.2\% (94/102),\newline 3 U; bound 89.5--92.4\% & 90.5\% (95/105),\newline 0 U \\
+No leak of Linkwarden's commit rule & 100\% (12/12), 0 U & 100\% (11/11), 1 U & 100\% (12/12), 0 U \\
+All checks & 87.3\% (178/204), 12 U; bound 82.4--88.0\% & 96.2\% (200/208), 8 U; bound 92.6--96.3\% & 95.4\% (206/216), 0 U \\
 Completion (0--3) & 2.44 & 2.74 & 2.78 \\
 \midrule
 Development cost per feature & \$0.164 & \$0.190 & \$0.196 \\
@@ -183,16 +184,16 @@ Median development time & 47 s & 50 s & 53 s \\
 Knowledge tool calls per feature & 0 & 2.8 & 2.7 \\
 Maintenance per push (cost, time) & -- & \$0.41, 106 s & \$0.39, 98 s \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \end{table}
 
-\paragraph{Decisions carried over.} Every decision a developer stated in F1 or F2 was followed in every later feature where it applied, in both knowledge conditions. Without knowledge, later features followed 72\% of them. Shuffling condition labels within each application and feature, both knowledge conditions improved on none by 29 points (repo $p=0.0001$, team $p<0.001$). The 72\% is not a floor: the none agents saw the code of the earlier features and copied what it showed, such as Linkwarden's Conventional Commits subjects and Actual Budget's use of synced preferences (both 100\% without knowledge). The decisions that leave a weak trace in the code were lost: Maybe's rule that every new \code{UI::} component gets a Lookbook preview (0 of 6 without knowledge), Linkwarden's optional mobile \code{auth} argument for new router hooks (1 of 6), and Maybe's rule that totals across days live in the model (1 of 3). Decisions stated in the same prompt were followed 100\% of the time in all conditions, so the gap is the agent's missing memory across sessions, not its willingness to follow a rule.
+\paragraph{Decisions carried over} Team knowledge passed all 60 carried checks. Repository knowledge passed all 58 judged carried checks, with two Unjudged; without knowledge, 43 of 60 passed. The corresponding observed rates are 100\%, 100\% among judged applicable checks, and 71.7\%. Repository carried checks have bounds 96.7\% to 100\%; none has complete coverage at 71.7\%. The affected row bounds are: none stated 87.2\%--100\%, none code 84.8\%--91.4\%, none all 82.4\%--88.0\%; repository F2+F3 carried 96.7\%--100\%, repository F2 carried 90.5\%--100\%, repository stated 94.9\%--100\%, repository code 89.5\%--92.4\%, repository no-leak 91.7\%--100\%, and repository all 92.6\%--96.3\%. These are worst and best cases, not confidence intervals. The original label-permutation tests shuffled labels within application and feature and treated linked features as exchangeable, although features share evolving chains. Their results ($p=0.0001$ for repository and $p<0.001$ for team) are exploratory and do not account for this dependence or the missing judgments. The 72\% is not a floor: the none agents saw the code of the earlier features and copied what it showed, such as Linkwarden's Conventional Commits subjects and Actual Budget's use of synced preferences (both 100\% without knowledge). The decisions that leave a weak trace in the code were lost: Maybe's rule that every new \code{UI::} component gets a Lookbook preview (0 of 6 without knowledge), Linkwarden's optional mobile \code{auth} argument for new router hooks (1 of 6), and Maybe's rule that totals across days live in the model (1 of 3). The observed same-prompt results are not complete in every condition: the none row has five Unjudged checks and the repository row has two. These data do not establish 100\% compliance in every condition or isolate memory as the cause of the difference.
 
-\paragraph{Team versus repository knowledge.} Sharing one knowledge repository among the three applications made no difference to any check kind. After the last round, the three team repositories held 16 to 19 entries and the per-application repositories 5 to 11. Every entry was scoped to the application it came from (\code{app:actual}, \code{app:linkwarden}, \code{app:maybe}); no run promoted a rule to \code{company}. Linkwarden's commit convention did not leak: all Actual Budget commits in the team condition kept the repository's \code{[AI]} prefix, and no Maybe commit used a Conventional Commits prefix.
+\paragraph{Team versus repository knowledge} On these tasks, team knowledge passed all 60 carried checks; repository knowledge passed all 58 judged carried checks with two Unjudged; no-knowledge agents passed 43 of 60. This comparison does not establish equivalence between team and repository knowledge. After the last round, the three team repositories held 16 to 19 entries and the per-application repositories 5 to 11. Every entry was scoped to the application it came from (\code{app:actual}, \code{app:linkwarden}, \code{app:maybe}); no run promoted a rule to \code{company}. Linkwarden's commit convention did not leak: all Actual Budget commits in the team condition kept the repository's \code{[AI]} prefix, and no Maybe commit used a Conventional Commits prefix.
 
-\paragraph{Cost and time.} Reading the knowledge cost about 3 cents and 3 to 6 seconds per feature (16\% to 19\% more development cost). A maintenance run after a push took about 100 seconds in the background and cost \$0.39 to \$0.41, less than the \$1.35 of the first-run demo, most likely because each push carried one short session and usually one commit instead of six sessions and seven commits. Including maintenance after two of every three features, a feature cost about \$0.46 with the loop against \$0.16 without it. Over the whole experiment, development cost \$14.82, maintenance \$14.35, and judging \$5.46.
+\paragraph{Cost and time} Reading the knowledge cost about 3 cents and 3 to 6 seconds per feature (16\% to 19\% more development cost). A maintenance run after a small push cost \$0.39 to \$0.41 and took 98 to 106 seconds. These pushes typically carried one short session and one commit, so these measurements should not be generalized to every push. Including maintenance after two of every three features, a feature cost about \$0.46 with the loop against \$0.16 without it. Over the whole experiment, development cost \$14.82, maintenance \$14.35, and judging \$5.46.
 
-\paragraph{Limitations.} The treatment conditions reached the ceiling, so the experiment cannot rank repo against team knowledge or detect harm from extra entries. The decisions, features, and checks were designed by an agent working for us from the code, and the judge is a single model that sees only the diff. The reviewer merged every request unchanged, the remotes were local, and each push carried one short session. In the pilot chain, one decision was written into two documents (naming conventions and stack standards), which a human reviewer would have asked to merge. Most decisions in this experiment were conventions inside one application (UI components, preference keys, router hooks). After the experiment we adopted an admission policy that keeps such conventions out of the shared knowledge (Section~\ref{sec:admission}), so the experiment shows that the loop carries decisions across sessions, not that these particular decisions belong in it.
+\paragraph{Limitations} Team knowledge passed all 60 carried checks and repository knowledge passed all 58 judged carried checks, with two Unjudged; this coverage leaves little room to rank repo against team knowledge or detect harm from extra entries. The decisions, features, and checks were designed by an agent working for us from the code, and the judge is a single model that sees only the diff. The reviewer merged every request unchanged, the remotes were local, and each push carried one short session. In the pilot chain, one decision was written into two documents (naming conventions and stack standards), which a human reviewer would have asked to merge. Most decisions in this experiment were conventions inside one application (UI components, preference keys, router hooks). The later admission policy that excludes such UI conventions is a configurable design choice; this experiment does not establish it as a generally correct policy.
 
 \section{Maintenance Rerun (v3)}
 \label{sec:v3}
@@ -201,13 +202,13 @@ All twelve runs completed. Table~\ref{tab:v3maint} shows the joint blind scoring
 
 \begin{table}[htbp]
 \centering
-\caption{v2 and v3 maintenance on identical inputs, scored together by one blind judge (three applications per row).}
+\caption[Joint blind scoring of v2 and v3 maintenance.]{v2 and v3 maintenance on identical inputs, scored together by one blind judge (three applications per row). Jointly rescored v2 values differ from the original v2 report. Noise and unsupported extras are combined.}
 \label{tab:v3maint}
 \small
-\setlength{\tabcolsep}{4pt}
+\setlength{\tabcolsep}{3pt}
 \begin{tabular}{@{}lrrrrrrr@{}}
 \toprule
-Run & Required & Partly & Optional & Traps & Supported & Noise & Cost/run \\
+Run & Required & Partly & Optional & Traps & Supported & \shortstack{Noise +\\unsupported} & Cost/run \\
 \midrule
 v2 A Sonnet & 16/21 & 2 & 3/7 & 1/19 & 13 & 6 & \$1.40 \\
 v3 A Sonnet & 16/21 & 3 & 2/7 & 0/19 & 8 & 2 & \$1.42 \\
@@ -221,7 +222,7 @@ v3 B Haiku & 11/21 & 5 & 2/7 & 3/19 & 22 & 11 & \$0.54 \\
 \end{tabular}
 \end{table}
 
-The ranking of v2 holds: A finds about twice as many required facts as B with Sonnet (16 against 8), and A with Haiku now comes close to A with Sonnet (15). The v3 runs propose fewer records that are noise or unsupported (A Sonnet: 2 against 6; A Haiku: 5 against 12) and A with Sonnet fell into no trap. The admission policy cost a few facts on purpose: v3 A with Sonnet left out UI conventions such as Maybe's design tokens and tooltip component, which its v2 run had recorded. Linkwarden gained the most: A with Sonnet now records thin API routes, router hooks for client calls, and shared web and mobile logic, which no v2 run had fully recorded.
+In this joint rescoring, v2 A and B with Sonnet scored 16 and 9 required facts, compared with the original v2 report counts of 17 and 10. In v3, A Sonnet scored 16 and B Sonnet 8; A Haiku scored 15. These one-point differences reflect rescoring, not a changed run. The v3 runs propose fewer records classified as noise or unsupported together (A Sonnet: 2 against 6; A Haiku: 5 against 12). A Sonnet had zero of 19 predefined traps, but also produced one noise extra and one unsupported extra. These are recorded judgments of accepted proposals, not a systematic audit of writer fidelity. The unsupported Maybe Lookbook claim also appears in the written knowledge: it names \code{/lookbook}, while the judge identifies \code{/design-system}. The report audit confirmed the score and written claim but did not independently adjudicate the route against the complete application source. The admission policy cost a few facts on purpose: v3 A with Sonnet left out UI conventions such as Maybe's design tokens and tooltip component, which its v2 run had recorded. Linkwarden gained the most: A with Sonnet now records thin API routes, router hooks for client calls, and shared web and mobile logic, which no v2 run had fully recorded.
 
 \section{Persona-Driven Development}
 \label{sec:v3-dev}
@@ -230,55 +231,56 @@ All 126 sessions committed; none timed out. Table~\ref{tab:v3dev} summarizes the
 
 \begin{table}[htbp]
 \centering
-\caption{Persona-driven development on the v3 knowledge bases (six tasks, three repetitions). Fact checks are those tied to facts from the v2 conversations. The digest conditions were added after the first analysis.}
+\caption[Persona-driven development outcomes.]{Persona-driven development on the v3 knowledge bases (six tasks, three repetitions). Fact checks are tied to facts from v2 conversations. Cells show observed rates; U is Unjudged. Digest conditions were added after first analysis. p-values are original exploratory analyses; incomplete rows were not rescored. Bounds for affected rows are in the text and are not confidence intervals.}
 \label{tab:v3dev}
 \small
-\setlength{\tabcolsep}{4pt}
-\begin{tabular}{@{}lrrrrrr@{}}
+\setlength{\tabcolsep}{3pt}
+\begin{tabularx}{\linewidth}{@{}p{2.3cm}YYYrrY@{}}
 \toprule
-Knowledge & First commit & Final & Review rounds & Facts told & Dev cost & vs none ($p$) \\
+Knowledge & First commit & Final & Review rounds & \shortstack{Facts\\told} & \shortstack{Dev\\cost} & vs none ($p$, original) \\
 \midrule
-None & 71\% & 94\% & 0.50 & 1.17 & \$0.195 & -- \\
-A Sonnet & 68\% & 93\% & 0.50 & 1.00 & \$0.198 & $-4.4$ (0.26) \\
+None & 70.7\% (3 U) & 93.7\% (2 U) & 0.50 & 1.17 & \$0.195 & -- \\
+A Sonnet & 68\% (0 U) & 93\% & 0.50 & 1.00 & \$0.198 & $-4.4$ (0.26) \\
 B Sonnet & 73\% & 93\% & 0.39 & 0.83 & \$0.215 & $+0.7$ (0.85) \\
-A Haiku & 67\% & 92\% & 0.44 & 0.94 & \$0.206 & $-5.1$ (0.20) \\
+A Haiku & 67.2\% (2 U) & 92.1\% (2 U) & 0.44 & 0.94 & \$0.206 & $-5.1$ (0.20) \\
 B Haiku & 70\% & 92\% & 0.33 & 0.72 & \$0.207 & $-1.9$ (0.82) \\
-A Sonnet + digest & 73\% & 92\% & 0.44 & 1.11 & \$0.228 & $-1.9$ (0.65) \\
-B Sonnet + digest & 64\% & 90\% & 0.39 & 0.94 & \$0.206 & $-7.0$ (0.05) \\
+A Sonnet + digest & 73\% & 92.2\% (2 U) & 0.44 & 1.11 & \$0.228 & $-1.9$ (0.65) \\
+B Sonnet + digest & 64\% & 89.8\% (4 U) & 0.39 & 0.94 & \$0.206 & $-7.0$ (0.0509) \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \end{table}
 
-\paragraph{No condition beat no knowledge.} At the first commit the knowledge conditions passed 64\% to 73\% of fact checks against 71\% without knowledge; no difference is significant. The reason is visible per check: most fact checks were passed in every repetition of every condition, because the code showed the answer (Linkwarden's \code{safeFetch} next to the route, Actual Budget's \code{snapdom} in the current export code). The rest failed in every condition.
+\paragraph{No demonstrated improvement on these tasks} At the first commit, observed fact-check rates ranged from 64\% to 73\% with knowledge and were 71\% without it. The None and A-Haiku fact rows are incomplete; None has 41/58 judged pass, 17 fail, 3 Unjudged, and 14 explicitly not applicable. A Haiku has 41/61 judged pass, 20 fail, 2 Unjudged, and 12 explicitly not applicable; the missing-judgment bounds are 67.2\%--72.1\% for None and 65.1\%--68.3\% for A Haiku. The original comparisons used incomplete data and do not establish equivalence or that knowledge cannot help. Most checks were judged the same across repetitions, often where the code showed the answer, but the outcome remains task-specific.
 
-\paragraph{Why the hard checks failed.} We looked up, for every fact check, whether the blind maintenance scoring found the fact in that condition's knowledge and whether the agent opened the document holding it before its first commit (Table~\ref{tab:v3gap}). Without help, agents always read \code{index.md} and then one or two core documents; an entry in another document had no effect. We therefore added a session-start digest to \code{attach} (one line per entry, printed by the \code{SessionStart} hook into the session's context). With it, agents cited knowledge entries in 22 of 36 sessions instead of 29 of 72, but the hard checks still failed. The clearest case is Maybe's backfill task. The knowledge recorded what the developer had said in v2 (backfills are \code{data\_migration} rake tasks, not Sidekiq jobs or schema migrations). Agents with the digest read that entry and cited it, then ran the rake task automatically at container start. The teammate's real rule, that backfills stay manual, had never been said in the conversations the knowledge was learned from. Actual Budget's release-note convention was missing from every knowledge base, in v2 and in v3, and its check passed in only 6 of 14 first commits across the first five conditions.
+\paragraph{Content and access diagnostics} We looked up, for every fact check, whether the blind maintenance scoring found the fact in that condition's knowledge and whether the agent opened the document holding it before its first commit (Table~\ref{tab:v3gap}). The access diagnostic recorded which knowledge files agents opened before committing. File-opened status is an access proxy, not proof that an entry was understood or caused an outcome. We therefore added a session-start digest to \code{attach} (one line per entry, printed by the \code{SessionStart} hook into the session's context). With it, agents cited knowledge entries in 22 of 36 sessions instead of 29 of 72. This is a citation proxy; it does not establish comprehensive retrieval or improved development quality. The clearest case is Maybe's backfill task. The knowledge recorded what the developer had said in v2 (backfills are \code{data\_migration} rake tasks, not Sidekiq jobs or schema migrations). Agents with the digest read that entry and cited it, then ran the rake task automatically at container start. The teammate's real rule, that backfills stay manual, had never been said in the conversations the knowledge was learned from. Actual Budget's release-note convention was missing from every knowledge base, in v2 and in v3, and its check passed in 6 of 14 judged first commits across the first five conditions, with one additional Unjudged check.
 
 \begin{table}[htbp]
 \centering
-\caption{First-commit fact checks by where the knowledge stood.}
+\caption[First-commit fact checks by knowledge access.]{First-commit fact checks by where the knowledge stood. Observed rates use judged applicable checks; U denotes Unjudged. The hard-check subset is defined from observed no-knowledge failures and is not a complete classification.}
 \label{tab:v3gap}
 \small
-\begin{tabular}{@{}lrr@{}}
+\setlength{\tabcolsep}{4pt}
+\begin{tabularx}{\linewidth}{@{}YYY@{}}
 \toprule
 Situation & All fact checks & Hard checks\textsuperscript{a} \\
 \midrule
-No knowledge base & 71\% (41/58) & 15\% (3/20) \\
+No knowledge base & 70.7\% (41/58), 3 U & 15\% (3/20), 1 U \\
 Fact missing from the knowledge & 67\% (39/58) & 47\% (17/36) \\
 Fact present, document not opened & 56\% (35/62) & 0\% (0/27) \\
-Fact present, document opened & 77\% (99/128) & 0\% (0/21) \\
+Fact present, document opened & 77.3\% (99/128 judged), 2 U & 0\% (0/21), 0 U \\
 Fact present, digest in context & 70\% (64/92) & 4\% (1/23) \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 
 \smallskip
-{\footnotesize \textsuperscript{a} Checks that the agent without knowledge failed at least once.}
+{\footnotesize \textsuperscript{a} Checks that the agent without knowledge failed at least once in an observed first-commit judgment. For the no-knowledge hard subset, the observed result is 3/20 with one Unjudged check, giving bounds 3/21 to 4/21 (14.3\%--19.0\%). The file-opened hard subset is 0/21 with no missing checks. For all fact checks, the no-knowledge bounds are 41/61 to 44/61 (67.2\%--72.1\%); the file-opened bounds are 99/130 to 101/130 (76.2\%--77.7\%). This hard-subset definition may omit genuinely hard checks.}
 \end{table}
 
-\paragraph{Review closes the gap.} After at most two review rounds every condition reached 90\% to 94\% of fact checks. The teammate had to state about one fact per session in every condition, so on these tasks the knowledge did not reduce the reviewer's work measurably.
+\paragraph{Observed results after simulated review} After at most two simulated-teammate review rounds, the original observed final fact rates were 90\% to 94\%. Missing-judgment bounds for every affected fact row are: first None 67.2\%--72.1\%, first A Haiku 65.1\%--68.3\%; final None 90.8\%--93.8\%, final A Haiku 89.2\%--92.3\%, final A Sonnet digest 89.4\%--92.4\%, and final B Sonnet digest 84.1\%--90.5\%. The affected final rows are None 59/63 judged pass, 4 fail, 2 Unjudged, 10 not applicable; A Haiku 58/63 pass, 5 fail, 2 Unjudged, 10 not applicable; A Sonnet digest 59/64 pass, 5 fail, 2 Unjudged, 9 not applicable; B Sonnet digest 53/59 pass, 6 fail, 4 Unjudged, 12 not applicable. These explicit Not applicable counts are never included in the bounds. The table displays observed rates, not these bounds. These results do not establish that all conditions exceeded 90\%. Reviewers were simulated teammates, and these data do not demonstrate a reduction in real reviewer workload.
 
-\paragraph{What this adds to the other two experiments.} Knowledge helped when the deciding information existed only in an earlier conversation and was stated clearly (downstream: +8 points; feature sequence: +29 points). It did not help when the code already showed the answer, or when the decisive part of a rule had never been said. This is the reason for the admission policy, and it points future experiments at decisions the code does not show: decisions made in one repository and needed in another, and decisions that replace a pattern most of the code still uses.
+\paragraph{Interpretation across the development studies} Benefits varied by task and information available. The studies provide selected positive observations, a limited persona-development negative result, and hypotheses about possible causes. They do not establish a universal or causal mechanism. Excluding UI conventions is a later configurable design choice, not a result established by these experiments.
 
-\paragraph{Limitations.} The tasks were designed by agents around facts from simulated conversations, and most turned out to be visible in the code; the digest conditions were added after seeing the first results; the persona and judge are models; three repetitions per condition. One judge verdict (Maybe's self-hosted limit display) relied on the judge's recollection of code outside the diff and is unreliable.
+\paragraph{Limitations} The tasks were designed by agents around facts from simulated conversations, and most turned out to be visible in the code; the digest conditions were added after seeing the first results; the persona and judge are models; three repetitions per condition. One judge verdict (Maybe's self-hosted limit display) relied on the judge's recollection of code outside the diff and is unreliable.
 
 \section{Team Decisions Across Repositories}
 \label{sec:v4}
@@ -287,60 +289,62 @@ All three learning sessions ended with a merged knowledge change (\$0.31 per mai
 
 \begin{table}[htbp]
 \centering
-\caption{Team decisions stated in Linkwarden and tested in three repositories (five tasks, four repetitions per condition).}
+\caption[Team-decision outcomes across three repositories.]{Team decisions stated in Linkwarden and tested in three repositories (five tasks, four repetitions per condition). Pooled rates combine all three repositories, including Linkwarden learning-repository tasks; original hypothesis tests are task-weighted.}
 \label{tab:v4}
 \small
-\begin{tabular}{@{}lccr@{}}
+\setlength{\tabcolsep}{4pt}
+\begin{tabularx}{\linewidth}{@{}p{5cm}YYY@{}}
 \toprule
-& No knowledge & Team knowledge & Difference ($p$) \\
+& No knowledge & Team knowledge & Pooled difference \\
 \midrule
-Decision checks, first commit & 60\% (29/48) & 88\% (42/48) & $+30$ (0.0002) \\
+Decision checks, first commit & 60.4\% (29/48) & 87.5\% (42/48) & pooled +27.1 pp \\
 \quad TD1 no new package & 100\% (8/8) & 100\% (8/8) & \\
 \quad TD2 no personal data in logs & 92\% (11/12) & 100\% (12/12) & \\
 \quad TD3 timeout, failure isolated & 50\% (6/12) & 50\% (6/12) & \\
 \quad TD4 Conventional Commits & 25\% (4/16) & 100\% (16/16) & \\
-Decision checks, final & 71\% (34/48) & 88\% (42/48) & $+18$ (0.005) \\
-Code checks, first commit & 80\% (67/84) & 74\% (62/84) & $-7$ (0.25) \\
+Decision checks, final & 70.8\% (34/48) & 87.5\% (42/48) & pooled +16.7 pp \\
+Code checks, first commit & 79.8\% (67/84) & 73.8\% (62/84) & pooled -6.0 pp \\
 Review rounds per session & 0.25 & 0.05 & \\
 Decisions the teammate had to state & 0.20 & 0 & \\
 Development cost per session & \$0.17 & \$0.18 & \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \end{table}
 
-With the team knowledge, agents in other repositories followed the team's decisions at their first commit in 88\% of checks against 60\% without it ($p=0.0002$). The teammates asked for fewer fixes (0.05 review rounds per session against 0.25) and never had to restate a rule. Code-quality checks did not differ significantly.
+Across the 40 test sessions in all three repositories, including Linkwarden where the rules were learned, pooled first-commit decision checks were 29/48 (60.4\%) without knowledge and 42/48 (87.5\%) with team knowledge, a 27.1-point gain. The original task-weighted contrast was +30.0 points ($p=0.0002$). Pooled final results were 34/48 (70.8\%) and 42/48 (87.5\%), a 16.7-point gain; the original task-weighted contrast was +18.3 points ($p=0.005$). First-commit code checks changed from 67/84 (79.8\%) to 62/84 (73.8\%), a -6.0-point pooled change; the original task-weighted contrast was -6.8 points ($p=0.25$). Three learning sessions are separate from these test results. Reduced review rounds (0.25 to 0.05 per session) are simulated-teammate review rounds.
 
-Most of the difference comes from one decision. Without knowledge, agents copied each repository's own commit style (Actual Budget's \code{[AI]} prefix, Maybe's plain subjects) and followed Conventional Commits in 4 of 16 commits; with the knowledge, in all 16. Two decisions needed no knowledge: agents already avoided new packages and kept personal data out of the logs they wrote. The timeout decision did not change on its checks, but the checks were stricter than the rule. Every session with the team knowledge set an explicit timeout; the failing ones did not treat a non-2xx response as a failure or allowed retries beyond 10 seconds. Without knowledge, no Maybe exchange-rate client set a timeout at all.
+Most of the first-commit gain came from one decision: Conventional Commits accounted for 12 of the 13 additional decision passes. Without knowledge, agents copied each repository's own commit style (Actual Budget's \code{[AI]} prefix, Maybe's plain subjects) and followed Conventional Commits in 4 of 16 commits; with the knowledge, in all 16. Other decisions pooled were 25/32 without and 26/32 with knowledge. Agents avoided new packages in both conditions. TD2 privacy checks were 11/12 without knowledge and 12/12 with knowledge, rather than perfect in both. The timeout decision did not change on its checks, but the checks were stricter than the rule. Every session with the team knowledge set an explicit timeout; the failing ones did not treat a non-2xx response as a failure or allowed retries beyond 10 seconds. Without knowledge, no Maybe exchange-rate client set a timeout at all.
 
-\paragraph{Limitations.} Five tasks, four repetitions, one learning repository, and decisions designed by an agent for this test; the result rests mainly on one decision. Agents without knowledge could have followed Conventional Commits only by guessing, so this is the intended contrast: a team rule that the repository in front of the agent does not show.
+\paragraph{Limitations} Five tasks, four repetitions, one learning repository, and decisions designed by an agent for this test; the result rests mainly on one decision. Agents without knowledge could have followed Conventional Commits only by guessing, so this is the intended contrast: a team rule that the repository in front of the agent does not show.
 
 \section{Live First-Run Demonstration}
 \label{sec:demo}
 
-We followed the documented first run from a clean clone four times on the public Actual Budget demo inputs (seven development commits, six sessions), each time starting from the empty knowledge that \code{contextops init} prepares and using the checked-in Sonnet configuration (Table~\ref{tab:demoruns}). The first run tested Kerem's first-run implementation (PR~\#13) as submitted; the problems it exposed were fixed, and the later runs verify the fixes.
+We followed the documented first-run path four times on the public Actual Budget demo inputs (seven development commits, six sessions), starting from empty knowledge and using the checked-in Sonnet configuration (Table~\ref{tab:demoruns}). The first run was revision \code{caf4bdb}, which included PR~\#13 implementation plus session import/export changes; it was not PR~\#13 as submitted. Four recorded runs used simulated development sessions. Final recorded acceptance at \code{b20f3f9} predates team-scope and admission-policy changes, so these runs document the historical template-to-populated path and do not live-verify the current branch.
 
 \begin{table}[H]
 \centering
-\caption{Live first-run runs from empty knowledge on the Actual Budget demo.}
+\caption[Recorded live first-run demonstrations.]{Live first-run runs from empty knowledge on the Actual Budget demo.}
 \label{tab:demoruns}
 \small
-\begin{tabular}{@{}llrrrrl@{}}
+\setlength{\tabcolsep}{3pt}
+\begin{tabularx}{\linewidth}{@{}YlrrrrY@{}}
 \toprule
-Revision & Strategy & Accepted & Rejected & Cost & Time & Documents written \\
+Revision & \shortstack{Strat-\\egy} & \shortstack{Ac-\\cepted} & \shortstack{Re-\\jected} & Cost & Time & Documents written \\
 \midrule
-\code{caf4bdb} (PR \#13) & A & 10 & 1 & \$1.01 & 3:59 & terms, stack, pitfalls \\
+\code{caf4bdb} (PR \#13 + session import/export) & A & 10 & 1 & \$1.01 & 3:59 & terms, stack, pitfalls \\
 \code{43888a7} (fixes) & A & 14 & 0 & \$0.72 & 3:10 & all four \\
 \code{43888a7} (fixes) & B & 3 & 0 & \$0.50 & 1:16 & terms, pitfalls \\
 \code{b20f3f9} (final) & A & 15 & 0 & \$1.35 & 4:58 & all four \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \end{table}
 
-\paragraph{First run.} The first run wrote ten correct entries, for example that amounts are stored at $\times$100 for every currency including yen, that the sync server must import \code{fetch} from \code{undici}, and that report range validation must compare normalized dates. It also exposed three problems. A correct convention was lost: the conventions specialist proposed that commit messages start with \code{[AI]}, citing two developer messages and the commit log, but review rejected the whole record because the commit log was not accepted as a locator. The writer used inconsistent identifiers (\code{STACK-001} but \code{PIT001}) because the empty templates showed no example. And the conventions specialist handed typing rules to the stack document, but forks run in parallel and handoffs were only reported, so nobody acted on them.
+\paragraph{First run} The first run wrote ten correct entries, for example that amounts are stored at $\times$100 for every currency including yen, that the sync server must import \code{fetch} from \code{undici}, and that report range validation must compare normalized dates. It also exposed three problems. A correct convention was lost: the conventions specialist proposed that commit messages start with \code{[AI]}, citing two developer messages and the commit log, but review rejected the whole record because the commit log was not accepted as a locator. The writer used inconsistent identifiers (\code{STACK-001} but \code{PIT001}) because the empty templates showed no example. And the conventions specialist handed typing rules to the stack document, but forks run in parallel and handoffs were only reported, so nobody acted on them.
 
-\paragraph{Fixes.} We changed review so that it drops only unresolvable locators and rejects a record only when none of its locators resolve, and accepted the commit log as evidence. We added a handoff pass in which each receiver gets one extra turn on a fork of its own session. We stated the identifier format in the run notes and templates. A further run showed facts scoped as \code{app:actual-budget}, \code{app:desktop-client}, and \code{app:sync-server} for the same application, so specialists are now told to use \code{app:<checkout folder name>}. Three deterministic tests cover the new behavior (42 in total).
+\paragraph{Fixes} We changed review so that it drops only unresolvable locators and rejects a record only when none of its locators resolve, and accepted the commit log as evidence. We added a handoff pass in which each receiver gets one extra turn on a fork of its own session. We stated the identifier format in the run notes and templates. A further run showed facts scoped as \code{app:actual-budget}, \code{app:desktop-client}, and \code{app:sync-server} for the same application, so specialists are now told to use \code{app:<checkout folder name>}. Three deterministic tests cover the new behavior (42 in total).
 
-\paragraph{After the fixes.} At the final revision the same run wrote fifteen entries into all four core documents (Table~\ref{tab:demo}). The naming document now holds the \code{[AI]} prefix, the release-note requirement, and one component per file; all entries use \code{app:actual} and hyphenated identifiers. Two of the naming records had cited a non-diff path; review dropped that locator and kept them on their conversation evidence, where the old rule would have rejected them. In the intermediate run the handoff pass added the \code{ts-strict-ignore} rule to the stack document for \$0.03. From the same empty baseline, strategy B wrote only three entries, which mirrors the A/B coverage difference of v2.
+\paragraph{After the fixes} At final recorded acceptance, revision \code{b20f3f9}, the run wrote fifteen entries into all four core documents (Table~\ref{tab:demo}). The naming document now holds the \code{[AI]} prefix, the release-note requirement, and one component per file; all entries use \code{app:actual} and hyphenated identifiers. Two of the naming records had cited a non-diff path; review dropped that locator and kept them on their conversation evidence, where the old rule would have rejected them. In the intermediate run the handoff pass added the \code{ts-strict-ignore} rule to the stack document for \$0.03. From the same empty baseline, strategy B wrote only three entries, which mirrors the A/B coverage difference of v2.
 
 \begin{table}[htbp]
 \centering

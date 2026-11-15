@@ -5,7 +5,7 @@
 \begin{itemize}[nosep]
   \item \textbf{Developer}: develops an application with a coding agent and later reviews knowledge changes.
   \item \textbf{Development agent}: Claude Code working in the application; it reads the knowledge through the pointer written by \code{attach}.
-  \item \textbf{Reviewer}: a teammate who reviews and merges the pull or merge request a run opens on the knowledge repository.
+  \item \textbf{Reviewer}: a teammate who reviews any proposed knowledge change and may merge it after review; remote publication is optional and disabled by default.
   \item \textbf{Setup agent}: any coding agent that follows the setup skill on the developer's behalf.
   \item \textbf{Maintenance agents}: sweeper, specialists, cartographer, and writer inside a run.
   \item \textbf{Researcher}: runs the evaluation harness and compares strategies.
@@ -65,13 +65,13 @@ Figure~\ref{fig:usecases} shows the main use cases.
   \item The system shall export a session in a shareable form (local paths replaced, thinking and tool results removed) and import it for another checkout.
   \item The system shall support a knowledge repository shared by a team's applications or bound to one application, and scope facts accordingly.
   \item The system shall connect an application so that its coding-agent sessions read the current knowledge, without changing tracked application files.
-  \item On a push of the application, the system shall run maintenance on the pushed range and the sessions since the last run without blocking the push, and, when enabled, open a pull or merge request on the knowledge repository.
+  \item A configured pre-push hook shall capture the refs being pushed and prepare maintenance on that range and selected sessions. Refresh currently calls \code{git fetch} synchronously without a timeout, so nonblocking behavior is not guaranteed. Remote publication requires \code{open\_pr: true}; the default output is local.
 \end{enumerate}
 
 \section{Non-Functional Requirements}
 
 \begin{enumerate}[label=NFR\arabic*., leftmargin=3.5em, nosep]
-  \item \textbf{Privacy}: evidence and run artifacts stay local; a result branch is pushed only when the team enables review requests, and nothing is merged automatically.
+  \item \textbf{Privacy}: orchestration and run artifacts are local by default. Selected source, diff, and conversation evidence is sent to hosted Claude inference. Remote publication requires \code{open\_pr: true}; nothing is merged automatically.
   \item \textbf{Reviewability}: every fact is traceable to evidence; generated knowledge is never marked human-verified.
   \item \textbf{Cost}: per-agent and per-run budgets; a five-task push should cost less than \$2 with Sonnet-class models.
   \item \textbf{Reproducibility}: deterministic tests run without credentials or model calls; documented first run works from a clean clone.

@@ -1,54 +1,52 @@
 \chapter{CONCLUSION}
 \label{ch:conclusion}
 
-At the midterm point Context Ops is a working, tested, and reproducible system. The runtime implements two context-acquisition strategies behind one shared pipeline, keeps every result local and reviewable, and can be set up by a coding agent from a README prompt. We have run three maintenance evaluations (the pilot, v2, and its rerun), four downstream evaluations, and a live first run from empty knowledge. The knowledge repository now works as a team's shared repository or as one application's: developers attach their applications once, their agents read the knowledge, and every push opens a review request on it.
+At midterm, Context Ops has a shared runtime for two context-acquisition strategies, deterministic tests, and a documented setup path. Four development studies contain 367 evaluated sessions: 120 ready-made downstream runs, 81 feature-sequence sessions, 126 persona-development sessions, and 40 team-study test sessions. The team study also has three separate learning sessions. The full development corpus contains 533 judge files. Nine files omit 61 expected judgments, so the feature-sequence and persona findings include visible missingness counts and sensitivity bounds. These are coverage checks, not independent reviews of judgment correctness. The evaluation uses simulated developers and reviewers. The runtime uses local orchestration and artifacts with hosted Claude inference; selected evidence is sent to the hosted service. Remote publication requires \code{open\_pr: true} and is disabled by default.
 
 \section{Findings So Far}
 
 \begin{enumerate}[nosep]
-  \item \textbf{Reading everything once beats reading selectively.} On long multi-task pushes, the sweeper-first strategy found 17 of 21 required facts with Sonnet against 10 for fresh specialists. The difference comes from coverage: every sweeper read all six sessions, fresh specialists read about a third of them.
-  \item \textbf{Forks are cheap only when the cache prefix is shared.} Two invisible differences, a role-specific system prompt and asynchronously connected tools, made every fork re-write the inherited history. After removing both, forks became cheaper than fresh specialists, and A became cheaper than B per fact found.
-  \item \textbf{A cheaper model does not make A cheaper.} With Haiku the sweeper's long reading multiplied every fork's per-turn cost, and A-Haiku cost 2.7 times B-Haiku.
-  \item \textbf{Downstream effect.} \DSConclusionText
-  \item \textbf{The loop carries decisions across sessions.} When developers stated team decisions while working, later features in fresh sessions followed all of them with push-triggered maintenance and merged knowledge, against 72\% without knowledge ($p<0.001$, 81 features). The lost decisions were the ones the code shows weakly. A knowledge repository shared by three applications worked as well as one per application, kept every entry scoped to its application, and leaked no application's rule into another. A maintenance run per push cost about \$0.40 and 100 seconds in the background.
-  \item \textbf{Knowledge helps where the code is silent, and only there.} Rerun on the v2 inputs, maintenance kept its ranking and became cleaner (A with Sonnet: 16 of 21 required facts, no traps, fewer noise records). On six new persona-driven tasks, however, no knowledge base beat no knowledge, because the code already showed most answers and the hardest rule had never been said in the conversations. Agents also skim the knowledge; a session-start digest made them cite it more often but did not change these results. A person reviewing the diff closed most gaps in every condition.
-  \item \textbf{Team knowledge crosses repositories.} Decisions a tech lead stated while working in Linkwarden were stored as team-wide entries and reached agents working in Actual Budget and Maybe: 88\% of decision checks at the first commit against 60\% without the knowledge ($p<0.001$), with fewer review rounds. Most of the gain came from the commit convention, which the other repositories' code contradicts.
-  \item \textbf{The template-to-populated path works.} From a clean clone and empty knowledge, the documented run produced evidence-backed entries in about four minutes for \$0.7 to \$1.4. The first run exposed a validation rule that discarded correct facts, inconsistent identifiers, unhandled handoffs, and inconsistent scopes; after the fixes the same run filled all four core documents with fifteen entries.
+  \item \textbf{Maintenance coverage varied by strategy and model.} In the original v2 scoring, A-Sonnet found 17 of 21 required facts and B-Sonnet 10. A joint blind rescoring recorded 16 and 9 on the same runs. The v3 A-Sonnet rerun found 16 of 21 required facts, three partial matches, no predefined traps, eight supported extras, one noise extra, and one unsupported extra. One run per application does not establish a general strategy winner.
+  \item \textbf{Cache behavior affected cost.} A role-specific system prompt and asynchronously connected tools prevented cache reuse in the inspected forks. After both were corrected, live checks showed that forks read their inherited history from cache; in v2, forked specialists cost less than fresh specialists. Changed conversations and configuration prevent attributing the pilot-to-v2 cost difference solely to caching. In v2, A-Haiku still cost 2.7 times B-Haiku.
+  \item \textbf{Ready-made downstream tasks showed a selected positive result.} Maintained A passed 161/188 pooled checks (85.6\%), compared with 146/188 (77.7\%) without knowledge, an 8.0-point pooled difference. The original task-weighted contrast was +8.2 points ($p=0.0209$). Stale seed knowledge did not demonstrate a benefit. Routine tasks improved from 82\% to 97\%, while tasks labeled knowledge tasks moved from 74\% to 76\%; the findings do not support a claim that knowledge helps only when code is silent. Mean development cost rose from \$0.202 to \$0.240 per task. Median time rose from 44 to 47 seconds and mean time from 75 to 96 seconds. These are client-side list-price estimates, not subscription invoices; maintenance cost is separate.
+  \item \textbf{Feature sequences showed carried decisions with incomplete coverage.} Team knowledge passed all 60 judged carried checks. Repository knowledge passed all 58 judged carried checks with two Unjudged. Without knowledge, 43 of 60 passed. The original feature-label permutation tests are exploratory because linked features share evolving chains, and they do not account for the missing judgments. Small-push maintenance cost \$0.39 to \$0.41 and took 98 to 106 seconds in this experiment; those pushes typically carried one short session and one commit.
+  \item \textbf{Persona development showed no demonstrated improvement on these tasks.} Observed first-commit fact rates ranged from 64\% to 73\% with knowledge and were 71\% without. The None and A-Haiku rows are incomplete: first None has 3 Unjudged, first A Haiku has 2; final None and A Haiku each have 2, final A Sonnet digest has 2, and final B Sonnet digest has 4. Bounds exclude explicit Not applicable judgments and are reported in the results. Original final observed fact rates were 90\% to 94\%, but the missing judgments mean this does not establish that every condition exceeded 90\%. Reviewers were simulated teammates, and one Maybe self-hosting verdict was unreliable. Citation frequency is a proxy, not proof of comprehensive retrieval or improved quality.
+  \item \textbf{Team knowledge crossed repositories in the team study.} Across all three repositories, including Linkwarden where the rules were learned, pooled first-commit decision checks were 29/48 (60.4\%) without knowledge and 42/48 (87.5\%) with knowledge, a 27.1-point pooled gain. The original task-weighted contrast was +30.0 points ($p=0.0002$). Conventional Commits accounted for 12 of the 13 additional passes; other decision checks changed from 25/32 to 26/32. TD2 privacy checks were 11/12 without knowledge and 12/12 with knowledge. Review-round counts reflect simulated teammate review.
+  \item \textbf{The recorded first-run path was repeated four times.} The first run was revision \code{caf4bdb}, which included PR~\#13 implementation and session import/export changes; it was not PR~\#13 as submitted. Final recorded acceptance, \code{b20f3f9}, predates team-scope and admission-policy changes. These historical runs do not verify the current branch live.
 \end{enumerate}
 
 \section{Status of the Success Criteria}
 
-Table~\ref{tab:criteria} compares the evidence collected so far with the success criteria of Section~2.2.2.
+Table~\ref{tab:criteria} compares the evidence collected so far with the success criteria of Section~2.2.2. Status labels describe the evidence currently available, not universal guarantees.
 
 \begin{table}[H]
 \centering
 \caption{Success criteria at the midterm.}
 \label{tab:criteria}
 \small
-\begin{tabularx}{\linewidth}{@{}l >{\raggedright\arraybackslash}X l@{}}
+\begin{tabularx}{\linewidth}{@{}p{3.5cm}Yp{3.2cm}@{}}
 \toprule
 Criterion & Evidence so far & Status \\
 \midrule
-Coverage $\geq$ 75\%, traps $\leq$ 5\% & A-Sonnet v3: 76\% of required facts (16 of 21) and 0 of 19 traps (v2: 81\%, 1 trap); one run per application & Met \\
-Cost $<$ \$2 per push & A-Sonnet \$1.42, B-Sonnet \$0.92 (v3); \$0.40 per push in the feature sequence & Met \\
-Downstream benefit & +8 points with A's knowledge ($p=0.02$); feature sequence 100\% against 72\%; across repositories 88\% against 60\% (both $p<0.001$); persona tasks whose answers the code shows: no difference & Met where the code is silent \\
-Reproducibility & Public demo from a clean clone recorded four times; fixes verified live; PR \#13 and follow-ups not yet merged & Met, in review \\
-Safety & Credential and path scans pass; result branches reach the team only as review requests; no automatic merge & Met \\
+Coverage $\geq$ 75\%, traps $\leq$ 5\% & v3 A-Sonnet: 16/21 required facts (76.2\%), 0/19 predefined traps, plus 8 supported, 1 noise, and 1 unsupported extra; one run per application & Observed, one run/app \\
+Cost < \$2 per push & v3 A-Sonnet \$1.42 and B-Sonnet \$0.92 per application run. Feature-study small pushes cost \$0.39--\$0.41 and took 98--106 s, typically with one short session and one commit & Observed in tested runs \\
+Downstream benefit & Selected positive results in ready-made and team studies; persona result is limited and incomplete; feature study has missing judgments and dependent feature chains & Mixed, task-specific evidence \\
+Reproducibility & Four recorded historical demo runs; final acceptance predates team-scope and admission-policy changes; hosted-forge validation remains pending & Partially evidenced \\
+Safety & The baseline scan at \code{e7e095b} reported two PDF binary manual-review flags and no detected credential. Hosted-forge and human-review validation remain pending & Not established \\
 \bottomrule
 \end{tabularx}
 \end{table}
-
 \section{Next Steps}
 
 \begin{enumerate}[nosep]
-  \item \textbf{Repetitions and a human audit.} Repeat the v3 maintenance runs at least three times per condition and have both team members audit a sample of the judge's verdicts.
-  \item \textbf{Cheaper A.} Try a Haiku writer, pre-loaded evidence for the sweeper to shorten its reading, more parallel forks, and a middle strategy (``C'') in which specialists share a cached evidence prefix without a sweeper.
-  \item \textbf{Cumulative maintenance.} Run maintenance over several consecutive pushes on the same knowledge, including updates, merges, and retirements of facts that become stale.
-  \item \textbf{Decisions that the code does not show.} Test the kinds of knowledge the admission policy keeps, where a missing decision is costly: infrastructure changed only through Terraform while the agent works in an application repository (with recording stand-ins for \code{gcloud}, \code{kubectl}, and \code{terraform}), a decision that replaces a pattern most of the existing code still uses, a rejected approach that leaves no trace in the code, and security rules such as keeping personal data out of logs. A decision stated in one repository and needed in another is where team knowledge should outperform per-repository knowledge.
-  \item \textbf{Harder feature sequences.} The feature-sequence experiment reached the ceiling with two decisions per prompt and one short session per push. Next: longer chains, several developers per push, decisions that are revised or contradict each other, a human reviewer who rejects or edits requests, and a hosted GitHub or GitLab remote.
-  \item \textbf{Publication.} Release the simulated conversations, tasks, hidden checks, and protocol as a dataset with instructions to reproduce every number in this report.
+  \item Repeat v3 maintenance runs and have team members audit a sample of judge verdicts.
+  \item Test cumulative maintenance across consecutive pushes, including updates, merges, and retirements of stale facts.
+  \item Evaluate cross-repository decisions, decisions that replace patterns still visible in code, rejected approaches absent from code, and security requirements.
+  \item Run longer feature chains with multiple developers, revised or conflicting decisions, a human reviewer who can reject or edit requests, and a hosted GitHub or GitLab remote.
+  \item Review the public/history scan's PDF binary flags and complete human and hosted-forge validation before making stronger safety or reproducibility claims.
+  \item Publish the simulated conversations, tasks, hidden checks, and protocol with instructions to reproduce the reported numbers.
 \end{enumerate}
 
 \section{Future Work}
 
-Beyond this semester, the approach could support other coding agents (a Codex backend is tracked as a separate issue), semantic storage with synonyms and consolidation, and real teams' conversations collected with consent. We plan to make the repository and dataset public so that others can compare maintenance strategies on the same inputs and improve them.
+Future work may support other coding agents, including the separately tracked Codex backend, and evaluate semantic storage, consolidation, and real team conversations collected with consent. The experiments reported here support selected observations and hypotheses about their causes, not a universal or causal mechanism. Excluding UI conventions is a later configurable policy choice, not a conclusion established by these experiments.

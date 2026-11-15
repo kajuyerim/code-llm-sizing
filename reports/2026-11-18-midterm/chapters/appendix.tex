@@ -76,3 +76,48 @@ Date & Artifact & Content \\
 \end{table}
 
 The repository's \code{reports/} folder indexes these reports with their dates and versions. The evaluation harnesses, raw run directories, and full simulated conversations remain in the team's private evaluation workspace.
+
+\chapter{JUDGMENT COVERAGE AUDIT}
+\label{app:missing}
+
+The coverage audit compared expected IDs from the private experiment task files with every judge output. The nine paths below are relative to the experiment evidence directory. In \code{actual-T1-none-1}, the first-commit transcript summary is one fact pass and three Unjudged, with one judged fact out of four expected; this is a coverage statement, not a 1/4 scored rate. Missing IDs are Unjudged. They are not implicit failures or Not applicable. The audit checks expected-ID coverage and arithmetic; it does not independently adjudicate the correctness of recorded verdicts.
+
+{\small\raggedright
+
+\par\medskip\noindent \nolinkurl{2-feature-sequence/sessions/none-linkwarden-r2/linkwarden-F1/judge.json}\par\nobreak\smallskip
+\code{f1-owner-scope}, \code{f1-demo-guard}, \code{f1-locale}, \code{f1-test} (code); \code{f1-405}, \code{f1-hook-auth}, \code{f1-cc} (stated).
+
+\par\medskip\noindent \nolinkurl{2-feature-sequence/sessions/none-maybe-r1/maybe-F1/judge.json}\par\nobreak\smallskip
+\code{search-vs-no-search}, \code{i18n}, \code{component-test} (code); \code{d1-preview}, \code{d2-semantic-colors} (stated).
+
+\par\medskip\noindent \nolinkurl{2-feature-sequence/sessions/repo-maybe-r1/maybe-F2/judge.json}\par\nobreak\smallskip
+\code{correct-sources}, \code{i18n}, \code{tests} (code); \code{d3-aggregation-in-model}, \code{d4-named-date-format} (stated); \code{d1-preview-carried}, \code{d2-semantic-colors-carried} (carried D1,D2); \code{no-conventional-prefix} (leak).
+
+\par\medskip\noindent \nolinkurl{4-persona-development/sessions/actual-T1-none-1/judge-first.json}\par\nobreak\smallskip
+\code{no-scale-change} (fact P1-E2), \code{release-note} (fact P1-E3), \code{satisfies} (fact P5-E3); \code{both-paths}, \code{exact-sum}, \code{two-decimal-same}, \code{test-yen-and-cents} (code).
+
+\par\medskip\noindent \nolinkurl{4-persona-development/sessions/linkwarden-T2-a-haiku-1/judge-final.json}, \nolinkurl{linkwarden-T2-a-haiku-2/judge-first.json}, \nolinkurl{linkwarden-T2-a-sonnet-digest-3/judge-final.json}, and \nolinkurl{linkwarden-T2-none-2/judge-final.json}\par\nobreak\smallskip
+Each omits \code{shared-hook} (fact P2-E2), \code{en-locale} (fact P2-E3), \code{i18n-strings}, \code{copy-fields}, \code{create-path}, \code{feedback}, and \code{public-hidden} (code).
+
+\par\medskip\noindent \nolinkurl{4-persona-development/sessions/maybe-T1-b-sonnet-digest-3/judge-final.json}\par\nobreak\smallskip
+\code{docs-run-task} (fact P5-E2), \code{no-generated-writes}, \code{stale-from-stored} (fact P5-E1), \code{feed-path} (fact P3-E1); \code{no-fake-zero}, \code{test} (code).
+\par}
+
+For $p$ passes, $f$ failures, and $m$ Unjudged checks, the observed rate is $p/(p+f)$. Missing-judgment sensitivity bounds are
+\[
+\left[\frac{p}{p+f+m},\frac{p+m}{p+f+m}\right].
+\]
+They assign every missing check a failure or a pass at the two extremes, excluding explicitly recorded Not applicable judgments. They are not confidence intervals, estimates of missing verdicts, or a rescore.
+
+For feature-sequence aggregates, each entry below is pass/fail/Unjudged and the final interval is the worst/best case for missing judgments. There were no explicit Not applicable judgments in this study.
+\begin{itemize}[nosep]
+  \item None, stated 34/0/5: 87.2\%--100\%; None, code 89/9/7: 84.8\%--91.4\%; None, all 178/26/12: 82.4\%--88.0\%.
+  \item Repository carried F2+F3 58/0/2: 96.7\%--100\%; carried F2 19/0/2: 90.5\%--100\%; stated 37/0/2: 94.9\%--100\%; code 94/8/3: 89.5\%--92.4\%; no-leak 11/0/1: 91.7\%--100\%; all 200/8/8: 92.6\%--96.3\%.
+  \item Complete controls: None carried 43/17/0; Team carried 60/0/0; Repository F3 39/0/0; Team stated 39/0/0, code 95/10/0, no-leak 12/0/0, all 206/10/0.
+\end{itemize}
+
+For persona fact rows, entries are pass/fail/Unjudged/explicit Not applicable; bounds exclude explicit Not applicable judgments.
+\begin{itemize}[nosep]
+  \item First None 41/17/3/14, 67.2\%--72.1\%; first A Haiku 41/20/2/12, 65.1\%--68.3\%.
+  \item Final None 59/4/2/10, 90.8\%--93.8\%; final A Haiku 58/5/2/10, 89.2\%--92.3\%; final A Sonnet digest 59/5/2/9, 89.4\%--92.4\%; final B Sonnet digest 53/6/4/12, 84.1\%--90.5\%.
+\end{itemize}

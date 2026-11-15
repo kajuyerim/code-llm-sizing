@@ -1,98 +1,49 @@
-% Layout that follows the CMPE 492 report template (Bogazici University thesis style).
-\usepackage[utf8]{inputenc}
+% Layout is provided by the unchanged official FBE thesis style.
+% Project-specific packages and macros are limited to content requirements.
+\usepackage{styles/fbe_tez}
+\usepackage[utf8x]{inputenc}
 \usepackage[T1]{fontenc}
-\usepackage{lmodern}
-\usepackage[a4paper,left=3.2cm,right=2.4cm,top=3cm,bottom=3cm]{geometry}
-\usepackage{setspace}
-\usepackage{titlesec}
-\usepackage[titles]{tocloft}
-\usepackage{fancyhdr}
+\usepackage{amsmath,amsthm,amssymb}
+\usepackage[bottom]{footmisc}
+\usepackage{cite}
+\usepackage{url}
 \usepackage{graphicx}
+\usepackage{longtable}
+\usepackage{float}
+\usepackage{multirow}
+\usepackage{array}
 \usepackage{booktabs}
 \usepackage{tabularx}
-\usepackage{array}
-\usepackage{multirow}
-\usepackage{xcolor}
-\usepackage{caption}
-\usepackage{float}
 \usepackage{enumitem}
-\usepackage{amsmath}
+\usepackage{xcolor}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc,backgrounds}
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.18}
 \usepackage{listings}
 \usepackage[hidelinks]{hyperref}
-\usepackage{url}
 
-\onehalfspacing
-\setlength{\parindent}{1.5em}
-\setlength{\parskip}{0.4em}
-
-% Page numbers in the top right corner on every page.
-\setlength{\headheight}{15pt}
-\pagestyle{fancy}
-\fancyhf{}
-\fancyhead[R]{\thepage}
-\renewcommand{\headrulewidth}{0pt}
-\fancypagestyle{plain}{\fancyhf{}\fancyhead[R]{\thepage}\renewcommand{\headrulewidth}{0pt}}
-
-% Headings: "1. INTRODUCTION" centered; "1.1. Title" centered; "2.2.1. Title" left.
-\titleformat{\chapter}[block]{\centering\bfseries\large}{\thechapter.\hspace{0.6em}}{0pt}{\MakeUppercase}
-\titlespacing*{\chapter}{0pt}{0pt}{2.2em}
-\titleformat{\section}[block]{\centering\bfseries\normalsize}{\thesection.\hspace{0.4em}}{0pt}{}
-\titlespacing*{\section}{0pt}{1.6em}{1em}
-\titleformat{\subsection}[block]{\bfseries\normalsize}{\thesubsection.\hspace{0.4em}}{0pt}{}
-\titlespacing*{\subsection}{0pt}{1.2em}{0.6em}
-\setcounter{secnumdepth}{3}
-\setcounter{tocdepth}{2}
-
-% Table of contents in the template's style.
-\renewcommand{\contentsname}{\hfill\bfseries\large TABLE OF CONTENTS\hfill}
-\renewcommand{\cftaftertoctitle}{\hfill}
-\renewcommand{\cftchapaftersnum}{.}
-\renewcommand{\cftsecaftersnum}{.}
-\renewcommand{\cftsubsecaftersnum}{.}
-\renewcommand{\cftchapfont}{\normalfont}
-\renewcommand{\cftchappagefont}{\normalfont}
-\renewcommand{\cftchapleader}{\cftdotfill{\cftdotsep}}
-\setlength{\cftbeforechapskip}{0.5em}
-\renewcommand{\listfigurename}{\hfill\bfseries\large LIST OF FIGURES\hfill}
-\renewcommand{\listtablename}{\hfill\bfseries\large LIST OF TABLES\hfill}
-\renewcommand{\cftloftitlefont}{}
-\renewcommand{\cftlottitlefont}{}
-\renewcommand{\cftafterloftitle}{\hfill}
-\renewcommand{\cftafterlottitle}{\hfill}
-\renewcommand{\cftfigpresnum}{Figure }
-\renewcommand{\cfttabpresnum}{Table }
-\renewcommand{\cftfigaftersnum}{.}
-\renewcommand{\cfttabaftersnum}{.}
-\setlength{\cftfignumwidth}{6.5em}
-\setlength{\cfttabnumwidth}{6em}
-
-% "Figure 9.1. Caption" below figures, "Table 9.1. Caption." above tables.
-\captionsetup{labelsep=period,font=small,justification=centering}
-\captionsetup[table]{position=top}
-\renewcommand{\thefigure}{\thechapter.\arabic{figure}}
-\renewcommand{\thetable}{\thechapter.\arabic{table}}
-
-\renewcommand{\bibname}{REFERENCES}
 \newcommand{\code}[1]{\texttt{#1}}
-
+% Allow compact results tables to wrap within the template's text width.
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\setlength{\emergencystretch}{2em}
 \definecolor{inkA}{HTML}{1F4E79}
 \definecolor{inkB}{HTML}{8A5A00}
 \definecolor{inkN}{HTML}{6B6B6B}
 \definecolor{boxfill}{HTML}{F3F6FA}
-
 \tikzset{
   box/.style={draw, rounded corners=2pt, fill=boxfill, align=center, font=\small, inner sep=5pt},
   plain/.style={draw, align=center, font=\small, inner sep=5pt},
   arr/.style={-{Stealth[length=2.2mm]}, thick},
   note/.style={font=\footnotesize, align=center, text=inkN},
 }
-
 \lstset{basicstyle=\ttfamily\footnotesize, breaklines=true, columns=fullflexible, frame=single,
   framesep=4pt, xleftmargin=6pt, xrightmargin=6pt}
 
-% \input that works between table rules (plain TeX primitive input).
+% Plain TeX input keeps generated rows valid between alignment rules.
 \makeatletter\newcommand{\inputrows}[1]{\@@input #1 }\makeatother
+
+% Accommodate two-digit section numbers in the official contents layout.
+\makeatletter
+\renewcommand*\l@section{\@dottedtocline{1}{1.5em}{2.2em}}
+\makeatother
