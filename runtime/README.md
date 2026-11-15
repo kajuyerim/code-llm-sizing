@@ -8,7 +8,7 @@ Start with [setup](../setup.md) for installation and tests without credentials. 
 | --- | --- |
 | `contextops init --kb PATH --branch knowledge/APP_NAME [--scope team\|repository] [--application NAME]` | Prepare blank knowledge on a new local branch, without committing or inference. `--scope` sets who the knowledge serves; `--application` binds a repository-scoped knowledge base to one application. |
 | `contextops attach --repo APP --kb PATH --strategy MODE [--name NAME] [--no-hook] [--no-refresh]` | Connect an application checkout: its Claude Code sessions read the knowledge, and its pushes start maintenance. Writes only untracked local files. No model calls. |
-| `contextops refresh --kb PATH` | Fast-forward a clean knowledge checkout to its upstream. Attached applications run it at session start. |
+| `contextops refresh --kb PATH [--digest] [--no-fetch]` | Fast-forward a clean knowledge checkout to its upstream; with `--digest`, print one line per entry. Attached applications run it at session start. |
 | `contextops sweep --repo PATH --kb PATH --base REF --head REF --strategy MODE --session ID [--session ID] [--cutoff ISO_TIME]` | Freeze selected evidence and run locally. Real model calls occur. |
 | `contextops sessions --repo PATH [--limit N]` | List the application's Claude Code sessions (ID, last message, opening line) to choose `--session` values. No model calls. |
 | `contextops export-session --repo PATH --session ID --out FILE` | Write a shareable copy of one session: developer and agent messages, text, and tool calls, with the application root and home directory replaced by placeholders. Thinking, tool results, and other records are dropped. Message text is unchanged, so review it before sharing. |
@@ -57,7 +57,7 @@ Both `sweep` and `run` print a completion summary with actual changed files, rep
 `attach` writes three untracked files in the application and adds them to `.git/info/exclude`:
 
 - `CLAUDE.local.md`: a marked block naming the knowledge checkout and telling the agent to read its `index.md` before a task. If the application relies on `AGENTS.md` without a `CLAUDE.md`, the block imports it, because a `CLAUDE.local.md` otherwise stops Claude Code from reading `AGENTS.md`. Existing personal notes are kept; rerunning replaces only the block.
-- `.claude/settings.local.json`: the knowledge checkout in `permissions.additionalDirectories` (read without prompts) and a `SessionStart` hook that runs `contextops refresh`, so new sessions read merged knowledge. Existing settings are kept.
+- `.claude/settings.local.json`: the knowledge checkout in `permissions.additionalDirectories` (read without prompts) and a `SessionStart` hook that runs `contextops refresh --digest`. It fast-forwards the checkout, so new sessions read merged knowledge, and prints a digest with one line per entry (ID, content, scope; evidence left out), which Claude Code adds to the session's context. The digest stays under 9,000 characters, because Claude Code moves longer session-start output into a file. `--no-digest` and `--no-refresh` turn the parts off. Existing settings are kept.
 - `pre-push` hook: unless `--no-hook`. It refuses to replace another hook without `--force`, and refuses when `core.hooksPath` is set; call `python -m contextops hook "$@"` from your hook manager instead.
 
 The pointer is plain text with an absolute path, not an `@` import, so no external-import approval is needed. It is local to that checkout: Git worktrees need their own `attach`.

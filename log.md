@@ -1,5 +1,9 @@
 # Knowledge Change History
 
+## 2026-11-15: Put a digest of the knowledge in every session
+
+- In persona-driven development on four maintained knowledge bases, agents always read `index.md` but opened only the documents they guessed were relevant. When a needed entry sat in a document they did not open, it had no effect. `attach` now registers `contextops refresh --digest` at session start; it prints one line per entry, and Claude Code adds that to the session's context.
+
 ## 2026-11-15: Keep only what the code does not show
 
 - Run notes in `init.md` now state what the knowledge keeps: operational procedures, tool and service usage, security rules, rejected approaches, replaced decisions, cross-repository contracts, and team terms. UI and styling conventions, patterns the code already shows, and task-specific instructions are left out with NO_CHANGE. Teams edit the list in `init.md`.

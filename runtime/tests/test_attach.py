@@ -183,6 +183,24 @@ class AttachTests(unittest.TestCase):
         self.session_file.write_text(json.dumps(message) + '\n')
         return gitutil.rev_parse(self.app, 'HEAD')
 
+    def test_session_start_digest_lists_entries_within_the_limit(self):
+        (self.kb / 'core/pitfalls.md').write_text(
+            '# Pitfalls\n\n| ID | Trigger | What goes wrong | Do instead | Scope | Evidence |\n| --- | --- | --- | --- | --- | --- |\n'
+            '| PIT-001 | Backfill inside a migration | Long deploys | Run the data_migration task by hand | app:demo | msg-1 |\n')
+        self.commit(self.kb)
+        self.command('attach', '--repo', str(self.app), '--kb', str(self.kb), '--no-hook')
+        data = json.loads((self.app / '.claude/settings.local.json').read_text())
+        self.assertIn('--digest', data['hooks']['SessionStart'][0]['hooks'][0]['command'])
+        self.assertIn('digest of its entries', (self.app / 'CLAUDE.local.md').read_text())
+        text = self.command('refresh', '--kb', str(self.kb), '--digest')
+        self.assertIn('core/pitfalls.md:', text)
+        self.assertIn('- PIT-001: Backfill inside a migration / Long deploys / Run the data_migration task by hand / app:demo', text)
+        self.assertNotIn('msg-1', text)
+        self.assertNotIn('contextops:', text)  # no upstream is not a problem worth adding to context
+        from contextops.attach import digest
+        self.assertLessEqual(len(digest(self.kb, limit=400)), 400)
+        self.assertIn('truncated', digest(self.kb, limit=400))
+
     def test_refresh_fast_forwards_only_clean_checkouts(self):
         remote = self.bare_remote(self.kb, 'knowledge')
         other = self.root / 'other-clone'

@@ -2,7 +2,8 @@
 
 Reading: a managed block in the application's CLAUDE.local.md tells the coding agent where the
 knowledge is, and .claude/settings.local.json lets it read that directory without prompts. A
-SessionStart hook fast-forwards the knowledge checkout so new sessions read merged knowledge.
+SessionStart hook fast-forwards the knowledge checkout so new sessions read merged knowledge, and prints a
+digest of the entries, which Claude Code adds to the session's context.
 Maintenance: the pre-push hook prepares a run for the pushed commits in the background.
 All application-side files are local and excluded through .git/info/exclude; nothing tracked changes.
 """
@@ -37,7 +38,9 @@ def pointer(kb: Path, app: str, scope: str, has_agents_md: bool) -> str:
         f"Shared knowledge for {whose} (terminology, stack standards, naming conventions, pitfalls, "
         f"and tool notes) is in a separate checkout: {kb}",
         "",
-        f"Read `{kb / 'index.md'}` before starting a task and follow the entries that apply. This "
+        "A digest of its entries is added at the start of each session. Before starting a task, check the "
+        f"digest (or `{kb / 'index.md'}` if there is none), open the documents whose entries touch the task, and "
+        "follow the entries that apply. This "
         f"application is `app:{app}`; `company` entries apply to every application"
         + ("" if scope == "repository" else ", and entries scoped to another application do not apply here")
         + ". The checkout is maintained through reviewed pull or merge requests; do not edit it from here.",
@@ -47,7 +50,7 @@ def pointer(kb: Path, app: str, scope: str, has_agents_md: bool) -> str:
 
 
 def attach(app: Path, kb: Path, strategy: str | None, name: str | None = None,
-           hook: bool = True, refresh: bool = True, force: bool = False) -> list[str]:
+           hook: bool = True, refresh: bool = True, force: bool = False, digest: bool = True) -> list[str]:
     from contextops.strategies import STRATEGIES
 
     app, kb = gitutil.repo_root(app).resolve(), gitutil.repo_root(kb.expanduser()).resolve()
@@ -94,15 +97,18 @@ def attach(app: Path, kb: Path, strategy: str | None, name: str | None = None,
     directories = settings.setdefault("permissions", {}).setdefault("additionalDirectories", [])
     if str(kb) not in directories:
         directories.append(str(kb))
-    if refresh:
+    if refresh or digest:
         command = f"{shlex.quote(sys.executable)} -m contextops refresh --kb {shlex.quote(str(kb))}"
+        command += "" if refresh else " --no-fetch"
+        command += " --digest" if digest else ""
         starts = settings.setdefault("hooks", {}).setdefault("SessionStart", [])
         starts[:] = [entry for entry in starts
                      if not any("contextops refresh" in h.get("command", "") for h in entry.get("hooks", []))]
         starts.append({"matcher": "startup", "hooks": [{"type": "command", "command": command, "timeout": 30}]})
     settings_path.parent.mkdir(exist_ok=True)
     settings_path.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
-    done.append(f"read access{' and session-start refresh' if refresh else ''} in {settings_path}")
+    extras = [x for x, on in (("refresh", refresh), ("digest", digest)) if on]
+    done.append(f"read access{' and session-start ' + ' and '.join(extras) if extras else ''} in {settings_path}")
 
     gitutil.git(app, "config", "contextops.kb", str(kb))
     gitutil.git(app, "config", "contextops.app", name)
@@ -132,3 +138,42 @@ def refresh(kb: Path, remote: str = "origin") -> str:
     if not gitutil.succeeds(kb, "-c", "core.hooksPath=/dev/null", "merge", "--ff-only", "--quiet", "@{u}"):
         return "knowledge checkout has diverged from its upstream; not refreshed"
     return f"knowledge checkout at {gitutil.git(kb, 'rev-parse', '--short', 'HEAD')}"
+
+
+DIGEST_LIMIT = 9000  # Claude Code moves session-start context over 10,000 characters into a file.
+
+
+def digest(kb: Path, limit: int = DIGEST_LIMIT) -> str:
+    """One line per knowledge entry (ID, content cells, scope), grouped by document, within limit."""
+    kb = gitutil.repo_root(kb.expanduser())
+    docs = sorted((kb / "core").glob("*.md")) + sorted((kb / "tools").glob("*/README.md"))
+    lines = [f"Shared knowledge digest ({kb}, revision {gitutil.git(kb, 'rev-parse', '--short', 'HEAD')}). "
+             "Open a document for the full entry and its evidence."]
+    for doc in docs:
+        rows = []
+        header = None
+        for raw in doc.read_text(encoding="utf-8").splitlines():
+            if not raw.startswith("|"):
+                continue
+            cells = [c.strip() for c in raw.strip().strip("|").split("|")]
+            if cells and cells[0].upper() == "ID":
+                header = [c.lower() for c in cells]
+                continue
+            if not cells or not re.fullmatch(r"[A-Z]+-?\d+", cells[0]):
+                continue
+            keep = [c for i, c in enumerate(cells[1:], 1)
+                    if c and not (header and i < len(header) and header[i] in ("evidence", "rationale", "level"))]
+            text = " / ".join(keep)
+            rows.append(f"- {cells[0]}: {text if len(text) <= 240 else text[:237] + '...'}")
+        if rows:
+            lines.append(f"{doc.relative_to(kb).as_posix()}:")
+            lines.extend(rows)
+    note = "(digest truncated; open the documents for the remaining entries)"
+    out, size = [], 0
+    for line in lines:
+        if size + len(line) + 1 > limit - len(note) - 1:
+            out.append(note)
+            break
+        out.append(line)
+        size += len(line) + 1
+    return "\n".join(out) if len(out) > 1 else ""

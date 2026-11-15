@@ -35,11 +35,14 @@ def main(argv: list[str] | None = None) -> None:
     attach.add_argument("--name", help="application name used in scopes; defaults to the folder name")
     attach.add_argument("--no-hook", action="store_true", help="only wire reading, no push-triggered maintenance")
     attach.add_argument("--no-refresh", action="store_true", help="do not fast-forward knowledge at session start")
+    attach.add_argument("--no-digest", action="store_true", help="do not add a digest of the entries at session start")
     attach.add_argument("--force", action="store_true", help="replace an existing pre-push hook")
 
     refresh = commands.add_parser("refresh", help="fast-forward a clean knowledge checkout to its upstream")
     refresh.add_argument("--kb", type=Path, required=True)
     refresh.add_argument("--verbose", action="store_true")
+    refresh.add_argument("--no-fetch", action="store_true", help="only print the digest")
+    refresh.add_argument("--digest", action="store_true", help="print a digest of the entries (session-start context)")
 
     install = commands.add_parser("install", help="install the pre-push hook in an application repo")
     install.add_argument("--kb", type=Path, required=True, help="path to the knowledge base checkout")
@@ -111,19 +114,25 @@ def _attach(args: argparse.Namespace) -> None:
     from contextops.attach import attach
 
     done = attach(args.repo, args.kb, args.strategy, args.name, hook=not args.no_hook,
-                  refresh=not args.no_refresh, force=args.force)
+                  refresh=not args.no_refresh, force=args.force, digest=not args.no_digest)
     print("Attached:\n" + "\n".join(f"  {item}" for item in done))
     print("These files are local to this checkout and excluded from Git. New Claude Code sessions in the "
           "application read the knowledge; pushes start maintenance in the background when a hook is installed.")
 
 
 def _refresh(args: argparse.Namespace) -> None:
-    from contextops.attach import refresh
+    from contextops.attach import digest, refresh
 
-    message = refresh(args.kb)
-    # Session-start output becomes agent context, so stay silent unless something is wrong.
-    if args.verbose or not message.startswith("knowledge checkout at"):
-        print(f"contextops: {message}")
+    if not args.no_fetch:
+        message = refresh(args.kb)
+        # Session-start output becomes agent context, so mention only real problems.
+        quiet = message.startswith(("knowledge checkout at", "knowledge checkout has no upstream"))
+        if args.verbose or not quiet:
+            print(f"contextops: {message}")
+    if args.digest:
+        text = digest(args.kb)
+        if text:
+            print(text)
 
 
 def _install(args: argparse.Namespace) -> None:
