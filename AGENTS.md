@@ -10,7 +10,9 @@ This branch implements A, sweeper first, and B, fresh specialists, through one s
 
 ## Implementation and verification
 
-The approved integration permits dependency installation in an isolated environment, credential-free tests, the two integration PRs, and one Codex-backend follow-up issue. It does not authorize rerunning experiments, installing hooks, live model calls, automatically publishing generated knowledge, or merging PRs. Preserve existing issue states, assignments, and human-review checkboxes.
+For first-run onboarding, read [the setup skill](skills/setup-shared-knowledge/SKILL.md) and follow the user's request. Setup-only requests stop before inference; setup-and-run requests authorize the configured local maintenance execution. Historical integration permissions describe earlier project work, not restrictions on an outside user's newly requested run. Authentication stays private, outputs stay local by default, and neither installation nor a maintenance run implies permission for hooks, remote publication, or merges. Preserve existing issue states and human-review checkboxes unless the user requests tracking changes.
+
+The setup agent configures the runtime and prepares an empty knowledge baseline on a new branch. It does not prefill application facts. Maintenance agents produce learned knowledge; subsequent runs reuse the accepted knowledge baseline. Research and historical evidence are retained separately from the initialized knowledge content.
 
 Tests generate disposable source and knowledge repositories under the system temporary directory, not committed application fixtures. Run the checks documented in [setup](setup.md). Scan public files and history, including decoded walkthrough evidence, before publishing. Report suspected credentials by location and category only, never by value.
 

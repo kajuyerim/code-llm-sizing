@@ -5,6 +5,7 @@ This guide explains how to maintain documents under core. Read the current docum
 ## Admission and placement
 
 - Store shared terms, approved stack standards, and broadly applicable conventions in core. Keep tool-specific implementation details in the appropriate tool area.
+- Admit only what the team cannot learn from the repository in front of it: operational procedures, tool usage, security rules, rejected approaches, replaced decisions, cross-repository contracts, and team terms. UI and styling conventions, patterns the code or linters already show, and task-specific instructions stay out. The list a run applies is "What this knowledge keeps" in [init.md](../init.md); teams can edit it there.
 - Cite source revisions and paths for implementation claims. Cite conversation session and message references for developer definitions, requirements, and decisions. Preserve message order and speaker roles.
 - Treat accepted decisions, proposed ideas, rejected approaches, and later corrections differently. An agent's completion message alone does not establish implementation.
 - Distinguish descriptive behavior from normative policy. A code deviation does not automatically replace an approved standard; record the discrepancy or propose a scoped exception.

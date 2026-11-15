@@ -2,30 +2,48 @@
 
 Context Ops is a CMPE 492 senior project at Boğaziçi University studying how agents maintain shared knowledge as software evolves. After application development, maintenance reads a separate application's source revision, Git diff, and developer-agent conversation, then proposes updates to this knowledge repository.
 
-## Start here
+## Set up with your agent
 
-1. **Understand:** read [How Our Knowledge Maintenance System Works](docs/walkthrough/README.md). Download its [interactive HTML](docs/walkthrough/index.html) and open it locally for original evidence and A/B comparisons.
-2. **Install and test:** follow [setup](setup.md). Deterministic tests use fake responses and temporary repositories, with no account, model call, or API charge.
-3. **Run on your application:** select a strategy, committed revision range, and Claude Code conversation sessions. Real runs use your own private Claude authentication.
-4. **Inspect:** review the local proposals, knowledge patch, report, and knowledge branch before deciding what to keep.
-
-## Quickstart
-
-You need Python 3.11 or newer, Git, a Claude Code login, and an application repository of your own that you have worked on with Claude Code.
+Clone this repository into a directory separate from your application, then open the clone in your coding agent:
 
 ```sh
-git clone https://github.com/kajuyerim/code-llm-sizing.git && cd code-llm-sizing
-python3 -m venv .venv && . .venv/bin/activate
-python -m pip install -r runtime/requirements-lock.txt && python -m pip install --no-deps -e runtime
-python -m unittest discover -s runtime/tests        # no account, no model calls
-
-contextops sessions --repo /path/to/your/app        # pick the Claude Code sessions to learn from
-contextops sweep --repo /path/to/your/app --kb . \
-  --base <commit before the work> --head <commit after it> \
-  --strategy sweeper-first --session <session id>   # real model calls; output stays local
+git clone --branch feat/team-knowledge-loop https://github.com/kajuyerim/code-llm-sizing.git
+cd code-llm-sizing
 ```
 
-The last line prints a report path. The proposed knowledge changes are in `knowledge.patch` next to it and on a local branch of this checkout. Nothing is pushed or merged. [Setup](setup.md) covers each step in detail.
+This selects the branch containing the work under review. After it is merged, use the default branch instead. A remote clone includes only pushed commits.
+
+You need **Python 3.11+, Git, and an existing application with committed development changes and local Claude Code development sessions**. Running maintenance also requires **private Claude authentication**; installation, software tests, and preparation need no model calls. Your setup agent can be any coding agent; maintenance currently uses the Claude backend and Claude Code history. Inference runs on the configured Claude service.
+
+Give your agent this prompt:
+
+> Read this repository’s README and setup skill. Configure Context Ops for my existing application, prepare an empty knowledge branch, run the sweeper-first workflow using my relevant Claude Code development sessions, and show me the resulting knowledge changes. Ask for missing inputs and keep the result local for review.
+
+For preparation only, use this alternative:
+
+> Read this repository’s README and setup skill. Configure Context Ops for my existing application, prepare and commit an empty knowledge baseline, and select the committed range and relevant Claude Code sessions. Ask for missing inputs and show me the command to run next. Stop before inference, hook installation, or publication; keep everything local for review.
+
+The [setup skill](skills/setup-shared-knowledge/SKILL.md) is the authoritative procedure. It helps your agent select the application, committed range and sessions, prepare blank knowledge on a new local branch, configure and commit the baseline, and run **A, sweeper first**. The setup agent invokes Context Ops; the maintenance runtime writes learned knowledge. Existing installations reuse their accepted knowledge rather than resetting it.
+
+A successful writer creates a local result branch. The command shows changed files, the report and patch, and Git commands to review and open that branch. Your starting branch remains selected. Some runs correctly produce no changes; incomplete runs and candidate patches are identified. Nothing is pushed or merged by the default configuration.
+
+## Manual setup and evidence
+
+Follow [setup](setup.md) for the equivalent manual commands, authentication details, troubleshooting, and optional B execution. Installation and deterministic tests need no model account or inference; running maintenance uses your private Claude authentication.
+
+For an explanation of the system, read [How Our Knowledge Maintenance System Works](docs/walkthrough/README.md), or download the [interactive walkthrough](docs/walkthrough/index.html) and open it locally. These are historical evaluation evidence. The first-run path has credential-free software checks and recorded [live acceptance runs](docs/first-run-acceptance.md#live-acceptance-record-2-14-november-2026-b20f3f9). The final recorded acceptance revision predates the current team-scope and admission-policy changes.
+
+Without an application of your own, follow the [first-run demo](docs/demo/README.md). It reconstructs a public Actual Budget checkout, imports six simulated development sessions into isolated history, and prepares frozen evidence without authentication or inference. You can inspect the recorded fifteen-entry result from revision `b20f3f9`; that is historical output, not newly generated knowledge. A fresh maintenance run requires your own Claude access, and its cost and output can differ. [Current preparation is verified](docs/demo/verification.md); fresh live acceptance on the current policy remains pending.
+
+## Day-to-day use by a team
+
+The knowledge repository is a team's shared Git repository: one place for the decisions that span its applications (`scope: team`, the default). A single application can use it alone with `scope: repository`. It keeps what the code in front of an agent does not show: how the team provisions and deploys, how it uses tools and internal services, security rules, rejected approaches, replaced decisions, and contracts between repositories. UI details and patterns the code already shows stay out; teams tune this list in `init.md`. Developers clone it beside their applications and run `contextops attach` once per application. After that:
+
+- Claude Code sessions in the application read the knowledge before a task, and the knowledge checkout is refreshed at session start.
+- `git push` in the application starts maintenance in the background on the pushed commits and recent sessions.
+- With `open_pr: true` and a supported remote, the run publishes a result branch and opens a pull request (GitHub) or merge request (GitLab) on the knowledge repository for human review. The default configuration keeps the result local.
+
+See [setup, step 8](setup.md#8-use-it-day-to-day-attach-your-application).
 
 ## Two ways to acquire context
 
@@ -47,7 +65,8 @@ Both **A, `sweeper-first`**, and **B, `fresh-specialists`**, are available throu
 | `maintenance/` | Procedures for maintaining core and tool knowledge |
 | `agents/` | Shared role definitions, assignments, sweeper, and writer |
 | `skills/` | Reusable setup and issue-creation procedures |
-| `docs/` | Walkthrough, architecture, evaluation, and provenance |
+| `docs/` | Walkthrough, architecture, evaluation, provenance, and the first-run demo |
+| `reports/` | Dated project reports: pilot, v2, and the midterm report |
 | `runtime/` | Shared Claude runtime, operational guide, and tests |
 | `init.md` | Common run settings and instructions |
 
@@ -56,6 +75,8 @@ Both **A, `sweeper-first`**, and **B, `fresh-specialists`**, are available throu
 `tools/` replaces the former `products/` folder. These are knowledge areas, not executable agent tools. Application sources, evaluation fixtures, and private run artifacts stay outside this repository. Firebase/Dataform folders do not imply application usage or company policy.
 
 ## Evidence and current status
+
+All project reports, current and previous, are listed with their dates in [reports](reports/README.md). In the three-feature sequence, team knowledge passed all 60 carried-decision checks, repository knowledge passed all 58 judged checks with two unjudged (96.7%-100% sensitivity bounds), and no knowledge passed 43/60. The separate team-rule study improved pooled first-commit decision checks from 29/48 to 42/48 across all three repositories, including the learning repository; 12 of the 13 additional passes concerned commit-message conventions. The persona study did not demonstrate a development-quality improvement on its tasks. Nine incomplete judge files affect the feature and persona studies; the reports disclose their missing checks without rescoring. See [evaluation](docs/evaluation.md) and the [results page](reports/2026-11-15-results/context-ops-results.html). The midterm report is [here](reports/2026-11-18-midterm/context-ops-midterm.pdf).
 
 Both strategies and the shared runtime are merged into `master` through [PR #7](https://github.com/kajuyerim/code-llm-sizing/pull/7) and [PR #8](https://github.com/kajuyerim/code-llm-sizing/pull/8). [PR #9](https://github.com/kajuyerim/code-llm-sizing/pull/9) adds fork cache reuse, MCP-free maintenance execution, conversation-session discovery, and the v2 evaluation summary.
 

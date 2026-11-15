@@ -1,0 +1,44 @@
+% Descriptive display of existing judged counts; no new statistical analysis.
+\begin{figure}[p]
+\centering
+{\linespread{1}\selectfont
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.96\linewidth,height=6.7cm,
+  title={\textbf{A. Ready-made tasks: observed check pass rates}},
+  ybar,bar width=26pt,clip=false,ymin=0,ymax=100,xmin=-0.6,xmax=3.6,
+  ylabel={Passed applicable checks (\%)},ytick={0,20,40,60,80,100},
+  xtick={0,1,2,3},xticklabels={No knowledge,Seed,Maintained A,Maintained B},
+  tick label style={font=\small},title style={font=\small},label style={font=\small},
+  axis x line*=bottom,axis y line*=left,ymajorgrids,grid style={gray!20}]
+\addplot[fill=inkA,draw=none] coordinates
+ {(0,{100*146/188}) (1,{100*146/190}) (2,{100*161/188}) (3,{100*152/188})};
+\node[font=\footnotesize,above,align=center] at (axis cs:0,{100*146/188}) {77.7\%\\146/188};
+\node[font=\footnotesize,above,align=center] at (axis cs:1,{100*146/190}) {76.8\%\\146/190};
+\node[font=\footnotesize,above,align=center] at (axis cs:2,{100*161/188}) {85.6\%\\161/188};
+\node[font=\footnotesize,above,align=center] at (axis cs:3,{100*152/188}) {80.9\%\\152/188};
+\end{axis}
+\end{tikzpicture}
+
+\vspace{1.1cm}
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.85\linewidth,height=5.3cm,
+  title={\textbf{B. Team study: first-commit decision passes}},
+  xbar stacked,bar width=28pt,clip=false,
+  nodes near coords,nodes near coords align={center},point meta=explicit,xmin=0,xmax=48,ymin=-0.6,ymax=1.6,
+  xlabel={Passed decision checks (out of 48)},xtick={0,8,16,24,32,40,48},
+  ytick={0,1},yticklabels={No knowledge,Team knowledge},
+  tick label style={font=\small},title style={font=\small},label style={font=\small},
+  axis x line*=bottom,axis y line*=left,xmajorgrids,grid style={gray!20},
+  legend style={font=\small,at={(0.5,-0.42)},anchor=north,legend columns=2,column sep=10pt,draw=none}]
+\addplot[fill=inkA,draw=none,nodes near coords style={font=\small,text=white}] coordinates {(4,0) [4] (16,1) [16]};
+\addplot[fill=gray!35,draw=none,nodes near coords style={font=\small,text=black}] coordinates {(25,0) [25] (26,1) [26]};
+\legend{Conventional Commits,Other decisions}
+\node[font=\small,right] at (axis cs:29,0) {29/48};
+\node[font=\small,right] at (axis cs:42,1) {42/48};
+\end{axis}
+\end{tikzpicture}}
+\caption[Two descriptive views of development outcomes.]{Separate descriptive summaries of two studies. Panel A pools applicable check verdicts; Maintained B was added after analysis of the original three conditions. Panel B pools test sessions in all three repositories, including Linkwarden where the rules were learned; 12 of 13 additional passes were Conventional Commits. Original task-weighted hypothesis tests are reported separately.}
+\label{fig:development-summary}
+\end{figure}

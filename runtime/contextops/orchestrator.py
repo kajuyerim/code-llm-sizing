@@ -16,11 +16,12 @@ from contextops.cartographer import run_cartographer
 from contextops.config import InitConfig, load_config
 from contextops.evidence import build_pack
 from contextops.initializer import plan_workers
-from contextops.report import Outcome, render_report
+from contextops.report import Outcome, render_report, render_completion
 from contextops.review import review_results
 from contextops.run import RunContext, load_run, record_cutoff, frozen_sessions
-from contextops.strategies import STRATEGIES
-from contextops.writer import open_pr, write_changes
+from contextops.strategies import STRATEGIES, deliver_handoffs
+from contextops.publish import publish
+from contextops.writer import write_changes
 
 
 async def orchestrate(run_dir: Path) -> Path:
@@ -54,13 +55,14 @@ async def orchestrate(run_dir: Path) -> Path:
         ledger = Ledger(config.budget.total_usd)
 
         results = await strategy(workers, ctx, config, ledger)
+        handoff_pass = await deliver_handoffs(results, ctx, config, ledger)
         for result in results:
             name = result.run.label.replace(":", "-")
             _dump(ctx.run_dir / "workers" / f"{name}.json", asdict(result.run))
         review = review_results(results, ctx, evidence)
         _dump(ctx.run_dir / "review.json", asdict(review))
 
-        outcome = Outcome(workers=workers, skipped=skipped, review=review)
+        outcome = Outcome(workers=workers, skipped=skipped, review=review, handoff_pass=handoff_pass)
         if config.cartographer and review.unowned and ledger.has_room():
             outcome.proposals = await run_cartographer(ctx, config, review, ledger)
             _dump(ctx.run_dir / "proposals.json", outcome.proposals)
@@ -72,13 +74,16 @@ async def orchestrate(run_dir: Path) -> Path:
 
         report = render_report(ctx, config, outcome, ledger, evidence)
         if committed and config.output.open_pr:
-            outcome.publication.pr_url = open_pr(ctx, report)
-            if outcome.publication.pr_url:
-                report += f"\nPull request: {outcome.publication.pr_url}\n"
+            published = publish(ctx, config, report)
+            outcome.publication.pr_url = published.url
+            outcome.publication.published = published.note
+            report += f"\n## Review request\n\n- {published.note}\n" + (
+                f"- {published.url}\n" if published.url else "")
 
         _write_metrics(ctx, config, ledger)
         report_path = ctx.run_dir / "report.md"
         report_path.write_text(report, encoding="utf-8")
+        (ctx.run_dir / "completion.txt").write_text(render_completion(ctx, outcome, ledger), encoding="utf-8")
         record_cutoff(ctx.runs_dir, ctx.app_root, ctx.cutoff)
         return report_path
     finally:

@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import json
-import shutil
-import subprocess
 from dataclasses import dataclass, field
 
 from contextops import gitutil, frontmatter
@@ -25,6 +23,7 @@ class Publication:
     branch: str
     committed: bool = False
     pr_url: str | None = None
+    published: str | None = None
     reverted: list[str] = field(default_factory=list)
     note: str | None = None
 
@@ -37,7 +36,7 @@ async def write_changes(
 
     spec = load_agent(config.writer, config.default_model)
     prompt = "\n".join([
-        f"Run: {ctx.run_id}, application {ctx.app_root.name} at {ctx.head_sha[:7]}",
+        f"Run: {ctx.run_id}, application {ctx.app_label} at {ctx.head_sha[:7]}",
         f"Records to apply: {accepted}",
         f"Evidence pack, if you need to check a record: {ctx.pack}",
         f"Date for log.md: {ctx.cutoff:%Y-%m-%d}",
@@ -80,36 +79,11 @@ async def write_changes(
     gitutil.git(ctx.kb_snapshot, "add", "-A")
     gitutil.git(
         ctx.kb_snapshot, "-c", "core.hooksPath=/dev/null", "commit", "-m",
-        f"contextops: knowledge updates from {ctx.app_root.name}@{ctx.head_sha[:7]}\n\n"
+        f"contextops: knowledge updates from {ctx.app_label}@{ctx.head_sha[:7]}\n\n"
         f"Run: {ctx.run_id}\nAccepted records: {len(review.accepted)}",
     )
     publication.committed = True
     return publication, run.output
-
-
-def open_pr(ctx: RunContext, body: str) -> str | None:
-    """Push the branch and open a PR with gh. Returns the PR URL when one was created."""
-    try:
-        gitutil.git(ctx.kb_snapshot, "push", "-u", "origin", ctx.branch)
-    except subprocess.CalledProcessError:
-        return None
-    if shutil.which("gh") is None:
-        return None
-
-    body_file = ctx.run_dir / "pr-body.md"
-    body_file.write_text(body, encoding="utf-8")
-    result = subprocess.run(
-        [
-            "gh", "pr", "create",
-            "--head", ctx.branch,
-            "--title", f"Knowledge updates from {ctx.app_root.name}@{ctx.head_sha[:7]}",
-            "--body-file", str(body_file),
-        ],
-        cwd=ctx.kb_snapshot, capture_output=True, text=True,
-    )
-    if result.returncode != 0:
-        return None
-    return result.stdout.strip() or None
 
 
 def _revert_outside_scope(ctx: RunContext) -> list[str]:

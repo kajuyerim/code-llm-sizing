@@ -18,13 +18,14 @@ import yaml
 from contextops import access, frontmatter, gitutil, transcripts
 from contextops.agents import AgentRun, Ledger, load_agent, run_agent
 from contextops.cli import main
+from contextops.strategies import deliver_handoffs
 from contextops.config import load_config
 from contextops.evidence import build_pack
 from contextops.initializer import Worker, plan_workers
 from contextops.orchestrator import orchestrate
 from contextops.review import review_results
 from contextops.run import create_run, frozen_sessions, load_run, record_cutoff, last_cutoff
-from contextops.strategies import WorkerResult, fresh_specialists
+from contextops.strategies import WorkerResult, fresh_specialists, worker_prompt
 from contextops.writer import _revert_outside_scope
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -185,6 +186,59 @@ class RuntimeTests(unittest.TestCase):
             review=review_results([WorkerResult(worker,AgentRun(worker.label,output=output))],ctx,evidence)
             self.assertEqual(len(review.rejected),1)
 
+    def test_review_drops_only_unresolved_locators_and_accepts_commit_log(self):
+        ctx = self.prepare(); config = load_config(self.kb); evidence = build_pack(ctx, config)
+        worker = plan_workers(config, evidence)[0][0]
+        good = {'kind': 'conversation', 'session': 'chosen-session', 'message': 'message-1'}
+        bad = {'kind': 'diff', 'path': 'not/changed.txt'}
+        commits = {'kind': 'diff', 'path': 'diff/commits.txt', 'quote': 'Deterministic test checkpoint'}
+        base = {'op': 'ADD', 'fact_id': 'TERM-999', 'target': worker.owns, 'text': 'Supported definition',
+                'scope': 'app:test', 'reason': 'Developer decision'}
+        def review(*items):
+            output = {'records': [{**base, 'evidence': list(items)}], 'handoffs': [], 'unowned': []}
+            return review_results([WorkerResult(worker, AgentRun(worker.label, output=output))], ctx, evidence)
+        mixed = review(good, bad)
+        self.assertEqual(len(mixed.accepted), 1)
+        self.assertEqual(mixed.accepted[0]['evidence'], [good])
+        self.assertIn('not part of the diff', mixed.accepted[0]['dropped_locators'][0]['issue'])
+        self.assertEqual(len(review(bad).rejected), 1)
+        only_commits = review(commits)
+        self.assertEqual(len(only_commits.accepted), 1)
+        self.assertNotIn('dropped_locators', only_commits.accepted[0])
+
+    def test_worker_prompt_names_the_application_scope(self):
+        ctx = self.prepare(); config = load_config(self.kb); evidence = build_pack(ctx, config)
+        worker = plan_workers(config, evidence)[0][0]
+        self.assertIn(f'`app:{self.app.name.lower()}`', worker_prompt(worker, ctx))
+
+    def test_handoffs_reach_their_owner_once_on_a_fork_of_its_session(self):
+        ctx = self.prepare(); config = load_config(self.kb); evidence = build_pack(ctx, config)
+        workers = plan_workers(config, evidence)[0]
+        sender, receiver = workers[0], workers[1]
+        note = {'to': receiver.owns, 'note': 'A definition for you', 'evidence': []}
+        def first(worker, handoffs=()):
+            output = {'records': [], 'findings': [], 'handoffs': list(handoffs), 'unowned': [],
+                      'contradictions': [], 'unresolved': [], 'coverage': {'sessions_read': [], 'files_read': [], 'notes': ''}}
+            return WorkerResult(worker, AgentRun(worker.label, status='success', session_id=f'{worker.label}-s',
+                                                 cost_usd=0.10, session_cost_usd=0.50, output=output))
+        results = [first(sender, [note]), first(receiver)] + [first(w) for w in workers[2:]]
+        added = {'op': 'ADD', 'fact_id': 'X-001', 'target': receiver.owns, 'text': 't', 'scope': 'app:test',
+                 'reason': 'r', 'evidence': [{'kind': 'conversation', 'session': 'chosen-session', 'message': 'message-1'}]}
+        async def fake(spec, **kw):
+            return AgentRun(kw['label'], status='success', session_id='child', cost_usd=0.65,
+                            output={'records': [added], 'handoffs': [note], 'unowned': []})
+        ledger = Ledger(10)
+        with patch('contextops.strategies.run_agent', side_effect=fake) as call:
+            log = asyncio.run(deliver_handoffs(results, ctx, config, ledger))
+        self.assertEqual(call.call_count, 1)
+        kwargs = call.call_args.kwargs
+        self.assertEqual((kwargs['resume'], kwargs['fork']), (f'{receiver.label}-s', True))
+        self.assertIn('A definition for you', kwargs['prompt'])
+        self.assertEqual(results[1].run.output['records'], [added])
+        self.assertEqual(log[0]['records_added'], 1)
+        self.assertAlmostEqual(ledger.spent, 0.15)  # only the increment over the receiver's session
+        self.assertTrue((ctx.run_dir / 'handoffs.json').is_file())
+
     def test_shared_pipeline_no_network_or_source_writes(self):
         ctx=self.prepare(); before=gitutil.rev_parse(self.app,'HEAD')
         async def specialist(spec, **kw):
@@ -198,7 +252,7 @@ class RuntimeTests(unittest.TestCase):
             path=kw['cwd']/'core/terminology.md'
             path.write_text(path.read_text()+'\nTERM-999: Test definition.\n')
             return AgentRun('writer',status='success',output={'applied':[],'skipped':[],'log_entry':''})
-        with patch('contextops.strategies.run_agent',specialist), patch('contextops.writer.run_agent',writer), patch('contextops.orchestrator._prepare_auth'), patch('contextops.orchestrator.open_pr',side_effect=AssertionError('Publication forbidden')):
+        with patch('contextops.strategies.run_agent',specialist), patch('contextops.writer.run_agent',writer), patch('contextops.orchestrator._prepare_auth'), patch('contextops.orchestrator.publish',side_effect=AssertionError('Publication forbidden')):
             report=asyncio.run(orchestrate(ctx.run_dir))
         self.assertTrue(report.exists())
         self.assertTrue(gitutil.succeeds(self.kb,'rev-parse','--verify',ctx.branch))
@@ -390,6 +444,45 @@ class RuntimeTests(unittest.TestCase):
         handoff = json.loads((self.root / 'runs' / 'sweeper-first').glob('*/sweeper.json').__next__().read_text())
         self.assertTrue(handoff['children'])
         self.assertTrue(all(child['shares_cache_prefix'] for child in handoff['children']))
+
+    def test_export_and_import_session_round_trip_without_local_paths(self):
+        records = [
+            {'type': 'user', 'cwd': str(self.app), 'uuid': 'u1', 'sessionId': 'chosen-session',
+             'timestamp': (self.cutoff - timedelta(seconds=3)).isoformat(),
+             'message': {'role': 'user', 'content': f'Please edit {self.app}/README.md'}},
+            {'type': 'assistant', 'cwd': str(self.app), 'uuid': 'a1', 'sessionId': 'chosen-session',
+             'timestamp': (self.cutoff - timedelta(seconds=2)).isoformat(),
+             'message': {'role': 'assistant', 'content': [
+                 {'type': 'thinking', 'thinking': 'private reasoning'},
+                 {'type': 'text', 'text': 'Editing it now.'},
+                 {'type': 'tool_use', 'id': 't1', 'name': 'Edit', 'input': {'file_path': f'{self.app}/README.md'}}]}},
+            {'type': 'user', 'cwd': str(self.app), 'uuid': 'r1', 'sessionId': 'chosen-session',
+             'timestamp': (self.cutoff - timedelta(seconds=1)).isoformat(),
+             'message': {'role': 'user', 'content': [
+                 {'type': 'tool_result', 'tool_use_id': 't1', 'content': 'secret file body'}]}},
+            {'type': 'file-history-snapshot', 'snapshot': {'files': [str(self.app)]}},
+        ]
+        self.session_file.write_text(''.join(json.dumps(r) + '\n' for r in records))
+        exported = self.root / 'chosen-session.jsonl'
+        with contextlib.redirect_stdout(io.StringIO()):
+            main(['export-session', '--repo', str(self.app), '--session', 'chosen-session', '--out', str(exported)])
+        text = exported.read_text()
+        for leaked in (str(self.app), 'private reasoning', 'secret file body', 'file-history-snapshot'):
+            self.assertNotIn(leaked, text)
+        self.assertIn('{{APP}}/README.md', text)
+
+        other = self.root / 'other-checkout'
+        gitutil.git(self.root, 'clone', '-q', str(self.app), str(other))
+        with contextlib.redirect_stdout(io.StringIO()):
+            main(['import-session', '--repo', str(other), str(exported)])
+            main(['import-session', '--repo', str(other), str(exported)])  # identical re-import is a no-op
+        sessions = transcripts.load_sessions(other.resolve(), None, self.cutoff, selected=['chosen-session'])
+        self.assertEqual([m.uuid for m in sessions[0].messages], ['u1', 'a1'])
+        self.assertIn(f'{other.resolve()}/README.md', sessions[0].messages[1].text)
+
+        exported.write_text(text.replace('Editing it now.', 'Changed.'))
+        with self.assertRaisesRegex(ValueError, 'already exists'):
+            transcripts.import_session(exported, other.resolve())
 
     def test_sessions_lists_selectable_history_without_inference(self):
         out = io.StringIO()

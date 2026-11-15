@@ -1,0 +1,49 @@
+\chapter{CONCLUSION}
+\label{ch:conclusion}
+
+At midterm, Context Ops has a shared runtime for two context-acquisition strategies, deterministic tests, and a documented setup path. Four development studies contain 367 evaluated sessions: 120 ready-made downstream runs, 81 feature-sequence sessions, 126 persona-development sessions, and 40 team-study test sessions. The team study also has three separate learning sessions. The full development corpus contains 533 judge files. Nine files omit 61 expected judgments, so the feature-sequence and persona findings include visible missingness counts and sensitivity bounds. These are coverage checks, not independent reviews of judgment correctness. The evaluation uses simulated developers and reviewers. The runtime uses local orchestration and artifacts with hosted Claude inference; selected evidence is sent to the hosted service. Remote publication requires \code{open\_pr: true} and is disabled by default.
+
+\section{Findings So Far}
+
+\begin{enumerate}[nosep]
+  \item \textbf{Maintenance results depend on condition and measurement.} Original v2 A/B-Sonnet scores (17/21 and 10/21) differ from joint rescoring (16/21 and 9/21). The v3 A-Sonnet result was 16/21 with three partial matches, 0/19 predefined traps, eight supported extras, one noise, and one unsupported extra. One run per application does not establish a general winner. Cache fixes improved fork reuse, but changed inputs and configuration prevent attributing pilot-to-v2 cost differences solely to caching; Haiku A remained 2.7 times B cost.
+  \item \textbf{Downstream findings are selected and task-specific.} Maintained A showed a positive pooled result in ready-made tasks; stale seed did not demonstrate benefit. Team-study gains were concentrated in Conventional Commits (12 of 13 additional passes). Routine tasks also improved, so effects were not confined to code-silent tasks. The persona study showed no demonstrated improvement on these tasks, with incomplete rows and one unreliable self-hosting verdict. See the results tables for estimates and bounds.
+  \item \textbf{Feature carry-over was high but incompletely covered.} Team passed 60/60 carried checks; repo passed 58/58 judged with two U; none passed 43/60. Original permutation tests are exploratory because linked features share evolving chains and missingness was not modeled. Tested small-push maintenance was \$0.39--\$0.41 and 98--106 seconds, usually for one short session and one commit.
+  \item \textbf{The demo is historical evidence.} Four runs document the template-to-populated path. First revision \code{caf4bdb} included PR~\#13 implementation and session import/export changes; it was not PR~\#13 as submitted. Final acceptance \code{b20f3f9} predates team-scope and admission-policy changes, so the current branch was not live-verified.
+\end{enumerate}
+
+\section{Status of the Success Criteria}
+
+Table~\ref{tab:criteria} compares the evidence collected so far with the success criteria of Section~2.2.2. Status labels describe the evidence currently available, not universal guarantees.
+
+\begin{table}[H]
+\centering
+\caption{Success criteria at the midterm.}
+\label{tab:criteria}
+\small
+\begin{tabularx}{\linewidth}{@{}p{3.5cm}Yp{3.2cm}@{}}
+\toprule
+Criterion & Evidence so far & Status \\
+\midrule
+Coverage $\geq$ 75\%, traps $\leq$ 5\% & v3 A-Sonnet: 16/21 required facts (76.2\%), 0/19 predefined traps, plus 8 supported, 1 noise, and 1 unsupported extra; one run per application & Observed, one run/app \\
+Cost < \$2 per push & v3 A-Sonnet \$1.42 and B-Sonnet \$0.92 per application run. Feature-study small pushes cost \$0.39--\$0.41 and took 98--106 s, typically with one short session and one commit & Observed in tested runs \\
+Downstream benefit & Selected positive results in ready-made and team studies; persona result is limited and incomplete; feature study has missing judgments and dependent feature chains & Mixed, task-specific evidence \\
+Reproducibility & Four recorded historical demo runs; final acceptance predates team-scope and admission-policy changes; hosted-forge validation remains pending & Partially evidenced \\
+Safety & The baseline scan at \code{e7e095b} reported two PDF binary manual-review flags and no detected credential. Hosted-forge and human-review validation remain pending & Not established \\
+\bottomrule
+\end{tabularx}
+\end{table}
+\section{Next Steps}
+
+\begin{enumerate}[nosep]
+  \item Repeat v3 maintenance runs and have team members audit a sample of judge verdicts.
+  \item Test cumulative maintenance across consecutive pushes, including updates, merges, and retirements of stale facts.
+  \item Evaluate cross-repository decisions, decisions that replace patterns still visible in code, rejected approaches absent from code, and security requirements.
+  \item Run longer feature chains with multiple developers, revised or conflicting decisions, a human reviewer who can reject or edit requests, and a hosted GitHub or GitLab remote.
+  \item Review the public/history scan's PDF binary flags and complete human and hosted-forge validation before making stronger safety or reproducibility claims.
+  \item Publish the simulated conversations, tasks, hidden checks, and protocol with instructions to reproduce the reported numbers.
+\end{enumerate}
+
+\section{Future Work}
+
+Future work may support other coding agents, including the separately tracked Codex backend, and evaluate semantic storage, consolidation, and real team conversations collected with consent. The experiments reported here support selected observations and hypotheses about their causes, not a universal or causal mechanism. Excluding UI conventions is a later configurable policy choice, not a conclusion established by these experiments.

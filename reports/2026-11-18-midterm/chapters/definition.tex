@@ -1,0 +1,111 @@
+\chapter{PROJECT DEFINITION AND PLANNING}
+
+\section{Project Definition}
+
+Context Ops is a system that keeps a team's shared knowledge up to date as an application is developed with coding agents. Its inputs are a source application repository, an explicit range of committed changes (a base and a head commit), and a selection of the Claude Code sessions in which those changes were developed. Its output is a reviewable change to a separate knowledge repository: a Git branch, a patch, structured change records with evidence, and a run report with cost and timing.
+
+The knowledge repository has a fixed taxonomy. Four core documents hold terminology, technology stack standards, naming conventions, and pitfalls. A \code{tools/} folder holds one sub-folder per technology (for example Recharts or bank synchronization), each with relevance hints that decide when its maintainer runs. Every fact has a stable identifier such as \code{TERM-102} or \code{PIT-103}, an explicit scope (\code{company}, \code{app:<name>}, or \code{tool:<name>}), and evidence references.
+
+The project scope includes:
+\begin{itemize}[nosep]
+  \item the maintenance runtime with two context-acquisition strategies (A and B) behind one shared pipeline;
+  \item an evaluation harness that simulates development and measures maintenance quality, cost, and time;
+  \item a downstream evaluation that measures whether the maintained knowledge helps development, including across consecutive features;
+  \item a reproducible first-run path that lets an outside user start from an empty template.
+\end{itemize}
+Out of scope are developing the applications themselves, automatic merging, and production deployment of the optional Git pre-push hook, which remains experimental. Remote publication is configurable and disabled by default.
+
+\section{Project Planning}
+
+\subsection{Project Time and Resource Estimation}
+
+Table~\ref{tab:timeline} lists the completed milestones and the plan for the rest of the semester. The team consists of two students who meet the advisor weekly. Work-hour estimates are not reported.
+
+\begin{table}[!htbp]
+\centering
+\caption{Completed milestones and remaining plan.}
+\label{tab:timeline}
+\small
+\begin{tabularx}{\linewidth}{@{}l X l@{}}
+\toprule
+Date & Milestone & Status \\
+\midrule
+19 Oct & Knowledge taxonomy, roles, and evidence rules designed & Done \\
+29 Oct & Both strategies implemented as separate runtimes; pilot plan with three applications & Done \\
+30 Oct & October pilot: 3 applications $\times$ 5 checkpoints $\times$ \{Claude, GPT\} $\times$ \{A, B\} = 60 runs & Done \\
+1 Nov & Strategies merged into one shared runtime with CI and credential scans (PRs \#7, \#8) & Done \\
+5 Nov & Prompt-cache fix for forks; experiment v2 with longer multi-persona conversations (PR \#9) & Done \\
+6 Nov & Advisor meeting: downstream comparison, report index, and reproducible demo requested & Done \\
+13 Nov & Agent-guided first-run setup and \code{contextops init} (PR \#13, in review) & In review \\
+14 Nov & Downstream comparison (120 development runs); fixes to PR \#13 found by live first-run runs & Done \\
+15 Nov & Team or repository scope, \code{attach}, push-triggered review requests; feature-sequence experiment (81 features, 36 maintenance runs); maintenance rerun on the v2 inputs and persona-driven development on each resulting knowledge base (126 sessions); session-start digest; team decisions carried across repositories (43 sessions) & Done \\
+18 Nov & Midterm report & This report \\
+Late Nov & Repetitions of the maintenance runs; human audit of a sample of judgments; more cross-repository decisions and decisions that replace a pattern most of the code still uses (for example infrastructure only through Terraform) & Planned \\
+Early Dec & Cumulative maintenance with a human reviewer on a hosted GitHub or GitLab remote; consolidation and retirement of stale entries & Planned \\
+Mid Dec & Dataset and protocol release; final report and presentation & Planned \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The main resource is model inference. All runs use a Claude subscription through the Claude Agent SDK; the SDK reports a client-side list-price estimate for each call, which we use as our cost measure. Table~\ref{tab:resources} summarizes the measured cost of the work done so far. A development machine (Apple Silicon laptop, Python 3.13) is sufficient for every step; no servers are required.
+
+\begin{table}[!htbp]
+\centering
+\caption{Measured inference cost by activity (client-side list-price estimates).}
+\label{tab:resources}
+\small
+\begin{tabular}{@{}lrr@{}}
+\toprule
+Activity & Runs & Estimated cost \\
+\midrule
+v2 maintenance runs (4 conditions $\times$ 3 applications) & 12 & \$11.55 \\
+Downstream development runs (Sonnet) & \DSRuns & \DSDevCost \\
+Downstream blind judging (Opus) & \DSJudged & \DSJudgeCost \\
+Live first-run runs (A and B, Sonnet) & 4 & \$3.58 \\
+Feature sequence: development, maintenance, judging & 81 / 36 / 81 & \$34.63 \\
+v3 maintenance rerun and blind scoring & 12 / 3 & \$13.99 \\
+Persona development: agent, persona, judging & 126 & \$44.45 \\
+Team decisions across repositories (learning and test) & 3 + 40 & \$14.05 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Success Criteria}
+
+We defined the following criteria for the final project. The midterm status of each is given in Chapter~\ref{ch:conclusion}.
+\begin{enumerate}[nosep]
+  \item \textbf{Maintenance coverage.} On the v2 benchmark, a strategy captures at least 75\% of the required facts in its accepted proposals while admitting at most 5\% of the decoy (trap) facts.
+  \item \textbf{Cost.} Maintaining one five-task push costs less than \$2 with Sonnet-class models, and the cheaper strategy is identified with the source of its savings.
+  \item \textbf{Downstream benefit.} With maintained knowledge, a development agent passes more hidden review checks than without knowledge, with a cost increase per task that is smaller than the maintenance cost divided by the number of tasks that reuse the knowledge.
+  \item \textbf{Reproducibility.} A new user can clone the repository, start from an empty template, and obtain populated knowledge on a local branch by following the documentation, using only public inputs.
+  \item \textbf{Safety.} No credential, private path, or raw private conversation appears in published material; no generated knowledge is merged without human review.
+\end{enumerate}
+
+\subsection{Risk Analysis}
+
+Table~\ref{tab:risks} lists the main risks we identified and how we address them.
+
+\begin{table}[!htbp]
+\centering
+\caption{Risks and mitigations.}
+\label{tab:risks}
+\small
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{4.2cm} >{\raggedright\arraybackslash}X@{}}
+\toprule
+Risk & Mitigation \\
+\midrule
+Model outputs vary between runs, so one run per condition can mislead. & Repetitions in the downstream study (5 per cell) and the feature-sequence experiment (3 per condition); more maintenance repetitions planned; every report states the number of runs. \\
+A model judge may be biased or inconsistent. & Judges are blind to the condition; checks are written before execution; a human audit of a sample is planned. \\
+Simulated developers are less realistic than real ones. & Personas speak informally, iterate, and correct the agent; planted facts are delivered in the persona's own words; the limitation is stated with every result. \\
+Claude Code's transcript format is internal and can change. & All parsing is isolated in one module; sessions are frozen and hashed at run preparation. \\
+Wrong or stale knowledge misleads later agents. & Evidence for every fact, scoped claims, local branches, mandatory human review, no automatic merge. \\
+Conversation text tries to redirect the agents (prompt injection). & Evidence is labeled as data, not instructions; writes are restricted to Markdown in \code{core/} and \code{tools/} by a pre-tool check. \\
+Inference cost grows with long conversations. & Prompt-cache sharing between sweeper and forks; relevance-based selection of tool specialists; per-agent and per-run budgets. \\
+Private data leaks into the public repository. & Application sources and raw runs stay outside the repository; automated credential scans of files and history; path and identity scrubbing for published evidence. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Team Work}
+
+Kerem Haktan Kurt designed and implemented sweeper-first strategy A, integrated both strategies with continuous integration and credential checks, wrote the architecture documentation, and implemented agent-guided setup (\code{contextops init}). Bar\i{}\c{s} \"{O}ks\"{u}z implemented fresh-specialist strategy B, the development simulation harness and persona model, ran v2, found and fixed fork caching, and designed and ran the downstream comparison and first-run demonstration. The October pilot, taxonomy, and report are joint work. GitHub issues and pull requests track the work; human review and end-to-end validation remain in progress.

@@ -30,6 +30,24 @@ class WorkerResult:
     run: AgentRun
 
 
+def app_name(ctx: RunContext) -> str:
+    """The scope label for this application: its configured name, else its checkout's folder name."""
+    return ctx.app_label
+
+
+def scope_line(ctx: RunContext) -> str:
+    app = app_name(ctx)
+    if ctx.scope == "repository":
+        return (f"This knowledge base serves one application, {app}. Scope facts about it as `app:{app}`, "
+                "not a package or product name. Use `company` only for rules a developer states for the "
+                "whole organization.")
+    return (f"This knowledge base is shared by a team's applications; this run observed {app}. Scope facts "
+            f"about it as `app:{app}`, not a package or product name. Use `company` (the team that owns this "
+            "knowledge) only when a developer states that a rule applies across the team's applications. "
+            "Existing entries scoped to other applications describe those applications: do not change them "
+            "from this evidence.")
+
+
 def worker_prompt(worker: Worker, ctx: RunContext) -> str:
     lines = [
         f"Assignment: {worker.label}",
@@ -46,6 +64,8 @@ def worker_prompt(worker: Worker, ctx: RunContext) -> str:
         "",
         f"Source application, read-only, checked out at {ctx.head_sha}: {ctx.app_snapshot}",
         f"Knowledge base at baseline {ctx.kb_baseline[:7]}: {ctx.kb_snapshot}",
+        "",
+        scope_line(ctx),
         "",
         "Sweep the evidence for your assignment, compare it with the current knowledge, "
         "and return your change records. When nothing applies, return a single NO_CHANGE "
@@ -111,6 +131,8 @@ def sweeper_prompt(spec: AgentSpec, workers: list[Worker], ctx: RunContext) -> s
         "",
         f"Source application, read-only, checked out at {ctx.head_sha}: {ctx.app_snapshot}",
         f"Knowledge base at baseline {ctx.kb_baseline[:7]}: {ctx.kb_snapshot}",
+        "",
+        scope_line(ctx),
         "",
         "Specialists that will continue from your session:",
         roster,
@@ -237,3 +259,80 @@ STRATEGIES = {
     "fresh-specialists": fresh_specialists,
     "sweeper-first": sweeper_first,
 }
+
+
+def handoff_prompt(worker: Worker, notes: list[dict]) -> str:
+    return "\n\n".join([
+        "Your first pass is complete. Other specialists ran in parallel and handed the findings "
+        f"below to {worker.owns}, which you own. Check each one against the original evidence "
+        "exactly as before. Return change records only for findings that are supported and belong "
+        "in your document, and do not repeat records you already returned. If none apply, return a "
+        "single NO_CHANGE record. Return findings, handoffs, and unowned as empty lists.",
+        json.dumps(notes, indent=1, ensure_ascii=False),
+    ])
+
+
+def _owns(worker: Worker, target: str, ctx: RunContext) -> bool:
+    target = target.removeprefix(str(ctx.kb_snapshot).rstrip("/") + "/").removeprefix("./")
+    return target == worker.owns or (worker.owns.endswith("/") and target.startswith(worker.owns))
+
+
+async def deliver_handoffs(
+    results: list[WorkerResult], ctx: RunContext, config: InitConfig, ledger: Ledger
+) -> list[dict]:
+    """One extra turn for each specialist that received handoffs, on a fork of its own session.
+
+    Specialists run in parallel, so a handoff used to reach the report and nobody else. The same
+    pass runs for both strategies; it resumes the receiver's session, so the receiver keeps its
+    reading and the shared cache prefix. New handoffs from this pass are not delivered again.
+    """
+    log = []
+    gate = asyncio.Semaphore(config.budget.max_parallel)
+    sent = [
+        {**item, "from": result.worker.label}
+        for result in results if result.run.output
+        for item in result.run.output.get("handoffs", [])
+    ]
+
+    async def deliver(result: WorkerResult) -> None:
+        worker, run = result.worker, result.run
+        notes = [n for n in sent if n["from"] != worker.label and _owns(worker, n.get("to", ""), ctx)]
+        if not notes:
+            return
+        entry = {"to": worker.label, "handoffs": len(notes), "from": sorted({n["from"] for n in notes})}
+        log.append(entry)
+        if run.status != "success" or not run.session_id or run.output is None:
+            entry["status"] = "receiver-unavailable"
+            return
+        async with gate:
+            if not ledger.has_room():
+                entry["status"] = "skipped-budget"
+                return
+            parent_cost = run.session_cost_usd if run.session_cost_usd is not None else run.cost_usd
+            child = await run_agent(
+                worker.spec,
+                label=f"{worker.label}:handoffs",
+                system=shared_system_prompt(config),
+                prompt=handoff_prompt(worker, notes),
+                schema=AGENT_OUTPUT,
+                cwd=ctx.pack,
+                dirs=[ctx.app_snapshot, ctx.kb_snapshot],
+                budget_usd=config.budget.per_agent_usd + parent_cost,
+                max_turns=config.budget.max_turns,
+                resume=run.session_id,
+                fork=True,
+            )
+        parent = AgentRun(run.label, cost_usd=parent_cost, model_usage=run.model_usage)
+        _subtract_parent(child, parent)
+        ledger.add(child)
+        entry.update(status=child.status, cost_usd=round(child.cost_usd, 4), session_id=child.session_id)
+        if child.status == "success" and child.output:
+            added = [r for r in child.output.get("records", []) if r.get("op") != "NO_CHANGE"]
+            run.output["records"] = list(run.output.get("records", [])) + added
+            entry["records_added"] = len(added)
+        else:
+            entry["error"] = child.error or child.status
+
+    await asyncio.gather(*(deliver(result) for result in results))
+    _write(ctx.run_dir / "handoffs.json", log)
+    return log

@@ -16,11 +16,11 @@ Return evidence-backed change records for the naming document. Preserve stable I
 
 ## Look for
 
-Find developer-stated naming rules, corrections with a general rationale, and configuration enforcing an accepted convention.
+Find developer-stated naming rules that matter beyond one repository's code, such as names of cloud resources, analytics events, environment variables, queues, and API fields, and corrections with a general rationale.
 
 ## Ignore
 
-Skip isolated local renames, generated files, and unconfirmed naming choices made by the development agent.
+Skip isolated local renames, generated files, unconfirmed naming choices made by the development agent, UI and component naming, and conventions that the code, linters, or formatters already enforce.
 
 ## Deciding
 

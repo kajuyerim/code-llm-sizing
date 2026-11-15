@@ -1,0 +1,92 @@
+\chapter{METHODOLOGY}
+\label{ch:method}
+
+\section{Maintenance Pipeline}
+
+A maintenance run freezes the application range, knowledge baseline, selected Claude Code sessions, and cutoff. Conversation normalization preserves roles, order, and message IDs while omitting tool results and model thinking; the normalized evidence is hashed and packaged with the explicit diff and changed files. Plain code selects four core specialists and relevant tool specialists. The strategies differ only in context acquisition: A sweeps then forks, while B starts specialists fresh (Figure~\ref{fig:flow}).
+\begin{enumerate}[nosep]
+  \item \textbf{Investigation.} Specialists return structured change records (Section~\ref{sec:record}); tool roles run only when relevance hints match.
+  \item \textbf{Review and writing.} Recipients get one handoff turn. Deterministic checks validate target ownership, operation, and evidence locators. Source validation confirms an existing path, not a cited line; conversation and diff references use separate rules. Unresolvable locators are dropped, unsupported records deferred, and records with no valid evidence rejected. An optional cartographer proposes documents for findings that do not fit existing ones. One writer applies accepted records in a temporary worktree, logs and commits them to a local branch; the runtime reports the actual diff.
+\end{enumerate}
+
+\section{Change Records and Evidence}
+\label{sec:record}
+
+Each JSON proposal identifies a document and fact, operation (ADD, UPDATE, DELETE, MERGE, NO\_CHANGE, NEEDS\_REVIEW), wording, scope, reason, and evidence locator. Locators cite a session message, diff path, source path, or memory file. Code supports implementation claims; developer statements support intent, definitions, requirements, and decisions; completion messages alone are insufficient. Specialists read sessions to the end so later messages can supersede earlier ones. Application observations stay scoped to that application unless an explicit statement establishes a broader standard.
+
+\section{Context-Acquisition Strategies}
+\label{sec:strategies}
+
+\textbf{Strategy A (sweeper first)} starts one sweeper agent that reads all of the evidence and records candidate findings for each specialist. When the sweeper finishes, the runtime forks its completed session once per specialist using the SDK's session-resume-and-fork mechanism. Each fork inherits the sweeper's entire context and then receives its own role. If the sweeper fails, the specialists do not run; A never falls back to B.
+
+\textbf{Strategy B (fresh specialists)} starts every specialist in a new session with only its role and the evidence pack. Each specialist decides for itself what to read.
+
+Both strategies use the same role definitions, rules, tools, evidence, review, and writer to focus the comparison on context acquisition; stochastic runs and the small sample still limit causal attribution.
+
+\paragraph{Prompt-cache sharing} Pilot forks had different prompts and schemas, rewriting about 42{,}000 inherited tokens; the pilot observed A costing 2.2 times B. The runtime now shares a role-free prompt and schema; roles arrive after inherited history. Live checks also found that asynchronously attached MCP connectors changed the tool list, so maintenance agents now run without MCP servers. After these changes, fork calls read inherited history from cache. Changes in inputs and configuration mean caching alone does not explain all pilot-to-v2 cost differences.
+
+\section{Simulation of Development}
+\label{sec:simulation}
+
+Because private real conversations lack ground truth, we generated task briefs for each application with expected outcomes and developer-stated facts, corrections, and definitions, plus decoys and deviations that should not be admitted.
+
+A language-model persona plays a developer working with Claude Code in an application checkout. In v2, three distinct teammate personas per application gave vague requests, answered questions, and iterated. They were instructed to deliver each pending fact before allowing a commit, but two undelivered facts were excluded from scoring. A filter rejected staging-revealing messages. The frozen commits and sessions formed the inputs for every maintenance condition; this simulates, rather than observes, human work.
+
+\section{Evaluation of Maintenance (RQ1)}
+
+For each push, a blind reviewer model receives the expected facts, the decoys, and the accepted records of each condition under shuffled labels. It marks each required fact as found, partial, or missed, and each decoy as admitted or not. Facts that the persona never actually delivered are excluded. We report required facts found, partial matches, optional facts, traps admitted, estimated cost, and wall-clock time per run. The writer's fidelity to accepted records was not scored in v2; proposals and applied documents are separate measurements.
+
+\section{Evaluation of Downstream Use (RQ2)}
+\label{sec:downstream-method}
+
+The ready-made downstream study compares three original conditions, then adds a fourth post hoc condition. Its 120 runs have complete judged coverage. The protocol was written and frozen before any measured run.
+
+\paragraph{Conditions} All conditions start from the same application revision (the head that the v2 maintenance runs saw).
+\begin{itemize}[nosep]
+  \item \textbf{none}: no knowledge and no pointer to it; the agent sees the source and its Git history.
+  \item \textbf{seed}: \code{CLAUDE.md} points to the v2 baseline knowledge, before maintenance.
+  \item \textbf{maintained (A)}: the same pointer to the baseline plus the knowledge patch written by the v2 A-Sonnet maintenance run.
+  \item \textbf{maintained (B)}: the baseline plus the patch of the v2 B-Sonnet run. This condition was added after the first three had been analysed, to test whether A's better maintenance carries over to development.
+\end{itemize}
+The knowledge directories differ only by those patches. They are read-only and have opaque names, so the agent cannot tell which revision it reads.
+
+\paragraph{Tasks} Each application has a routine task finishable from code alone and a knowledge task whose checks depend on project decisions. Prompts do not name checked conventions; each has 6 to 8 prewritten checks. Analysis bases are code, seed, maintained, or unstated. Full prompts and checks are in Supplement Appendix~A; see the \href{context-ops-supplement.pdf}{evidence supplement}.
+
+\paragraph{Execution} The development agent is Claude Code (Sonnet 5.5) with its standard system prompt, project settings only, file and shell tools, no web access, no subagents, and no dependency installation. Each run gets a fresh Git worktree. If the agent stops without committing, it receives one fixed neutral reply, at most twice; the number of extra messages is the clarification count. Each (task, condition) cell is repeated five times in an interleaved fixed order: 90 runs for the first three conditions and 30 more for maintained (B).
+
+\paragraph{Scoring} A blind judge (Opus 5.5) sees only the task, the checklist, the commit messages, and the diff. It marks each check pass, fail, or not applicable, rates completion from 0 to 3, and lists defects. The primary quality metric is the observed pass rate over judged applicable checks. Explicitly recorded not-applicable checks are excluded. Missing expected judgments are reported as Unjudged, never as failures or not applicable. We also record cost, wall-clock time, turns, tool calls, knowledge files read, and clarification rounds.
+
+\section{Evaluation over a Feature Sequence (RQ2, end to end)}
+\label{sec:loop-method}
+
+The feature-sequence experiment runs the full loop in Figure~\ref{fig:loop}: it tests whether decisions stated during development reach later features in fresh sessions. The protocol was frozen before measured runs.
+
+\paragraph{Features and decisions} Each application had three ordered small features on one checkout. F1 stated two team decisions, F2 two more, and F3 none; Linkwarden F1 also stated the Conventional Commits rule (full chains and checks are in Supplement Appendix~B). Decisions were selected where existing code did not settle them. Each feature had 7 to 9 hidden code, stated, carried, or no-leak checks.
+
+\paragraph{Conditions}
+\begin{itemize}[nosep]
+  \item \textbf{none}: no knowledge. Later features see the code and history left by earlier ones, but no earlier conversation.
+  \item \textbf{repo}: one empty knowledge repository per application (\code{scope: repository}) on a local bare remote, connected with \code{contextops attach}. After F1 and F2, the real pre-push hook runs strategy A on the pushed commits and the sessions since the last run and pushes its result branch; a simulated reviewer merges every branch unchanged.
+  \item \textbf{team}: one empty knowledge repository shared by the three applications (\code{scope: team}). Each round, the three applications develop the next feature against the same merged knowledge, then push in a fixed order.
+\end{itemize}
+Each condition was repeated three times (81 feature sessions, 36 maintenance runs). Feature development used the downstream study's agent, tools, limits, and judge, with project and local settings loaded so the attach pointer applied. Three judge files omitted 20 expected checks. Across all studies, 533 judge files cover 367 evaluated sessions; nine files omit 61 judgments (3 feature files/20 checks and 6 persona files/41 checks). Unjudged is distinct from explicit Not applicable. For pass $p$, fail $f$, and Unjudged $m$, observed rates use $p/(p+f)$ and sensitivity bounds use $[p/(p+f+m),(p+m)/(p+f+m)]$, excluding explicit NA. Bounds are not confidence intervals or rescoring. See Supplement Appendix~E and the \href{context-ops-supplement.pdf}{evidence supplement} for coverage details. The primary feature outcome is the pass rate of carried checks in F2 and F3.
+
+\section{Maintenance Rerun and Persona-Driven Development (v3)}
+\label{sec:v3-method}
+
+\paragraph{Maintenance rerun} We reran the four v2 conditions (A or B, Sonnet or Haiku) on exactly the v2 inputs: the same push and the same six conversations per application, the same cutoff, the same seed knowledge, and v2's budgets. Only the runtime changed: the fixes found by the live first runs, the application scope, \code{scope: repository}, and the admission policy. One blind judge (Opus 5.5) scored the accepted records of the v3 and the v2 runs together, as eight anonymous labels per application, against the v2 expected facts and traps.
+
+\paragraph{Development with personas} Agents designed six tasks targeting two to five v2 facts each, preferring facts on which maintenance conditions differed. Tasks used v3 knowledge bases from each run, plus a no-knowledge condition. A simulated teammate answered questions and reviewed each first commit for up to two rounds. A blind judge scored first and final diffs; review rounds and facts supplied by the teammate were recorded separately. Three repetitions gave 90 sessions; two digest conditions were added post hoc for 36 more, totaling 126. Six judge files omitted 41 expected checks (coverage bounds are in Supplement Appendix~E).
+
+\section{Team Decisions Across Repositories}
+\label{sec:v4-method}
+
+The four development studies contain 367 evaluated sessions: 120 downstream, 81 feature-sequence, 126 persona-development, and 40 team-study tests, plus three team-learning sessions. The team study tests whether a decision stated in one repository transfers to another where code does not reveal it. Its protocol was frozen before sessions began.
+
+\paragraph{Learning} One empty team knowledge repository (\code{scope: team}) on a local remote is attached to a Linkwarden checkout with the pre-push hook and the session-start digest. In three persona sessions, a tech lead asks for small Linkwarden changes and states four decisions in passing as rules for all of the team's repositories: no new third-party package for small things (TD1); no personal data or secrets in logs at any level (TD2); every outbound call has an explicit timeout of at most 10 seconds and its failure never breaks the user's action (TD3); commit subjects follow Conventional Commits (TD4). Each push runs maintenance and the result is merged unchanged. A design agent checked in the code that Actual Budget and Maybe do not reveal these rules; Actual Budget's recent history uses a different commit prefix and Maybe's code logs user emails and sets no HTTP timeouts.
+
+\paragraph{Testing} Five new tasks, two in Actual Budget, two in Maybe and one in Linkwarden, each give a natural chance to break two or three of the decisions (an \code{.ics} export that tempts a calendar package, a webhook on account creation, a CSV encoding fix, an exchange-rate fallback, short-link expansion). Persona teammates open naturally and never state the decisions; they know them privately and may ask for fixes in review. Conditions: no knowledge, or the frozen team knowledge attached with the digest. Four repetitions give 40 test sessions. Together with three separate learning sessions, the team study contains 43 sessions. The primary outcome is the pass rate of decision checks at the agent's first commit. The ready-made downstream study has 120 runs with complete expected-ID coverage; its original three conditions were followed by the post hoc B condition.
+
+\section{Reproducible First Run}
+
+To show the template-to-populated path to outside users, we prepared public inputs for one application: the upstream Actual Budget repository at a pinned commit, an eight-commit patch series comprising one setup commit and seven development commits from the v2 push (re-authored with a neutral identity and with local paths removed), and the six development sessions exported with the new \code{contextops export-session} command. We then followed the documented first run from a clean clone: install, run the tests, initialize empty knowledge with \code{contextops init}, import the sessions, run strategy A, and inspect the result.

@@ -1,0 +1,39 @@
+\documentclass[a4paper,12pt]{report}
+\input{preamble}
+\IfFileExists{generated/ds_macros.tex}{\input{generated/ds_macros}}{}
+\IfFileExists{generated/ds_text.tex}{\input{generated/ds_text}}{}
+\input{generated/placeholders}
+
+\title{CMPE 492\\[0.8em]Context Ops: Maintaining Shared Knowledge for Coding Agents\\[0.5em]\large Midterm Report}
+\author{Kerem Haktan Kurt\\Bar\i{}\c{s} \"{O}ks\"{u}z\\[1.2em]Advisor: Assoc. Prof. Atay \"{O}zg\"{o}vde}
+\date{November 2026}
+
+\begin{document}
+\hypersetup{pageanchor=false}
+\maketitle{}
+
+\pagenumbering{roman}
+\hypersetup{pageanchor=true}
+\tableofcontents
+\clearpage
+\listoffigures
+\clearpage
+\listoftables
+\clearpage
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+\input{chapters/introduction}
+\input{chapters/definition}
+\input{chapters/related}
+\input{chapters/methodology}
+\input{chapters/requirements}
+\input{chapters/design}
+\input{chapters/implementation}
+\input{chapters/results}
+\input{chapters/conclusion}
+
+\input{chapters/references}
+
+
+\end{document}

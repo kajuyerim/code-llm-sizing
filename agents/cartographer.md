@@ -26,7 +26,7 @@ An empty proposal list is the common and correct answer.
 ## What a proposal contains
 
 - `kind`: `core-file` or `tool-folder`.
-- `path`: `core/<name>.md` or `tools/<name>/`, following [naming conventions](../core/naming-conventions.md) NAME-001 and NAME-002.
+- `path`: `core/<name>.md` or `tools/<name>/`. Use lowercase names with hyphens; put tool-specific knowledge under its lowercase tool folder. These are bundle layout rules, separate from learned application naming conventions.
 - `type`: what kind of knowledge it holds, such as Standard, Terminology, Pitfall, or Reference.
 - `scope` and `rationale`: why existing documents do not fit, and which findings support it.
 - `seed_entries`: the first entries in the new document's format, each traceable to a finding.

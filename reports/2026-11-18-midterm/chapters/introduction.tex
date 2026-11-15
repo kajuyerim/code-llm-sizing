@@ -1,0 +1,34 @@
+\chapter{INTRODUCTION}
+
+Coding agents such as Claude Code work through long conversations where developers explain goals, correct mistakes, and state decisions the code does not record: why amounts use a fixed scale, where new components belong, which HTTP client a server uses, or which migration must never run automatically. When a session ends, this knowledge is often lost, leaving the next developer or agent to rely on source code and manually maintained instructions.
+
+Teams capture some of this context in instruction files such as \code{CLAUDE.md}~\cite{claudememory}, \code{AGENTS.md}~\cite{agentsmd}, and editor-specific rules. Maintained by hand, these files can stale as software changes, a longstanding documentation problem~\cite{lehman1980,parnas1994,aghajani2019}.
+
+\emph{Context Ops} studies agent-based maintenance of shared knowledge. After development, maintenance agents inspect the application source, explicit Git diff, and developer-agent conversations. They propose changes to a separate repository of terminology, standards, conventions, pitfalls, and tool notes. A writer applies accepted proposals to a local branch for human review; development agents read the resulting knowledge through the application's \code{CLAUDE.md} pointer.
+
+The project asks two research questions, which we keep separate throughout this report:
+
+\begin{description}[leftmargin=1.5em,labelindent=0em]
+  \item[RQ1 (maintenance).] How should maintenance agents acquire context from long development conversations? We compare two strategies on identical inputs. In strategy A (\emph{sweeper first}) one sweeper agent reads all the evidence and every specialist starts from a fork of the sweeper's completed session. In strategy B (\emph{fresh specialists}) every specialist starts fresh and reads the evidence itself.
+  \item[RQ2 (downstream use).] Does knowledge maintained this way help a development agent complete new tasks with better quality, at lower cost, faster, or with fewer clarification rounds?
+\end{description}
+
+At midterm, the Python runtime includes a command line interface, deterministic tests, and a documented first-run path. A configured push hook can prepare a local update; remote publication requires \code{open\_pr: true}. RQ1 covers an October pilot, the larger v2 evaluation, and its runtime rerun. RQ2 covers ready-made downstream tasks, consecutive feature maintenance, persona-driven development, and cross-repository team decisions. A historical demonstration traces an empty template to populated knowledge. Chapter~\ref{ch:results} reports findings and limitations.
+
+\section{Broad Impact}
+
+Knowledge that lives only in conversations is lost when a session ends, and the same corrections are repeated in later sessions. For teams that work with coding agents every day this is a direct cost: repeated explanations, repeated review comments, and code that is correct in isolation but inconsistent with the team's decisions. A maintained knowledge base also helps new human team members, since it records the reasons behind conventions in plain language with references to the evidence.
+
+In the downstream study, development cost averaged \$0.202 per task without knowledge and \$0.240 with maintained knowledge; median times were 44 and 47 seconds. The separate v2 maintenance cost was about \$1.40 per application push. Whether maintenance pays off depends on its effects on later work, which RQ2 measures.
+
+The simulation harness pairs language-model personas acting as developers with a Claude Code agent. It supplies conversations with planted facts, decoys, and corrections for repeatable evaluation; the developers and reviewers are simulated, not human workload observations.
+
+\section{Ethical Considerations}
+
+Development conversations may contain proprietary code, credentials, personal information, or private opinions. Orchestration and artifacts are local by default, but selected source, diff, and conversation evidence is sent to hosted Claude inference. The default output is a local branch; publication requires \code{open\_pr: true}, and nothing is merged automatically. The baseline scan at \code{e7e095b} reported two PDF binary manual-review flags in the working tree and history, not detected credentials; it is not a safety guarantee.
+
+Agent-written knowledge can be wrong: one downstream seed described a component naming scheme the code had abandoned. Generated knowledge is not marked human-verified, proposals cite evidence, and a person decides whether to merge. Conversations and code are evidence, not instructions to the maintenance agents.
+
+The evaluation uses simulated developers and teammate reviewers, limiting generalization to real teams. The applications are Maybe, Actual Budget, and Linkwarden. Published evidence was generated for this study with personal paths and identities removed.
+
+Runs consume paid inference. We report estimated costs and use prompt-cache sharing and relevance-based specialist selection to limit them.

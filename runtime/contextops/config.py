@@ -8,6 +8,7 @@ from pathlib import Path
 from contextops import frontmatter
 
 RUN_POLICIES = ("always", "when-relevant")
+SCOPES = ("team", "repository")
 
 
 @dataclass
@@ -47,6 +48,9 @@ class OutputSettings:
     runs_dir: Path
     branch: str
     open_pr: bool
+    remote: str = "origin"
+    target_branch: str | None = None
+    forge: str = "auto"
 
 
 @dataclass
@@ -54,6 +58,8 @@ class InitConfig:
     kb_root: Path
     instructions: str
     mode: str | None
+    scope: str
+    application: str | None
     auth: str
     default_model: str
     shared_rules: Path
@@ -78,6 +84,8 @@ def load_config(kb_root: Path) -> InitConfig:
         kb_root=kb_root,
         instructions=body.strip(),
         mode=meta.get("mode"),
+        scope=meta.get("scope", "team"),
+        application=meta.get("application"),
         auth=meta.get("auth", "subscription"),
         default_model=meta.get("model", "sonnet"),
         shared_rules=kb_root / meta.get("shared_rules", "agents/shared-rules.md"),
@@ -92,11 +100,20 @@ def load_config(kb_root: Path) -> InitConfig:
             runs_dir=Path(output.get("runs_dir", "~/.contextops/runs")).expanduser(),
             branch=output.get("branch", "contextops/{strategy}/{run_id}"),
             open_pr=output.get("open_pr", False),
+            remote=output.get("remote", "origin"),
+            target_branch=output.get("target_branch"),
+            forge=output.get("forge", "auto"),
         ),
     )
 
     if not config.workers:
         raise ValueError("init.md lists no workers")
+    if config.output.forge not in ("auto", "github", "gitlab", "none"):
+        raise ValueError("init.md: output.forge must be auto, github, gitlab, or none")
+    if config.scope not in SCOPES:
+        raise ValueError("init.md: scope must be team or repository")
+    if config.application is not None and not _valid_name(config.application):
+        raise ValueError("init.md: application must be a lowercase name such as my-app")
     if config.auth not in ("subscription", "api-key"):
         raise ValueError(f"init.md: unknown auth '{config.auth}'")
     if config.conversation.source != "claude-code":
@@ -114,6 +131,11 @@ def load_config(kb_root: Path) -> InitConfig:
         if path and (not path.is_file() or not path.resolve().is_relative_to(kb_root.resolve())):
             raise ValueError("init.md: agent definitions must exist inside the knowledge checkout")
     return config
+
+
+def _valid_name(name: str) -> bool:
+    import re
+    return bool(re.fullmatch(r"[a-z0-9][a-z0-9._-]*", str(name)))
 
 
 def _worker(kb_root: Path, raw: dict) -> WorkerEntry:

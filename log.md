@@ -1,5 +1,27 @@
 # Knowledge Change History
 
+## 2026-11-15: Put a digest of the knowledge in every session
+
+- In persona-driven development on four maintained knowledge bases, agents always read `index.md` but opened only the documents they guessed were relevant. When a needed entry sat in a document they did not open, it had no effect. `attach` now registers `contextops refresh --digest` at session start; it prints one line per entry, and Claude Code adds that to the session's context.
+
+## 2026-11-15: Keep only what the code does not show
+
+- Run notes in `init.md` now state what the knowledge keeps: operational procedures, tool and service usage, security rules, rejected approaches, replaced decisions, cross-repository contracts, and team terms. UI and styling conventions, patterns the code already shows, and task-specific instructions are left out with NO_CHANGE. Teams edit the list in `init.md`.
+- Team scope is the recommended setup; repository scope remains for a single application.
+
+## 2026-11-15: Attach applications and open review requests from pushes
+
+- The knowledge repository can serve a team's applications (`scope: team`) or one application (`scope: repository`, optionally bound with `application`). Specialists get a scope instruction for each mode; team runs leave other applications' entries alone.
+- `contextops attach` connects an application checkout. Its Claude Code sessions read the knowledge through a `CLAUDE.local.md` pointer and local read permission, and refresh the knowledge checkout at session start. Its pushes start maintenance through the pre-push hook. Only untracked, excluded files change in the application.
+- Push-triggered runs select the sessions active since the last run, so no session IDs need configuring. With `open_pr: true`, the result branch is pushed and a GitHub pull request or GitLab merge request is opened for review. Nothing is merged automatically.
+
+## 2026-11-14: Deliver handoffs, keep partly supported records, state the ID format
+
+- The live first-run acceptance lost a supported `[AI]` commit convention: one of its three locators pointed at `diff/commits.txt`, and review rejected the whole record. Review now drops only unresolvable locators, rejects a record only when none resolve, and accepts `diff/commits.txt`.
+- Handoffs between parallel specialists were reported but never acted on. Each receiver now gets one extra turn on a fork of its own session with the handoffs it received; `handoffs.json` records the pass.
+- The writer produced both `STACK-001` and `PIT001`. Run notes and empty templates now state the format: prefix, hyphen, three digits.
+- Without the application's name, one run scoped its facts as `app:actual-budget`, `app:desktop-client`, and `app:sync-server`. Specialists are now told to use `app:<checkout folder name>`.
+
 ## 2026-11-05: Run maintenance agents without MCP servers; list sessions
 
 - A live A run showed forks reading the inherited history from the prompt cache on their first call and re-writing all of it on the second. Claude.ai connectors tied to the login were attached to every agent and connected asynchronously, which changed the tool list between calls. Maintenance agents now run with no MCP servers (`strict_mcp_config`, connectors disabled). After the change, every fork call read the full inherited history from the cache.

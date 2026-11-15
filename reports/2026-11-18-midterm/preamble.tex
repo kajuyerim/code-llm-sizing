@@ -1,0 +1,49 @@
+% Layout is provided by the unchanged official FBE thesis style.
+% Project-specific packages and macros are limited to content requirements.
+\usepackage{styles/fbe_tez}
+\usepackage[utf8x]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amsthm,amssymb}
+\usepackage[bottom]{footmisc}
+\usepackage{cite}
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage{longtable}
+\usepackage{float}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc,backgrounds}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{listings}
+\usepackage[hidelinks]{hyperref}
+
+\newcommand{\code}[1]{\texttt{#1}}
+% Allow compact results tables to wrap within the template's text width.
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\setlength{\emergencystretch}{2em}
+\definecolor{inkA}{HTML}{1F4E79}
+\definecolor{inkB}{HTML}{8A5A00}
+\definecolor{inkN}{HTML}{6B6B6B}
+\definecolor{boxfill}{HTML}{F3F6FA}
+\tikzset{
+  box/.style={draw, rounded corners=2pt, fill=boxfill, align=center, font=\small, inner sep=5pt},
+  plain/.style={draw, align=center, font=\small, inner sep=5pt},
+  arr/.style={-{Stealth[length=2.2mm]}, thick},
+  note/.style={font=\footnotesize, align=center, text=inkN},
+}
+\lstset{basicstyle=\ttfamily\footnotesize, breaklines=true, columns=fullflexible, frame=single,
+  framesep=4pt, xleftmargin=6pt, xrightmargin=6pt}
+
+% Plain TeX input keeps generated rows valid between alignment rules.
+\makeatletter\newcommand{\inputrows}[1]{\@@input #1 }\makeatother
+
+% Accommodate two-digit section numbers in the official contents layout.
+\makeatletter
+\renewcommand*\l@section{\@dottedtocline{1}{1.5em}{2.2em}}
+\makeatother

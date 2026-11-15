@@ -1,0 +1,80 @@
+\chapter{REQUIREMENTS SPECIFICATION}
+
+\section{Actors}
+
+\begin{itemize}[nosep]
+  \item \textbf{Developer}: develops an application with a coding agent and later reviews knowledge changes.
+  \item \textbf{Development agent}: Claude Code working in the application; it reads the knowledge through the pointer written by \code{attach}.
+  \item \textbf{Reviewer}: a teammate who reviews any proposed knowledge change and may merge it after review; remote publication is optional and disabled by default.
+  \item \textbf{Setup agent}: any coding agent that follows the setup skill on the developer's behalf.
+  \item \textbf{Maintenance agents}: sweeper, specialists, cartographer, and writer inside a run.
+  \item \textbf{Researcher}: runs the evaluation harness and compares strategies.
+\end{itemize}
+
+\section{Use Cases}
+
+Figure~\ref{fig:usecases} shows the main use cases.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  actor/.style={align=center, font=\small},
+  uc/.style={draw, ellipse, align=center, font=\footnotesize, minimum width=4.2cm, minimum height=0.9cm, fill=boxfill},
+  link/.style={thin}]
+  \node[draw, thick, rounded corners=3pt, minimum width=7.4cm, minimum height=13.4cm, label={[font=\small\bfseries]above:Context Ops}] (sys) at (0,-0.55) {};
+  \node[uc] (u1) at (0,5.5) {Initialize empty knowledge};
+  \node[uc] (u10) at (0,4.4) {Attach an application};
+  \node[uc] (u2) at (0,3.3) {Select range and sessions};
+  \node[uc] (u3) at (0,2.2) {Run maintenance (A or B)};
+  \node[uc] (u4) at (0,1.1) {Review report and patch};
+  \node[uc] (u11) at (0,0.0) {Review and merge request};
+  \node[uc] (u5) at (0,-1.1) {Adopt or discard branch};
+  \node[uc] (u6) at (0,-2.2) {Read knowledge during a task};
+  \node[uc] (u7) at (0,-3.3) {Export or import a session};
+  \node[uc] (u8) at (0,-4.4) {Compare strategies on frozen inputs};
+  \node[uc] (u9) at (0,-5.5) {Propose new document or tool folder};
+  \node[actor] (dev) at (-5.6,2.6) {\Large$\bigcirc$\\[-2pt]\textbf{|}\\[-4pt]Developer};
+  \node[actor] (setup) at (-5.6,-1.6) {\Large$\bigcirc$\\[-2pt]\textbf{|}\\[-4pt]Setup agent};
+  \node[actor] (devag) at (5.6,1.6) {\Large$\bigcirc$\\[-2pt]\textbf{|}\\[-4pt]Development\\agent};
+  \node[actor] (rev) at (5.6,-1.0) {\Large$\bigcirc$\\[-2pt]\textbf{|}\\[-4pt]Reviewer};
+  \node[actor] (maint) at (5.6,-3.6) {\Large$\bigcirc$\\[-2pt]\textbf{|}\\[-4pt]Maintenance\\agents};
+  \node[actor] (res) at (-5.6,-4.6) {\Large$\bigcirc$\\[-2pt]\textbf{|}\\[-4pt]Researcher};
+  \foreach \u in {u2,u4,u5,u7,u10} \draw[link] (dev) -- (\u.west);
+  \foreach \u in {u1,u2,u3,u7,u10} \draw[link] (setup) -- (\u.west);
+  \draw[link] (devag) -- (u6.east);
+  \draw[link] (rev) -- (u11.east);
+  \foreach \u in {u3,u9} \draw[link] (maint) -- (\u.east);
+  \foreach \u in {u3,u8} \draw[link] (res) -- (\u.west);
+\end{tikzpicture}
+\caption{Use case diagram.}
+\label{fig:usecases}
+\end{figure}
+
+\section{Functional Requirements}
+
+\begin{enumerate}[label=FR\arabic*., leftmargin=3em, nosep]
+  \item The system shall prepare an empty knowledge baseline on a new local branch without model calls and without destroying existing knowledge or history.
+  \item The system shall list the Claude Code sessions recorded for an application and require an explicit selection of sessions, base, head, and strategy for every run.
+  \item The system shall freeze and hash the selected evidence so that different strategies and repeated runs read identical inputs.
+  \item The system shall run strategy A or B on request, with the same roles, rules, tools, and evidence.
+  \item The system shall select tool specialists from the relevance hints of tool folders.
+  \item Every proposal shall be a structured change record with at least one resolvable evidence locator, except NO\_CHANGE.
+  \item The system shall reject records whose locators do not resolve and defer records whose support is unclear.
+  \item Only the writer shall edit knowledge, and only Markdown under \code{core/} and \code{tools/} plus \code{index.md} and \code{log.md}.
+  \item The system shall write accepted changes to a new local branch and report the actual changed files, the patch, cost, and timing.
+  \item The system shall export a session in a shareable form (local paths replaced, thinking and tool results removed) and import it for another checkout.
+  \item The system shall support a knowledge repository shared by a team's applications or bound to one application, and scope facts accordingly.
+  \item The system shall connect an application so that its coding-agent sessions read the current knowledge, without changing tracked application files.
+  \item A configured pre-push hook shall capture the refs being pushed and prepare maintenance on that range and selected sessions. Refresh currently calls \code{git fetch} synchronously without a timeout, so nonblocking behavior is not guaranteed. Remote publication requires \code{open\_pr: true}; the default output is local.
+\end{enumerate}
+
+\section{Non-Functional Requirements}
+
+\begin{enumerate}[label=NFR\arabic*., leftmargin=3.5em, nosep]
+  \item \textbf{Privacy}: orchestration and run artifacts are local by default. Selected source, diff, and conversation evidence is sent to hosted Claude inference. Remote publication requires \code{open\_pr: true}; nothing is merged automatically.
+  \item \textbf{Reviewability}: every fact is traceable to evidence; generated knowledge is never marked human-verified.
+  \item \textbf{Cost}: per-agent and per-run budgets; a five-task push should cost less than \$2 with Sonnet-class models.
+  \item \textbf{Reproducibility}: deterministic tests run without credentials or model calls; documented first run works from a clean clone.
+  \item \textbf{Portability}: Python 3.11 or newer on macOS or Linux; Git; a Claude login or API key.
+  \item \textbf{Robustness}: a failure in one specialist does not corrupt the knowledge repository; a failed writer produces no commit.
+\end{enumerate}

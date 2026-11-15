@@ -12,16 +12,37 @@ from datetime import datetime
 from contextops import gitutil
 from contextops.run import create_run
 
-HOOK = """#!/bin/sh
-# Installed by contextops. Sweeps the pushed work in the background; never blocks the push.
-"{python}" -m contextops hook "$@" || true
-exit 0
-"""
+from contextops.attach import HOOK
 
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="contextops")
     commands = parser.add_subparsers(dest="command", required=True)
+
+    initialize = commands.add_parser("init", help="prepare empty knowledge on a new local branch")
+    initialize.add_argument("--kb", type=Path, required=True)
+    initialize.add_argument("--branch", required=True)
+    initialize.add_argument("--scope", choices=["team", "repository"],
+                            help="team: shared by a team's applications; repository: one application")
+    initialize.add_argument("--application", help="with --scope repository, the application's name")
+
+    attach = commands.add_parser("attach", help="connect an application so its coding agent reads this knowledge "
+                                 "and its pushes start maintenance")
+    attach.add_argument("--repo", type=Path, default=Path.cwd(), help="the application checkout")
+    attach.add_argument("--kb", type=Path, required=True, help="the knowledge checkout")
+    attach.add_argument("--strategy", choices=["fresh-specialists", "sweeper-first"],
+                        help="strategy for push-triggered runs (required unless --no-hook)")
+    attach.add_argument("--name", help="application name used in scopes; defaults to the folder name")
+    attach.add_argument("--no-hook", action="store_true", help="only wire reading, no push-triggered maintenance")
+    attach.add_argument("--no-refresh", action="store_true", help="do not fast-forward knowledge at session start")
+    attach.add_argument("--no-digest", action="store_true", help="do not add a digest of the entries at session start")
+    attach.add_argument("--force", action="store_true", help="replace an existing pre-push hook")
+
+    refresh = commands.add_parser("refresh", help="fast-forward a clean knowledge checkout to its upstream")
+    refresh.add_argument("--kb", type=Path, required=True)
+    refresh.add_argument("--verbose", action="store_true")
+    refresh.add_argument("--no-fetch", action="store_true", help="only print the digest")
+    refresh.add_argument("--digest", action="store_true", help="print a digest of the entries (session-start context)")
 
     install = commands.add_parser("install", help="install the pre-push hook in an application repo")
     install.add_argument("--kb", type=Path, required=True, help="path to the knowledge base checkout")
@@ -39,6 +60,15 @@ def main(argv: list[str] | None = None) -> None:
     sessions.add_argument("--repo", type=Path, default=Path.cwd())
     sessions.add_argument("--limit", type=int, default=20)
 
+    export = commands.add_parser("export-session", help="write a shareable copy of one session, with local paths replaced")
+    export.add_argument("--repo", type=Path, default=Path.cwd())
+    export.add_argument("--session", required=True)
+    export.add_argument("--out", type=Path, required=True)
+
+    imp = commands.add_parser("import-session", help="install exported sessions for an application checkout")
+    imp.add_argument("--repo", type=Path, default=Path.cwd())
+    imp.add_argument("files", type=Path, nargs="+")
+
     sweep = commands.add_parser("sweep", help="sweep a commit range by hand, without pushing")
     sweep.add_argument("--base", required=True)
     sweep.add_argument("--head", default="HEAD")
@@ -49,7 +79,8 @@ def main(argv: list[str] | None = None) -> None:
     sweep.add_argument("--cutoff", type=_cutoff, help="ISO 8601 timestamp with timezone; defaults to now")
 
     args = parser.parse_args(argv)
-    handlers = {"install": _install, "hook": _hook, "run": _run, "sweep": _sweep, "sessions": _sessions}
+    handlers = {"init": _init, "attach": _attach, "refresh": _refresh, "install": _install, "hook": _hook, "run": _run, "sweep": _sweep, "sessions": _sessions,
+                "export-session": _export_session, "import-session": _import_session}
     try:
         handlers[args.command](args)
     except (ValueError, FileNotFoundError, subprocess.CalledProcessError) as exc:
@@ -66,6 +97,42 @@ def _cutoff(value: str) -> datetime:
         return stamp
     except ValueError:
         raise argparse.ArgumentTypeError("cutoff must be ISO 8601 with a timezone") from None
+
+
+def _init(args: argparse.Namespace) -> None:
+    from contextops.onboarding import initialize_knowledge
+
+    changed = initialize_knowledge(args.kb, args.branch, args.scope, args.application)
+    print(f"Prepared empty knowledge on {args.branch} (no model calls)."
+          + (f" Scope: {args.scope}." if args.scope else ""))
+    print("Files reset:\n" + "\n".join(f"  {name}" for name in changed))
+    print("Review init.md, configure your run, and commit the baseline before sweeping.")
+    print("For subsequent runs, reuse the accepted knowledge branch without running init again.")
+
+
+def _attach(args: argparse.Namespace) -> None:
+    from contextops.attach import attach
+
+    done = attach(args.repo, args.kb, args.strategy, args.name, hook=not args.no_hook,
+                  refresh=not args.no_refresh, force=args.force, digest=not args.no_digest)
+    print("Attached:\n" + "\n".join(f"  {item}" for item in done))
+    print("These files are local to this checkout and excluded from Git. New Claude Code sessions in the "
+          "application read the knowledge; pushes start maintenance in the background when a hook is installed.")
+
+
+def _refresh(args: argparse.Namespace) -> None:
+    from contextops.attach import digest, refresh
+
+    if not args.no_fetch:
+        message = refresh(args.kb)
+        # Session-start output becomes agent context, so mention only real problems.
+        quiet = message.startswith(("knowledge checkout at", "knowledge checkout has no upstream"))
+        if args.verbose or not quiet:
+            print(f"contextops: {message}")
+    if args.digest:
+        text = digest(args.kb)
+        if text:
+            print(text)
 
 
 def _install(args: argparse.Namespace) -> None:
@@ -85,10 +152,18 @@ def _install(args: argparse.Namespace) -> None:
 
 
 def _hook(args: argparse.Namespace) -> None:
+    from contextops.attach import refresh
+
     app = gitutil.repo_root(Path.cwd())
     kb = gitutil.config_get(app, "contextops.kb")
     if not kb or Path(kb).resolve() == app.resolve():
         return  # not configured, or a push of the knowledge base itself
+    strategy = gitutil.config_get(app, "contextops.strategy")
+    selected = gitutil.config_get(app, "contextops.sessions")
+    # Start from the latest merged knowledge so the review request applies cleanly.
+    note = refresh(Path(kb))
+    if not note.startswith("knowledge checkout at"):
+        print(f"contextops: {note}", file=sys.stderr)
 
     # git sends one line per ref: <local ref> <local sha> <remote ref> <remote sha>
     for line in sys.stdin:
@@ -97,10 +172,9 @@ def _hook(args: argparse.Namespace) -> None:
             continue  # malformed, or a branch deletion
         local_ref, local_sha, _, remote_sha = fields
         try:
-            # Explicit selection is required even for this experimental adapter.
-            selected = gitutil.config_get(app, "contextops.sessions")
-            ctx = create_run(app, Path(kb), args.remote, local_ref, local_sha, remote_sha,
-                             sessions=selected.split() if selected else None)
+            # Pinned sessions win; otherwise every session active since the last run is evidence.
+            ctx = create_run(app, Path(kb), args.remote, local_ref, local_sha, remote_sha, strategy=strategy,
+                             sessions=selected.split() if selected else None, auto_select=not selected)
         except Exception as exc:  # the push must go through whatever happens here
             print(f"contextops: skipped ({exc})", file=sys.stderr)
             continue
@@ -114,7 +188,7 @@ def _run(args: argparse.Namespace) -> None:
     # Imported here so the hook path stays fast and does not load the Agent SDK.
     from contextops.orchestrator import orchestrate
 
-    print(asyncio.run(orchestrate(args.run_dir.expanduser())))
+    _execute(args.run_dir.expanduser(), orchestrate)
 
 
 def _sessions(args: argparse.Namespace) -> None:
@@ -130,6 +204,25 @@ def _sessions(args: argparse.Namespace) -> None:
     print(f"\nPass the ones you want as --session ID (repeat for several). {len(found)} session(s) found.")
 
 
+def _export_session(args: argparse.Namespace) -> None:
+    from contextops import transcripts
+
+    app = gitutil.repo_root(args.repo).resolve()
+    lines = transcripts.export_session(app, args.session)
+    args.out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"Wrote {len(lines)} records to {args.out}. Thinking and tool results were dropped and local paths "
+          "replaced; message text is unchanged, so review it before sharing.")
+
+
+def _import_session(args: argparse.Namespace) -> None:
+    from contextops import transcripts
+
+    app = gitutil.repo_root(args.repo).resolve()
+    for source in args.files:
+        target = transcripts.import_session(source, app)
+        print(f"{target.stem}  ->  {target}")
+
+
 def _sweep(args: argparse.Namespace) -> None:
     from contextops.orchestrator import orchestrate
 
@@ -143,7 +236,13 @@ def _sweep(args: argparse.Namespace) -> None:
     )
     if ctx is None:
         sys.exit("Nothing to sweep: base and head are the same commit.")
-    print(asyncio.run(orchestrate(ctx.run_dir)))
+    _execute(ctx.run_dir, orchestrate)
+
+
+def _execute(run_dir: Path, orchestrate) -> None:
+    print(f"Run artifacts: {run_dir}", flush=True)
+    asyncio.run(orchestrate(run_dir))
+    print((run_dir / "completion.txt").read_text(encoding="utf-8"), end="")
 
 
 def _spawn(run_dir: Path) -> None:
