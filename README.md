@@ -7,15 +7,21 @@ Context Ops is a CMPE 492 senior project at Boğaziçi University studying how a
 Clone this repository into a directory separate from your application, then open the clone in your coding agent:
 
 ```sh
-git clone https://github.com/kajuyerim/code-llm-sizing.git
+git clone --branch feat/team-knowledge-loop https://github.com/kajuyerim/code-llm-sizing.git
 cd code-llm-sizing
 ```
 
-You need **Python 3.11+, Git, private Claude authentication, and an existing application with committed development changes and local Claude Code development sessions**. Your setup agent can be any coding agent; maintenance currently uses the Claude backend and Claude Code history. Inference runs on the configured Claude service.
+This selects the branch containing the work under review. After it is merged, use the default branch instead. A remote clone includes only pushed commits.
+
+You need **Python 3.11+, Git, and an existing application with committed development changes and local Claude Code development sessions**. Running maintenance also requires **private Claude authentication**; installation, software tests, and preparation need no model calls. Your setup agent can be any coding agent; maintenance currently uses the Claude backend and Claude Code history. Inference runs on the configured Claude service.
 
 Give your agent this prompt:
 
 > Read this repository’s README and setup skill. Configure Context Ops for my existing application, prepare an empty knowledge branch, run the sweeper-first workflow using my relevant Claude Code development sessions, and show me the resulting knowledge changes. Ask for missing inputs and keep the result local for review.
+
+For preparation only, use this alternative:
+
+> Read this repository’s README and setup skill. Configure Context Ops for my existing application, prepare and commit an empty knowledge baseline, and select the committed range and relevant Claude Code sessions. Ask for missing inputs and show me the command to run next. Stop before inference, hook installation, or publication; keep everything local for review.
 
 The [setup skill](skills/setup-shared-knowledge/SKILL.md) is the authoritative procedure. It helps your agent select the application, committed range and sessions, prepare blank knowledge on a new local branch, configure and commit the baseline, and run **A, sweeper first**. The setup agent invokes Context Ops; the maintenance runtime writes learned knowledge. Existing installations reuse their accepted knowledge rather than resetting it.
 
@@ -27,7 +33,7 @@ Follow [setup](setup.md) for the equivalent manual commands, authentication deta
 
 For an explanation of the system, read [How Our Knowledge Maintenance System Works](docs/walkthrough/README.md), or download the [interactive walkthrough](docs/walkthrough/index.html) and open it locally. These are historical evaluation evidence. The first-run path has credential-free software checks and recorded [live acceptance runs](docs/first-run-acceptance.md#live-acceptance-record-2-14-november-2026-b20f3f9). The final recorded acceptance revision predates the current team-scope and admission-policy changes.
 
-To try the whole path without an application of your own, follow the [first-run demo](docs/demo/README.md). It rebuilds a public Actual Budget checkout, installs six shared development sessions, and turns empty knowledge into a populated local branch for about $1.
+Without an application of your own, follow the [first-run demo](docs/demo/README.md). It reconstructs a public Actual Budget checkout, imports six simulated development sessions into isolated history, and prepares frozen evidence without authentication or inference. You can inspect the recorded fifteen-entry result from revision `b20f3f9`; that is historical output, not newly generated knowledge. A fresh maintenance run requires your own Claude access, and its cost and output can differ. [Current preparation is verified](docs/demo/verification.md); fresh live acceptance on the current policy remains pending.
 
 ## Day-to-day use by a team
 
