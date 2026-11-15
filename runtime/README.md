@@ -6,14 +6,16 @@ Start with [setup](../setup.md) for installation and tests without credentials. 
 
 | Command | Purpose |
 | --- | --- |
-| `contextops init --kb PATH --branch knowledge/APP_NAME` | Prepare blank knowledge on a new local branch, without committing or inference. |
+| `contextops init --kb PATH --branch knowledge/APP_NAME [--scope team\|repository] [--application NAME]` | Prepare blank knowledge on a new local branch, without committing or inference. `--scope` sets who the knowledge serves; `--application` binds a repository-scoped knowledge base to one application. |
+| `contextops attach --repo APP --kb PATH --strategy MODE [--name NAME] [--no-hook] [--no-refresh]` | Connect an application checkout: its Claude Code sessions read the knowledge, and its pushes start maintenance. Writes only untracked local files. No model calls. |
+| `contextops refresh --kb PATH` | Fast-forward a clean knowledge checkout to its upstream. Attached applications run it at session start. |
 | `contextops sweep --repo PATH --kb PATH --base REF --head REF --strategy MODE --session ID [--session ID] [--cutoff ISO_TIME]` | Freeze selected evidence and run locally. Real model calls occur. |
 | `contextops sessions --repo PATH [--limit N]` | List the application's Claude Code sessions (ID, last message, opening line) to choose `--session` values. No model calls. |
 | `contextops export-session --repo PATH --session ID --out FILE` | Write a shareable copy of one session: developer and agent messages, text, and tool calls, with the application root and home directory replaced by placeholders. Thinking, tool results, and other records are dropped. Message text is unchanged, so review it before sharing. |
 | `contextops import-session --repo PATH FILE...` | Install exported sessions for another checkout of the application so `sessions` lists them and `--session` can select them. Refuses to overwrite a different session with the same ID. |
 | `contextops run RUN_DIR` | Execute an unattempted prepared run with its recorded inputs. |
-| `contextops install --kb PATH --repo PATH` | Explicitly install the experimental application pre-push hook. |
-| `contextops hook REMOTE [URL]` | Internal experimental hook entry point. |
+| `contextops install --kb PATH --repo PATH` | Install only the pre-push hook (older path; prefer `attach`). |
+| `contextops hook REMOTE [URL]` | Internal pre-push hook entry point. |
 
 The [setup skill](../skills/setup-shared-knowledge/SKILL.md) guides first-run setup. `init` requires a clean checkout and an unused branch, preserves the original branch, resets core/tool knowledge to empty templates while retaining frontmatter, refreshes the index/log, and leaves edits uncommitted. Additional learned Markdown under core/tools is removed on the new branch. Non-Markdown knowledge files and symlinks are rejected. Configure and commit the baseline before sweeping; subsequent runs do not initialize again.
 
@@ -28,6 +30,10 @@ The selected conversation is copied before inference, with a SHA-256 recorded in
 Subscription mode uses the user's private Claude Code authentication and removes `ANTHROPIC_API_KEY` from the runtime process. API-key mode requires that environment variable. No credential value belongs in this repository or its chats, examples, logs, screenshots, or published evidence. No authentication is required for the deterministic tests. Inference uses the configured provider, not a local model.
 
 `output.runs_dir` is the common parent, defaulting to `~/.contextops/runs`. The runtime always appends the strategy and run ID. `output.branch` must include `{strategy}` and `{run_id}`. `open_pr: false` is the default; no remote push occurs unless publication is explicitly enabled. A successful writer can create a local knowledge commit. Generated branches are never merged automatically.
+
+With `open_pr: true`, a committed result branch is pushed to `output.remote` (default `origin`) and a review request is opened against `output.target_branch` (default: the remote's default branch). `output.forge: auto` reads the remote URL: GitHub uses `gh pr create`; GitLab uses `glab mr create` when installed and otherwise Git push options (`merge_request.create`), which need no extra CLI. Other remotes, and `forge: none`, receive the branch only. The report becomes the request body; it lists records and evidence locators, not conversation text. Push and CLI errors are summarized without echoing remote output.
+
+`scope: team` (default) means the knowledge serves a team's applications: facts are scoped `app:<name>`, `company` is reserved for rules developers state for the whole team, and entries about other applications are left alone. `scope: repository` means one application; `application: NAME` makes runs and `attach` refuse any other name. The application name comes from `attach --name`, stored as Git config `contextops.app`, else the checkout folder name.
 
 ## Outputs
 
@@ -46,9 +52,17 @@ Cutoff state and unowned findings live under each strategy's directory. Raw evid
 
 Both `sweep` and `run` print a completion summary with actual changed files, report/patch locations when present, and commands to inspect a committed result branch. Candidate patches are identified as uncommitted; no-change or failed runs do not advertise a result branch. `completion.txt` preserves this summary. The selected checkout branch is unchanged by maintenance. `total_duration_ms` sums agent durations, so measure wall-clock elapsed time separately for acceptance records.
 
-## Experimental pre-push adapter
+## Attached applications and the pre-push hook
 
-The hook source remains available but is not installed or production-verified by setup or tests. It requires an explicit committed `init.md` mode and application `contextops.sessions` configuration containing selected session IDs. It captures refs from Git, prepares evidence, and launches maintenance in the background. Preparation itself can delay the hook; background completion does not gate the push. A knowledge commit created afterward is not part of the original application push. The adapter skips failures and does not turn a missing conversation into a valid run.
+`attach` writes three untracked files in the application and adds them to `.git/info/exclude`:
+
+- `CLAUDE.local.md`: a marked block naming the knowledge checkout and telling the agent to read its `index.md` before a task. If the application relies on `AGENTS.md` without a `CLAUDE.md`, the block imports it, because a `CLAUDE.local.md` otherwise stops Claude Code from reading `AGENTS.md`. Existing personal notes are kept; rerunning replaces only the block.
+- `.claude/settings.local.json`: the knowledge checkout in `permissions.additionalDirectories` (read without prompts) and a `SessionStart` hook that runs `contextops refresh`, so new sessions read merged knowledge. Existing settings are kept.
+- `pre-push` hook: unless `--no-hook`. It refuses to replace another hook without `--force`, and refuses when `core.hooksPath` is set; call `python -m contextops hook "$@"` from your hook manager instead.
+
+The pointer is plain text with an absolute path, not an `@` import, so no external-import approval is needed. It is local to that checkout: Git worktrees need their own `attach`.
+
+On `git push`, the hook fast-forwards the knowledge checkout, then prepares one run per pushed ref: the pushed range, the strategy chosen at `attach`, and every Claude Code session in this application with a message since the last run for it (or since the pushed base commit). `contextops.sessions` in the application's Git config pins sessions instead. Preparation happens inside the hook; the run continues in the background and never blocks or fails the push. No session, an unchanged range, or a dirty knowledge checkout skips the run with a one-line message. A knowledge commit created afterward is not part of the application push.
 
 ## Known limits
 
@@ -56,7 +70,7 @@ The hook source remains available but is not installed or production-verified by
 - Relevance uses globs and keywords; unknown usage paths may require human updates to hints.
 - Cost estimates are not billing. Concurrent calls and the writer can exceed the aggregate scheduling threshold.
 - Reports include agent claims; deterministic locator checks do not prove semantic correctness. Review actual document changes.
-- Tests exercise fake calls, permissions, and SDK option construction. They do not prove live provider behavior. No experiments were rerun for this integration.
+- Tests exercise fake calls, permissions, SDK option construction, Git remotes, and fake `gh`/GitLab push options. They do not prove live provider or forge behavior.
 - The separate historical GPT adapter is future Codex-backend work. It is not installed by this package.
 
 ## A session lineage and accounting

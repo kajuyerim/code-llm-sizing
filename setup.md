@@ -26,7 +26,7 @@ python runtime/check_docs.py
 python runtime/check_public.py --history
 ```
 
-Tests use fake responses and disposable repositories outside this checkout. They do not read your Claude history, authenticate, call a model, push, or install hooks. They verify software behavior, not live model quality. The [live acceptance record](docs/first-run-acceptance.md) remains pending until a separately authorized clean-clone run is completed.
+Tests use fake responses and disposable repositories outside this checkout. They do not read your Claude history, authenticate, call a model, push to a real remote, or install hooks outside their temporary repositories. They verify software behavior, not live model quality. See the [live acceptance records](docs/first-run-acceptance.md).
 
 ## 3. Choose your development evidence
 
@@ -122,6 +122,27 @@ A run with no relevant knowledge changes is valid. Deferred findings require rev
 
 For your next maintenance run, use the accepted knowledge branch as the baseline and select the next committed development range and appropriate sessions. Generated knowledge remains subject to human review. Raw runs are private local artifacts; sharing them requires deliberate selection and sanitization.
 
+## 8. Use it day to day: attach your application
+
+After the first run, a team usually keeps one shared knowledge repository on GitHub or GitLab, and every developer clones it next to their applications. Choose the scope once, when you initialize:
+
+- **Team knowledge** (`contextops init --scope team ...`, the default): several applications share one repository. Facts are scoped to the application they came from; team-wide (`company`) entries need a developer saying so.
+- **Repository knowledge** (`contextops init --scope repository --application my-app ...`): the repository serves one application, and runs for any other application are refused.
+
+Commit the initialized baseline, set `open_pr: true` in `init.md` if pushes should open review requests, and push the branch your team will treat as the accepted knowledge (for example `main`). Each developer then clones it, installs the runtime as in step 1, and connects each application:
+
+```sh
+contextops attach --repo /path/to/application --kb /path/to/code-llm-sizing --strategy sweeper-first
+```
+
+From then on:
+
+1. **Reading.** Every new Claude Code session in the application is told where the knowledge is and reads its `index.md` before a task. At session start the knowledge checkout is fast-forwarded to the merged branch.
+2. **Maintenance.** `git push` in the application starts a background run on the pushed commits and the sessions active since the last run.
+3. **Review.** With `open_pr: true`, the run pushes its result branch and opens a pull request (GitHub, through `gh`) or merge request (GitLab, through `glab` or push options). A teammate reviews and merges it; the next session reads the merged knowledge.
+
+`attach` changes only untracked files that it excludes from Git (`CLAUDE.local.md`, `.claude/settings.local.json`, and the pre-push hook); see the [runtime guide](runtime/README.md#attached-applications-and-the-pre-push-hook) for details, worktrees, and hook managers. Use `--no-hook` for read-only use, and keep the knowledge checkout clean: local edits there skip push-triggered runs.
+
 ## Optional B from the same baseline
 
 B is available with `--strategy fresh-specialists`. For an independent A/B comparison, use the same original knowledge baseline, source commits, selected sessions, cutoff, model and budgets. Do not switch to A's result before preparing B.
@@ -158,4 +179,4 @@ Execute the final command only if preparation succeeded. B receives raw evidence
 - **Authentication/model failure:** resolve private login or model availability, retain failed artifacts, and create a new run only when ready. Do not loop retries automatically.
 - **No result branch:** read the outcome and failures; no-change, deferred, budget-limited, and failed-writer runs may correctly have no branch.
 
-Existing integrations can be preserved. A new subtree integration or application-instruction edit is a separate setup choice. The pre-push adapter remains experimental and is not installed by these steps; see the [runtime guide](runtime/README.md).
+Existing integrations can be preserved. `attach` (step 8) is a separate, explicit choice; the first-run steps install no hook. See the [runtime guide](runtime/README.md).

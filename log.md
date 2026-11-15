@@ -1,5 +1,11 @@
 # Knowledge Change History
 
+## 2026-11-15: Attach applications and open review requests from pushes
+
+- The knowledge repository can serve a team's applications (`scope: team`) or one application (`scope: repository`, optionally bound with `application`). Specialists get a scope instruction for each mode; team runs leave other applications' entries alone.
+- `contextops attach` connects an application checkout. Its Claude Code sessions read the knowledge through a `CLAUDE.local.md` pointer and local read permission, and refresh the knowledge checkout at session start. Its pushes start maintenance through the pre-push hook. Only untracked, excluded files change in the application.
+- Push-triggered runs select the sessions active since the last run, so no session IDs need configuring. With `open_pr: true`, the result branch is pushed and a GitHub pull request or GitLab merge request is opened for review. Nothing is merged automatically.
+
 ## 2026-11-14: Deliver handoffs, keep partly supported records, state the ID format
 
 - The live first-run acceptance lost a supported `[AI]` commit convention: one of its three locators pointed at `diff/commits.txt`, and review rejected the whole record. Review now drops only unresolvable locators, rejects a record only when none resolve, and accepts `diff/commits.txt`.

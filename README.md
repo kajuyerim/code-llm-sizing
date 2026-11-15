@@ -29,6 +29,16 @@ For an explanation of the system, read [How Our Knowledge Maintenance System Wor
 
 To try the whole path without an application of your own, follow the [first-run demo](docs/demo/README.md). It rebuilds a public Actual Budget checkout, installs six shared development sessions, and turns empty knowledge into a populated local branch for about $1.
 
+## Day-to-day use by a team
+
+The knowledge repository stays a Git repository. It can hold one team's shared knowledge across several applications (`scope: team`) or one application's (`scope: repository`). Developers clone it beside their applications and run `contextops attach` once per application. After that:
+
+- Claude Code sessions in the application read the knowledge before a task, and the knowledge checkout is refreshed at session start.
+- `git push` in the application starts maintenance in the background on the pushed commits and recent sessions.
+- The run opens a pull request (GitHub) or merge request (GitLab) on the knowledge repository. A person reviews and merges it.
+
+See [setup, step 8](setup.md#8-use-it-day-to-day-attach-your-application).
+
 ## Two ways to acquire context
 
 | Strategy | How specialists start |

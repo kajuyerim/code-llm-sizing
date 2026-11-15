@@ -33,7 +33,7 @@ Use `contextops sweep` with explicit application/knowledge paths, immutable base
 
 A request to set up **and run** includes the selected local maintenance execution; do not ask for the same permission again. If the request was setup-only, finish configuration and provide the command without inference. Authentication happens privately through the user's Claude installation, never by asking for credentials in chat or writing them into the bundle. Resolve missing authentication before running; do not retry model failures in a loop.
 
-No hook, subtree integration, application-instruction edit, remote push, merge, or PR is part of this first-run procedure. New external publication requires the user's request. Maintenance creates a local result branch for review and leaves the starting checkout branch selected.
+No hook, subtree integration, application-instruction edit, remote push, merge, or PR is part of this first-run procedure. New external publication requires the user's request. When the user asks for day-to-day use, follow setup step 8: confirm the scope (team or repository), then run `contextops attach` for each application they name, and enable `open_pr` only when they want pushes to open review requests. Maintenance creates a local result branch for review and leaves the starting checkout branch selected.
 
 ## Review the real result
 

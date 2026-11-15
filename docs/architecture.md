@@ -38,6 +38,10 @@ Specialists run in parallel, so a finding one of them hands to another document'
 
 Review checks every evidence locator. A locator that does not resolve is dropped and reported with the record; a record is rejected only when none of its locators resolve. `diff/commits.txt` is valid diff evidence for commit messages.
 
+## Deployment loop
+
+The knowledge repository is shared through an ordinary Git remote. `scope: team` serves a team's applications and `scope: repository` serves one; the scope reaches every specialist as an instruction and fixes how facts are scoped. `contextops attach` connects an application checkout in both directions: its coding-agent sessions read the knowledge (a `CLAUDE.local.md` pointer, local read permission, and a session-start refresh), and its pre-push hook prepares a run from the pushed range and the sessions active since the last run. The writer's branch is pushed and opened as a pull or merge request; merging stays a human decision. The next session reads the merged knowledge, so application development and knowledge maintenance stay separate processes connected only through reviewed Git changes.
+
 ## Writing and boundaries
 
 Specialists have Read/Grep/Glob capabilities. Only the writer has Edit/Write. SDK pre-tool checks resolve paths and restrict evidence reads; writes are limited to Markdown beneath `core/` and `tools/`, plus exact `index.md` and `log.md`. Traversal, escaping symlinks, repository internals, and credential files are excluded. Grep content searches require a specific permitted file after Glob discovery, so recursive search cannot bypass filename restrictions. Deterministic checks and post-write inspection provide additional checks, not a claim of operating-system sandbox isolation.
@@ -48,4 +52,4 @@ The writer preserves existing frontmatter. Structural expansion and relevance-hi
 
 ## Limits
 
-Conversation parsing depends on Claude Code's internal format. Tool results and thinking are omitted, retained messages can be truncated, and unavailable history cannot be reconstructed. Optional auto-memory is disabled by default. Cost limits are estimates and a concurrent run can exceed its aggregate threshold. The pre-push adapter is experimental; local pilots do not establish production hook behavior. See [evaluation](evaluation.md) for the historical results and [runtime operations](../runtime/README.md) for the public interface.
+Conversation parsing depends on Claude Code's internal format. Tool results and thinking are omitted, retained messages can be truncated, and unavailable history cannot be reconstructed. Optional auto-memory is disabled by default. Cost limits are estimates and a concurrent run can exceed its aggregate threshold. The pre-push path and review requests are tested with local remotes and fake forge CLIs; the feature-sequence experiment ran them against local bare remotes, not a hosted forge. See [evaluation](evaluation.md) for the historical results and [runtime operations](../runtime/README.md) for the public interface.
