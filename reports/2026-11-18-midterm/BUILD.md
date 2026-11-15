@@ -9,15 +9,19 @@ Run from this directory with Tectonic installed:
 ```sh
 build_dir="$(mktemp -d)"
 tectonic --untrusted --outdir "$build_dir" main.tex
-# After review, copy only the final PDF into the report directory.
+tectonic --untrusted --outdir "$build_dir" supplement.tex
+# After review, copy only the final PDFs into the report directory.
 cp "$build_dir/main.pdf" context-ops-midterm.pdf
+cp "$build_dir/supplement.pdf" context-ops-supplement.pdf
 ```
 
 The build directory is external and disposable. Tectonic 0.17.0 is the verified build version for this report. Do not add generated TeX auxiliaries, bibliography outputs, or caches to version control. Tectonic resolves the bibliography from `references.bib` with `styles/fbe_tez_v11.bst`.
 
+The main report retains the nine chapters, diagrams, charts, central results, and limitations. The [evidence supplement](context-ops-supplement.pdf) is built independently from `supplement.tex` and the unchanged appendix inputs. Keep both PDFs in the same directory so their relative links work. The summary figure in `figures/development-summary.tex` plots the existing judged counts; it introduces no new analysis.
+
 ## Template source and license
 
-The supplied `report-template-v2.tex` is the project’s CMPE 492 structure reference. Its contents were preserved as nine report chapters, followed by the existing appendices. The report format is based on the official Bogazici University Institute of Graduate Studies in Science and Engineering thesis template, [available from the university template archive](https://mediastore.cc.bogazici.edu.tr/web/userfiles/files/fbe_adv_thesis_template_2022_2.zip), distributed locally as `fbe-template.zip`, SHA-256 `151418be852ac49b6d40571459f61a487c503a91d282a3d795f862726d7d36cd`.
+The supplied `report-template-v2.tex` is the project’s CMPE 492 structure reference. Its contents were preserved as nine report chapters, with the existing appendices retained in a separately linked evidence supplement. The report format is based on the official Bogazici University Institute of Graduate Studies in Science and Engineering thesis template, [available from the university template archive](https://mediastore.cc.bogazici.edu.tr/web/userfiles/files/fbe_adv_thesis_template_2022_2.zip), distributed locally as `fbe-template.zip`, SHA-256 `151418be852ac49b6d40571459f61a487c503a91d282a3d795f862726d7d36cd`.
 
 `styles/fbe_tez.sty` and `styles/fbe_tez_v11.bst` are copied unchanged from that ZIP. The style credits Feza Kerestecioğlu and Mehmet Can Güven and permits distribution of unchanged copies when documentation is included. The bibliography style carries its upstream custom-bib and LaTeX Project Public License notices. This file documents the source and the relevant redistribution terms; the upstream ZIP's `README.txt` is empty. The files are retained byte-for-byte, including their license and attribution headers.
 
