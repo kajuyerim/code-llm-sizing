@@ -126,8 +126,10 @@ For your next maintenance run, use the accepted knowledge branch as the baseline
 
 After the first run, a team usually keeps one shared knowledge repository on GitHub or GitLab, and every developer clones it next to their applications. Choose the scope once, when you initialize:
 
-- **Team knowledge** (`contextops init --scope team ...`, the default): several applications share one repository. Facts are scoped to the application they came from; team-wide (`company`) entries need a developer saying so.
-- **Repository knowledge** (`contextops init --scope repository --application my-app ...`): the repository serves one application, and runs for any other application are refused.
+- **Team knowledge** (`contextops init --scope team ...`, the default and the recommended setup): the team's applications share one repository, so a decision made while working in one repository reaches agents working in another. Facts are scoped to the application they came from; team-wide (`company`) entries need a developer saying so.
+- **Repository knowledge** (`contextops init --scope repository --application my-app ...`): for a single application on its own. Runs for any other application are refused.
+
+Before the first run, read "What this knowledge keeps" in `init.md` and adjust it to your team. It decides what maintenance admits.
 
 Commit the initialized baseline, set `open_pr: true` in `init.md` if pushes should open review requests, and push the branch your team will treat as the accepted knowledge (for example `main`). Each developer then clones it, installs the runtime as in step 1, and connects each application:
 

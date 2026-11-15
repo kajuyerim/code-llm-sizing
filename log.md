@@ -1,5 +1,10 @@
 # Knowledge Change History
 
+## 2026-11-15: Keep only what the code does not show
+
+- Run notes in `init.md` now state what the knowledge keeps: operational procedures, tool and service usage, security rules, rejected approaches, replaced decisions, cross-repository contracts, and team terms. UI and styling conventions, patterns the code already shows, and task-specific instructions are left out with NO_CHANGE. Teams edit the list in `init.md`.
+- Team scope is the recommended setup; repository scope remains for a single application.
+
 ## 2026-11-15: Attach applications and open review requests from pushes
 
 - The knowledge repository can serve a team's applications (`scope: team`) or one application (`scope: repository`, optionally bound with `application`). Specialists get a scope instruction for each mode; team runs leave other applications' entries alone.

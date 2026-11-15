@@ -31,7 +31,7 @@ To try the whole path without an application of your own, follow the [first-run 
 
 ## Day-to-day use by a team
 
-The knowledge repository stays a Git repository. It can hold one team's shared knowledge across several applications (`scope: team`) or one application's (`scope: repository`). Developers clone it beside their applications and run `contextops attach` once per application. After that:
+The knowledge repository is a team's shared Git repository: one place for the decisions that span its applications (`scope: team`, the default). A single application can use it alone with `scope: repository`. It keeps what the code in front of an agent does not show: how the team provisions and deploys, how it uses tools and internal services, security rules, rejected approaches, replaced decisions, and contracts between repositories. UI details and patterns the code already shows stay out; teams tune this list in `init.md`. Developers clone it beside their applications and run `contextops attach` once per application. After that:
 
 - Claude Code sessions in the application read the knowledge before a task, and the knowledge checkout is refreshed at session start.
 - `git push` in the application starts maintenance in the background on the pushed commits and recent sessions.
