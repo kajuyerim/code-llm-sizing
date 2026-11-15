@@ -1,6 +1,6 @@
 # First-run acceptance
 
-Status: implementation and credential-free verification are reviewable. Live acceptance runs on the public [first-run demo](demo/README.md) are recorded below, the latest at revision `b20f3f9`; it used simulated development conversations, so acceptance on a team's own application and sessions is still open.
+Status: historical live acceptance on the public [first-run demo](demo/README.md) is recorded below at `caf4bdb` and `b20f3f9`. These runs used simulated developer conversations and predate the current knowledge-selection policy. They do not verify the latest revision. Credential-free preparation is recorded separately in [demo preparation verification](demo/verification.md); fresh live acceptance on the current revision and on a team's own application remain pending.
 
 ## Software verification
 
@@ -41,7 +41,7 @@ Keep application sources, raw conversations, credentials, and full run directori
 | Wall clock | 10:14:50 to 10:18:49 UTC, 3 min 59 s |
 | Estimated cost | $1.01 (sweeper $0.44, four forks $0.41, writer $0.16) |
 | Outcome | Knowledge committed on `contextops/sweeper-first/20261114-101450-8cece04-3374e54c`; 10 accepted, 0 deferred, 1 rejected |
-| Written documents | `core/terminology.md` (2 entries), `core/tech-stack-standards.md` (3), `core/pitfalls.md` (5), `log.md`; the actual patch is [result.patch](demo/actual/result.patch) |
+| Written documents | `core/terminology.md` (2 entries), `core/tech-stack-standards.md` (3), `core/pitfalls.md` (5), `log.md`; the actual patch is [result-caf4bdb.patch](demo/actual/result-caf4bdb.patch) |
 
 What the run learned matches decisions stated in the sessions: amounts are stored at x100 for every currency, the sync server imports `fetch` from `undici`, report range validation compares normalized dates, snapdom replaced html-to-image, and the quarter key is the quarter's first month.
 
@@ -70,7 +70,7 @@ Same platform, application, range, sessions, cutoff, conversation hash, model, a
 | Wall clock | 20:27:10 to 20:32:08 UTC, 4 min 58 s |
 | Estimated cost | $1.35 (sweeper $0.66, four forks $0.50, writer $0.19) |
 | Outcome | Knowledge committed on `contextops/sweeper-first/20261114-202710-8cece04-ab77e26d`; 15 accepted, 1 deferred, 0 rejected |
-| Written documents | `core/naming-conventions.md` (3 entries), `core/tech-stack-standards.md` (5), `core/pitfalls.md` (5), `core/terminology.md` (2), `log.md`; the actual patch is [result.patch](demo/actual/result.patch) |
+| Written documents | `core/naming-conventions.md` (3 entries), `core/tech-stack-standards.md` (5), `core/pitfalls.md` (5), `core/terminology.md` (2), `log.md`; the actual patch is [result-b20f3f9.patch](demo/actual/result-b20f3f9.patch) |
 
 All fifteen entries use `app:actual` and hyphenated IDs. The naming document now holds the `[AI]` commit prefix, the release note requirement, and one component per file. Two of these records had cited `diff/files.txt`, which is not a diff path. Review dropped that locator and kept the records on their conversation evidence, where record 1's rules would have rejected them.
 
@@ -82,4 +82,15 @@ An intermediate run at `43888a7` exercised the handoff pass:
 
 A strategy B run from the same empty baseline wrote 3 entries for $0.50.
 
-Single runs on simulated sessions; the remaining limitation is acceptance on a team's own application.
+Single runs on simulated sessions. Current-revision live acceptance and acceptance on a team's own application remain open. The later knowledge-selection policy excludes some historical entries, so fifteen entries are not a current acceptance target.
+
+## Historical patch provenance
+
+The first record's patch is restored byte-for-byte from `18e4bab:docs/demo/actual/result.patch`; the second is restored from `98586b9:docs/demo/actual/result.patch`. Those are publication commits, distinct from the implementation revisions named in the records. The legacy `demo/actual/result.patch` remains unchanged as an alias of the second result for existing links.
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `result-caf4bdb.patch` | `a66fb0c682b040531547d0aa6952eaf3e0e19cc3c4bc5272c52418bce2b9d5a5` |
+| `result-b20f3f9.patch` | `336f7bc5538da8c54125a0241dd3197527d3af7664a5780e6727e762e07a8be3` |
+
+These are recorded output patches, not newly generated knowledge. They retain the historical scopes, identifiers and evidence wording, including the first run's known shortcomings.

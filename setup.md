@@ -6,7 +6,15 @@ For agent-guided setup, use the prompt in the [README](README.md#set-up-with-you
 
 ## 1. Install in a clean environment
 
-From the cloned Context Ops repository:
+Until the first-run work is merged into the default branch, clone `feat/team-knowledge-loop` explicitly. After that merge, the default-branch clone is appropriate. Record the resolved implementation revision rather than assuming a branch name is immutable:
+
+```sh
+git clone --branch feat/team-knowledge-loop https://github.com/kajuyerim/code-llm-sizing.git
+cd code-llm-sizing
+git rev-parse HEAD
+```
+
+From that checkout:
 
 ```sh
 python3 -m venv .venv
@@ -48,13 +56,31 @@ python -c 'from datetime import datetime, timezone; print(datetime.now(timezone.
 
 The collector requires local Claude Code JSONL history for this application. Sessions exported with `contextops export-session` can be installed for another checkout with `contextops import-session`; other exports and Codex history are not accepted. Missing or ambiguous sessions fail before inference. Selected sessions include their complete retained history through the cutoff, not just messages newer than the base commit. Tool results and thinking are omitted, sidechains are excluded by default, and truncation is reported. Your setup conversation is not a substitute for the development conversation.
 
-## 4. Prepare a blank knowledge branch
+## 4. Choose scope and prepare a blank knowledge branch
+
+Choose scope before initialization. `team` is the default: one knowledge repository can serve several applications, with application-specific entries kept scoped. Use `repository` for a knowledge repository dedicated to one application.
+
+The runtime uses the application checkout's lowercase folder name as its label unless `contextops.app` is set. Labels accept lowercase ASCII letters, digits, dots, hyphens and underscores, starting with a letter or digit. For a folder containing spaces or other characters, choose a stable label and set it explicitly:
+
+```sh
+git -C /path/to/application config contextops.app my-app
+```
+
+This is local Git configuration, not an application source edit or hook installation. Preserve an existing label unless deliberately changing it. For repository scope, the `--application` value below must match this label.
 
 For a **fresh clone only**, choose a new branch name:
 
 ```sh
 contextops init --kb . --branch knowledge/my-app
 ```
+
+For a single-application destination, use this instead:
+
+```sh
+contextops init --kb . --branch knowledge/my-app --scope repository --application my-app
+```
+
+Choose one initialization command, not both.
 
 This requires a clean checkout. It creates and switches to the new branch, replaces core knowledge with four blank templates, empties tool entry points while retaining frontmatter/relevance hints, removes additional learned Markdown in core/tools, and refreshes the index/log. Runtime, roles, maintenance guides, skills, and historical research documents are retained. The original branch and its committed knowledge remain available. Symlinks and non-Markdown knowledge files are rejected before initialization.
 
@@ -83,7 +109,9 @@ git status --short
 
 Record the resulting baseline SHA and the Context Ops implementation revision. Configuration and roles must be committed so the runtime's snapshot matches the reviewed settings. The checkout must be clean before sweeping.
 
-Authenticate privately using your Claude Code installation. Subscription mode uses that login and removes the API-key environment variable from the runtime process. Optional API-key mode reads your environment. Never paste a credential into chat or place one in tracked files. Authentication is only needed for real inference; the configured Claude service performs inference remotely.
+Authentication means your own provider access, not a credential distributed with Context Ops. No authentication is needed to install, initialize, select evidence, or inspect recorded results. If access is unavailable, stop before step 6 and retain the prepared baseline and command; use the [recorded demo](docs/demo/README.md#present-the-recorded-result-without-inference).
+
+The checked-in `auth: subscription` mode uses an existing private Claude Code login and removes `ANTHROPIC_API_KEY` from the runtime process. For API-key execution, set `auth: api-key` in `init.md` **before committing the baseline**, and set `ANTHROPIC_API_KEY` privately in the shell that will run maintenance. The [official Agent SDK quickstart](https://code.claude.com/docs/en/agent-sdk/quickstart) documents this API-key path. Merely exporting a key while leaving subscription mode selected will not use it. Never paste a credential into chat, put it in tracked files, or copy authentication stores between people. The configured Claude service performs inference remotely.
 
 ## 6. Run A manually
 
@@ -124,12 +152,7 @@ For your next maintenance run, use the accepted knowledge branch as the baseline
 
 ## 8. Use it day to day: attach your application
 
-After the first run, a team usually keeps one shared knowledge repository on GitHub or GitLab, and every developer clones it next to their applications. Choose the scope once, when you initialize:
-
-- **Team knowledge** (`contextops init --scope team ...`, the default and the recommended setup): the team's applications share one repository, so a decision made while working in one repository reaches agents working in another. Facts are scoped to the application they came from; team-wide (`company`) entries need a developer saying so.
-- **Repository knowledge** (`contextops init --scope repository --application my-app ...`): for a single application on its own. Runs for any other application are refused.
-
-Before the first run, read "What this knowledge keeps" in `init.md` and adjust it to your team. It decides what maintenance admits.
+After the first run, a team can keep its shared knowledge repository on GitHub or GitLab, with each developer cloning it next to their applications. Reuse the scope and accepted knowledge chosen in step 4; do not initialize again to attach an application. Team-wide (`company`) entries require an explicit team-wide developer decision.
 
 Commit the initialized baseline, set `open_pr: true` in `init.md` if pushes should open review requests, and push the branch your team will treat as the accepted knowledge (for example `main`). Each developer then clones it, installs the runtime as in step 1, and connects each application:
 

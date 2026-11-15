@@ -1,0 +1,123 @@
+diff --git a/core/naming-conventions.md b/core/naming-conventions.md
+index 2191814..1d78307 100644
+--- a/core/naming-conventions.md
++++ b/core/naming-conventions.md
+@@ -1,10 +1,19 @@
+ # Naming Conventions
+ 
+-Status: empty template. No application or company facts have been admitted.
++Status: generated entries, pending human review.
+ 
+ Write NAME IDs as NAME, a hyphen, and three digits for evidence-backed entries, with explicit scope. Generated entries require human review. Implementation observations do not establish company policy.
+ 
+ | ID | Convention | Scope | Evidence |
+ | --- | --- | --- | --- |
++| NAME-001 | Every commit message and PR title starts with the `[AI]` prefix, for example `[AI] Fix custom report range flipping for a To in the same period as From`. | app:actual | Developer statements in session 70de19bb (msg 239b2ae3) and session de720aee (msg 2b41817d); commit subjects in diff/commits.txt. |
++| NAME-002 | Each change adds a release note file under `upcoming-release-notes/`, named with a short descriptive kebab-case slug (for example `custom-reports-quarterly-interval.md`), not a PR number. The front matter has `category` (for example Bugfix, Enhancements or Maintenance) and `authors`. | app:actual | Developer: release notes are 'needed for every change' (session de720aee, msg 3cd09d35). Slug file names in diff/files.txt. |
++| NAME-003 | One React component per file. A shared props type used by several components goes in its own small file so the components do not import from each other. Example: `ActiveShapeMobile.tsx` and `ActiveShapeDesktop.tsx` import the type from `activeShapeProps.ts`. | app:actual | Developer correction in session d34fc234 (msg 6d99f24a); files added in diff/files.txt. |
+ 
+ Follow the [core maintenance guide](../maintenance/core.md).
++
++## Evidence
++
++- NAME-001: actual@8cece04 diff/commits.txt; conversation 70de19bb-341e-4ca0-a42f-f4262eb59326/239b2ae3-2fd0-484e-bb19-ebebe1e5f8ef
++- NAME-002: actual@8cece04 conversation de720aee-7716-4ecb-ba17-3a38c00ee07e/3cd09d35-5542-41bf-b111-e9e3934309d8
++- NAME-003: actual@8cece04 conversation d34fc234-ffeb-4f49-b9b7-9037b2a87b69/6d99f24a-b085-4a98-9ccf-2d2c5690d126
+diff --git a/core/pitfalls.md b/core/pitfalls.md
+index 3355df4..8c4bdf0 100644
+--- a/core/pitfalls.md
++++ b/core/pitfalls.md
+@@ -1,10 +1,23 @@
+ # Pitfalls
+ 
+-Status: empty template. No application or company facts have been admitted.
++Status: generated entries, pending human review.
+ 
+ Write PIT IDs as PIT, a hyphen, and three digits for evidence-backed entries, with explicit scope. Generated entries require human review. Implementation observations do not establish company policy.
+ 
+ | ID | Trigger | What goes wrong | Do instead | Scope | Evidence |
+ | --- | --- | --- | --- | --- | --- |
++| PIT-001 | Scaling a stored amount by the active currency's `decimalPlaces` (for example in `useFormat` or a util helper) instead of the fixed x100 | Zero-decimal currencies disagree between screens. A 1,500 yen budget showed as 15 on one screen and 150,000 on another. | Stored amounts are always x100 for every currency (1,500 yen is 150000). Use `decimalPlaces` only for display. `amountToInteger`, `integerToAmount` and `integerToCurrency` take no scale argument. | app:actual | Developer decision in the yen session; source `packages/loot-core/src/shared/util.ts` |
++| PIT-002 | Passing an undici `Agent` dispatcher (such as the SimpleFIN SSRF dispatcher) to Node's built-in global `fetch` in the sync server | The built-in fetch bundles a different undici version than the installed package. The mismatch is fragile and can break bank sync after a Node or undici change. | Import `fetch` from `undici` in every sync server module so the dispatcher and fetch always match. In tests, mock undici's `fetch`, not the global one. No lint rule catches a new bare `fetch(`. | app:actual | Commit 9c300f54 message; `packages/sync-server/src/app-cors-proxy.test.js` |
++| PIT-003 | A shared module-level `vi.fn()` mock (such as undici's `fetch` in the sync server tests) whose behavior is set with `mockImplementation` | `mockImplementation` keeps recorded calls, so a `toHaveBeenCalledWith` assertion can pass on a call made by an earlier test. | Call `mockClear()` on the shared mock in a top-level `beforeEach`, as `app-cors-proxy.test.js` does. | app:actual | Commit 216a1ad7; `packages/sync-server/src/app-cors-proxy.test.js` |
++| PIT-004 | Comparing a stored full date (`2026-07-01`) with a raw period key (`2026-07`, `2026`) as strings, as `validateEnd` in `reportRanges.ts` did | The longer string sorts later, so a To in the same month, quarter or year as From looked reversed and From was reset to the fallback range. | Compare against the normalized end date computed for the interval (for example `getMonthEnd` or `end + '-12-31'`), not the raw key. | app:actual | Commit 8cece049; `reportRanges.ts` `validateEnd` |
++| PIT-005 | Typing digits into the legacy `AmountInput` with `autoDecimals` on, for a currency with no decimals such as yen | Digits are read as cents, so 1500 shows as 15.00 instead of 1500 yen. | `autoDecimals` is skipped when the currency's `decimalPlaces` is 0 (`format.currency.decimalPlaces > 0`). Keep that guard. `AmountInput.test.tsx` covers yen and dollars. | app:actual | Developer accepted the guard; `AmountInput.tsx` |
+ 
+ Follow the [core maintenance guide](../maintenance/core.md).
++
++## Evidence
++
++- PIT-001: actual@8cece04 packages/loot-core/src/shared/util.ts; conversation de720aee-7716-4ecb-ba17-3a38c00ee07e/d208a293-ba9d-4d21-bb27-8001a9983cc5
++- PIT-002: actual@8cece04 packages/sync-server/src/app-cors-proxy.test.js; conversation 70de19bb-341e-4ca0-a42f-f4262eb59326/be2af540-6678-4141-aaad-1ff9103a384b
++- PIT-003: actual@8cece04 packages/sync-server/src/app-cors-proxy.test.js; diff/commits.txt
++- PIT-004: actual@8cece04 packages/desktop-client/src/components/reports/reportRanges.ts; conversation b44d114c-d4b7-4694-95b1-228bb7dd60bd/e54dbbc6-f221-45f3-ac39-b0a483796e71
++- PIT-005: actual@8cece04 packages/desktop-client/src/components/util/AmountInput.tsx; conversation de720aee-7716-4ecb-ba17-3a38c00ee07e/eb04ddcb-065d-465b-b2c5-93cc1726eaf9
+diff --git a/core/tech-stack-standards.md b/core/tech-stack-standards.md
+index e1fb391..f6d9b22 100644
+--- a/core/tech-stack-standards.md
++++ b/core/tech-stack-standards.md
+@@ -1,10 +1,23 @@
+ # Tech Stack Standards
+ 
+-Status: empty template. No application or company facts have been admitted.
++Status: generated entries, pending human review.
+ 
+ Write STACK IDs as STACK, a hyphen, and three digits for evidence-backed entries, with explicit scope. Generated entries require human review. Implementation observations do not establish company policy.
+ 
+ | ID | Decision or constraint | Scope | Rationale | Evidence |
+ | --- | --- | --- | --- | --- |
++| STACK-001 | Sync server code must import `fetch` from `undici` explicitly and must not use Node's global `fetch`. Tests mock `undici`'s `fetch`, not the global one. | app:actual (sync-server package) | The SimpleFIN SSRF dispatcher is an `Agent` from the installed undici package. Node's built-in global fetch bundles a different undici version, so the dispatcher and fetch must come from the same package. Nothing lints this rule, so a bare `fetch(` would still pass lint. | Developer: "server code imports fetch from undici explicitly and never relies on the global one"; commit 9c300f54 "Use undici's fetch throughout the sync server"; source `packages/sync-server/src/app-simplefin/app-simplefin.js:3` |
++| STACK-002 | The sync server uses undici as its only HTTP client library. Do not add axios, node-fetch or another HTTP library to it. | app:actual (sync-server package) | Developer: undici is what Node ships anyway, and another HTTP library on the server is unwanted. | Developer: "I don't want another HTTP library on the server, and undici is what Node ships anyway. Please keep it on undici." |
++| STACK-003 | The sync-server package declares `engines.node` as `>=22.19.0`. The root package.json floor (`>=22.18.0`) may differ, since package floors need not match the root. | app:actual (sync-server package) | The developer is fairly sure this is the agreed floor but gave no reason, and the agent found none in the repo. | Developer: "keep it at >=22.19.0 and don't revert it"; `packages/sync-server/package.json` engines; commit 9c300f54 "Raise the sync server Node floor to 22.19.0" |
++| STACK-004 | Report "Download Snapshot" uses `@zumer/snapdom` (`snapdom.toPng`, reading the returned image's `src` for the download link). `html-to-image` was removed. New dependencies in `packages/desktop-client` go under `devDependencies`, matching that package. | app:actual (desktop-client package) | html-to-image silently failed in Firefox (the developer believes it aborted during web font embedding); snapdom is maintained and embeds fonts itself. The Firefox fix has not been tested in a browser. | Developer: "i want to swap it for snapdom, it's maintained and has its own font embedding"; `packages/desktop-client/package.json:180` |
++| STACK-005 | Custom report intervals that AQL cannot group natively are handled by querying at a finer interval and rolling up client-side, as Weekly does from days. Quarterly queries by month and does not add `$quarter` to the AQL compiler. | app:actual | Developer chose a lower-risk path with no query engine change. | Developer: "client-side rollup sounds right, same as weekly. no aql changes." |
+ 
+ Follow the [core maintenance guide](../maintenance/core.md).
++
++## Evidence
++
++- STACK-001: actual@8cece04 packages/sync-server/src/app-simplefin/app-simplefin.js; conversation 70de19bb-341e-4ca0-a42f-f4262eb59326/fe370a12-46b9-470c-8115-39752c432913
++- STACK-002: actual@8cece04 conversation 70de19bb-341e-4ca0-a42f-f4262eb59326/aeb3ca2c-cd97-49d0-8c21-cb2687b48a96
++- STACK-003: actual@8cece04 packages/sync-server/package.json; conversation 70de19bb-341e-4ca0-a42f-f4262eb59326/56238ec1-3d78-4ec3-9516-6ffe31efe243
++- STACK-004: actual@8cece04 packages/desktop-client/package.json; conversation d34fc234-ffeb-4f49-b9b7-9037b2a87b69/e72d768a-19f3-48f7-841b-fbefcd49a705
++- STACK-005: actual@8cece04 diff/commits.txt; conversation f57650bf-521a-4bd3-832c-4da4852a658e/4cf9a7e0-1937-444a-949e-5894db41ae31
+diff --git a/core/terminology.md b/core/terminology.md
+index 0a1718d..efc3d85 100644
+--- a/core/terminology.md
++++ b/core/terminology.md
+@@ -1,10 +1,17 @@
+ # Terminology
+ 
+-Status: empty template. No application or company facts have been admitted.
++Status: generated entries, pending human review.
+ 
+ Write TERM IDs as TERM, a hyphen, and three digits for evidence-backed entries, with explicit scope. Generated entries require human review. Implementation observations do not establish company policy.
+ 
+ | ID | Term | Meaning | Scope | Evidence |
+ | --- | --- | --- | --- | --- |
++| TERM-001 | Stored amount (integer amount) | A money value as persisted: the decimal amount multiplied by 100, for every currency. 1,500 yen is stored as 150000 and 15.00 USD as 1500. A currency's decimalPlaces only controls display and input formatting, never the stored scale. Amount helpers (`amountToInteger`, `integerToAmount`, `integerToCurrency`) therefore take no decimalPlaces argument. | app:actual | Developer definition, session de720aee-7716-4ecb-ba17-3a38c00ee07e; `packages/loot-core/src/shared/util.ts` |
++| TERM-002 | Quarter key (custom report Quarterly interval) | A quarter in custom reports is identified by its first month, as YYYY-MM: Q3 2026 is `2026-07`. It is labelled `Q3 '26`. Quarterly is an interval alongside Daily, Weekly, Monthly and Yearly; data is queried by month and rolled up client-side into the quarter key (no AQL quarter bucket). | app:actual | Developer definition, session f57650bf-521a-4bd3-832c-4da4852a658e; `packages/loot-core/src/shared/months.ts` |
+ 
+ Follow the [core maintenance guide](../maintenance/core.md).
++
++## Evidence
++
++- TERM-001: actual@8cece04 packages/loot-core/src/shared/util.ts; conversation de720aee-7716-4ecb-ba17-3a38c00ee07e/d208a293-ba9d-4d21-bb27-8001a9983cc5
++- TERM-002: actual@8cece04 packages/loot-core/src/shared/months.ts; conversation f57650bf-521a-4bd3-832c-4da4852a658e/4cf9a7e0-1937-444a-949e-5894db41ae31
+diff --git a/log.md b/log.md
+index 3d8211a..666c6f0 100644
+--- a/log.md
++++ b/log.md
+@@ -1,5 +1,12 @@
+ # Knowledge Change History
+ 
++## 2026-11-05: Maintenance run 20261114-202710-8cece04-ab77e26d (actual@8cece04)
++
++- core/terminology.md: added TERM-001 (stored amount is always x100), TERM-002 (quarter key is the first month).
++- core/tech-stack-standards.md: added STACK-001 to STACK-005 (undici fetch, undici as only server HTTP client, sync-server Node floor, snapdom for snapshots, client-side interval rollup).
++- core/naming-conventions.md: added NAME-001 ([AI] prefix), NAME-002 (release note files), NAME-003 (one component per file).
++- core/pitfalls.md: added PIT-001 to PIT-005 (decimalPlaces scaling, global fetch with undici dispatcher, shared mock calls, raw period key comparison, AmountInput autoDecimals for yen).
++
+ ## 2026-11-14: Initialize empty knowledge
+ 
+ - Starting repository revision: `b20f3f9d5042e893734b91557db62e08572b839c`.
