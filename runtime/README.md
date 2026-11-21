@@ -9,7 +9,7 @@ Start with [setup](../setup.md) for installation and tests without credentials. 
 | `contextops init --kb PATH --branch knowledge/APP_NAME [--scope team\|repository] [--application NAME]` | Prepare blank knowledge on a new local branch, without committing or inference. `--scope` sets who the knowledge serves; `--application` binds a repository-scoped knowledge base to one application. |
 | `contextops attach --repo APP --kb PATH --strategy MODE [--name NAME] [--no-hook] [--no-refresh]` | Connect an application checkout: its Claude Code sessions read the knowledge, and its pushes start maintenance. Writes only untracked local files. No model calls. |
 | `contextops refresh --kb PATH [--digest] [--no-fetch]` | Fast-forward a clean knowledge checkout to its upstream; with `--digest`, print one line per entry. Attached applications run it at session start. |
-| `contextops sweep --repo PATH --kb PATH --base REF --head REF --strategy MODE --session ID [--session ID] [--cutoff ISO_TIME]` | Freeze selected evidence and run locally. Real model calls occur. |
+| `contextops sweep --repo PATH --kb PATH --base REF --head REF --strategy MODE [--backend BACKEND] --session ID [--session ID] [--cutoff ISO_TIME]` | Freeze selected evidence and run locally. Real model calls occur. |
 | `contextops sessions --repo PATH [--limit N]` | List the application's Claude Code sessions (ID, last message, opening line) to choose `--session` values. No model calls. |
 | `contextops export-session --repo PATH --session ID --out FILE` | Write a shareable copy of one session: developer and agent messages, text, and tool calls, with the application root and home directory replaced by placeholders. Thinking, tool results, and other records are dropped. Message text is unchanged, so review it before sharing. |
 | `contextops import-session --repo PATH FILE...` | Install exported sessions for another checkout of the application so `sessions` lists them and `--session` can select them. Refuses to overwrite a different session with the same ID. |
@@ -27,13 +27,29 @@ The selected conversation is copied before inference, with a SHA-256 recorded in
 
 `init.md` supplies model, budgets, common instructions, role paths, and output settings. Commit configuration/role changes before running so the snapshot matches the settings you reviewed. Specialist tools are Read/Grep/Glob (Grep requires a specific file after Glob discovery); the writer additionally receives scoped Edit/Write. These SDK capabilities are unrelated to the `tools/` knowledge taxonomy.
 
-Subscription mode uses the user's private Claude Code authentication and removes `ANTHROPIC_API_KEY` from the runtime process. API-key mode requires that environment variable. No credential value belongs in this repository or its chats, examples, logs, screenshots, or published evidence. No authentication is required for the deterministic tests. Inference uses the configured provider, not a local model.
+Claude subscription mode uses the user's private Claude Code authentication and removes `ANTHROPIC_API_KEY` from the runtime process. API-key mode requires that environment variable. No credential value belongs in this repository or its chats, examples, logs, screenshots, or published evidence. No authentication is required for the deterministic tests. Inference uses the configured provider, not a local model.
 
-`output.runs_dir` is the common parent, defaulting to `~/.contextops/runs`. The runtime always appends the strategy and run ID. `output.branch` must include `{strategy}` and `{run_id}`. `open_pr: false` is the default; no remote push occurs unless publication is explicitly enabled. A successful writer can create a local knowledge commit. Generated branches are never merged automatically.
+`output.runs_dir` is the common parent, defaulting to `~/.contextops/runs`. Claude appends the strategy and run ID. Codex adds `codex/` before the strategy to isolate cutoff state and finding backlogs. `output.branch` must include `{strategy}` and `{run_id}`. `open_pr: false` is the default; no remote push occurs unless publication is explicitly enabled. A successful writer can create a local knowledge commit. Generated branches are never merged automatically.
 
 With `open_pr: true`, a committed result branch is pushed to `output.remote` (default `origin`) and a review request is opened against `output.target_branch` (default: the remote's default branch). `output.forge: auto` reads the remote URL: GitHub uses `gh pr create`; GitLab uses `glab mr create` when installed and otherwise Git push options (`merge_request.create`), which need no extra CLI. Other remotes, and `forge: none`, receive the branch only. The report becomes the request body; it lists records and evidence locators, not conversation text. Push and CLI errors are summarized without echoing remote output.
 
 `scope: team` (default) means the knowledge serves a team's applications: facts are scoped `app:<name>`, `company` is reserved for rules developers state for the whole team, and entries about other applications are left alone. `scope: repository` means one application; `application: NAME` makes runs and `attach` refuse any other name. The application name comes from `attach --name`, stored as Git config `contextops.app`, else the checkout folder name.
+
+## Codex CLI
+
+Install the runtime from this checkout as described in [setup](../setup.md#1-install-in-a-clean-environment). Install the Codex CLI on your PATH and sign in privately with ChatGPT. An existing CLI login works with `auth: subscription`, including a custom external `CODEX_HOME`. Check `codex login status` and `codex exec fork --help` locally. Keep the Codex home outside both repositories. [OpenAI Docs on non-interactive authentication](https://developers.openai.com/codex/noninteractive#authenticate-in-automation)
+
+```sh
+contextops sweep --backend codex --strategy sweeper-first \
+  --repo /path/to/application --kb /path/to/knowledge \
+  --base BASE_SHA --head HEAD_SHA --session CLAUDE_DEVELOPMENT_SESSION_ID
+```
+
+Choose `fresh-specialists` for B. To make Codex the default, commit `backend: codex` in the knowledge baseline's `init.md`. Set `codex_model` there to change the model for every Codex role. It defaults to `gpt-6.1-terra`. The command-line backend takes precedence and is frozen in the run manifest. Both backends collect the same selected Claude Code development history.
+
+B starts a new `codex exec` for each specialist. A runs the sweeper to completion and invokes `codex exec fork PARENT_ID` separately for each specialist. A failed fork appears in the report and the manual command exits with status 1. The CLI uses a read-only sandbox and a scoped file-tool server. Only the writer receives knowledge editing tools. Codex keeps private session state for forks in its normal store.
+
+Codex reports invocation token usage. The raw and incremental fork counts are the same. Subscription dollar costs are unavailable, and the Claude USD and turn limits do not apply. Each Codex call has a ten-minute timeout and uses the shared parallelism limit. The CLI interface was inspected on `0.167.0-alpha.3.2`. Tests use a fake executable. Live model access and inheritance on this integration await separate verification. The CLI transport and schema conversion derive from the historical GPT evaluation adapter, whose pilot scores belong to that earlier configuration.
 
 ## Outputs
 
@@ -71,12 +87,11 @@ On `git push`, the hook fast-forwards the knowledge checkout, then prepares one 
 - Cost estimates are not billing. Concurrent calls and the writer can exceed the aggregate scheduling threshold.
 - Reports include agent claims; deterministic locator checks do not prove semantic correctness. Review actual document changes.
 - Tests exercise fake calls, permissions, SDK option construction, Git remotes, and fake `gh`/GitLab push options. They do not prove live provider or forge behavior.
-- The separate historical GPT adapter is future Codex-backend work. It is not installed by this package.
 
 ## A session lineage and accounting
 
-A retains the completed parent and each child in `sweeper.json`. Every specialist uses the same parent session ID with `fork_session=True`. A missing, reused, or parent-equal child ID fails lineage validation and its proposals are withheld. A failed sweeper skips specialists without a B fallback.
+A retains the completed parent and each child in `sweeper.json`. Every specialist forks the same parent session ID. Claude uses `fork_session=True`. A missing, reused, or parent-equal child ID fails lineage validation and its proposals are withheld. A failed sweeper skips specialists without a B fallback.
 
-Raw child usage remains available beside the incremental estimate and the validated result. Cost and model token counters subtract the parent when the reported values permit it; smaller reports are retained rather than forced negative. This follows the historical cumulative-report interpretation, and live SDK billing semantics remain unverified by the deterministic tests. Timing and turn counts are retained as reported.
+Raw child usage remains available beside the incremental estimate and the validated result. For Claude, cost and model token counters subtract the parent when the reported values permit it; smaller reports are retained rather than forced negative. This follows the historical cumulative-report interpretation, and live SDK billing semantics remain unverified by the deterministic tests. Timing and turn counts are retained as reported.
 
 Forks reuse the sweeper's prompt cache only when the cached prefix (tools and output schema, then the system prompt, then the inherited messages) is unchanged. The runtime therefore gives the sweeper and every specialist the same role-free system prompt and output schema, and sends each role as a user message. `sweeper.json` stores the parent's prefix fingerprint and a `shares_cache_prefix` flag per child. In a live run, a fork's first turn should report the inherited history as `cacheReadInputTokens`, not `cacheCreationInputTokens`.

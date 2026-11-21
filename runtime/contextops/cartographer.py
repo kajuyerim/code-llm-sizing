@@ -26,7 +26,7 @@ async def run_cartographer(
     recent = backlog.read_text(encoding="utf-8").splitlines()[-BACKLOG_WINDOW:]
     (ctx.run_dir / "unowned-backlog.jsonl").write_text("\n".join(recent) + "\n", encoding="utf-8")
 
-    spec = load_agent(config.cartographer, config.default_model)
+    spec = load_agent(config.cartographer, config.default_model, config.backend)
     prompt = "\n".join([
         f"Run: {ctx.run_id}, application {ctx.app_label} at {ctx.head_sha[:7]}",
         f"Unowned findings, newest last: {ctx.run_dir / 'unowned-backlog.jsonl'}",
@@ -42,8 +42,10 @@ async def run_cartographer(
         system=system_prompt(config, spec),
         prompt=prompt,
         schema=CARTOGRAPHER_OUTPUT,
-        cwd=ctx.run_dir,
-        dirs=[ctx.kb_snapshot],
+        run_dir=ctx.run_dir,
+        cwd=ctx.pack if config.backend == "codex" else ctx.run_dir,
+        dirs=([ctx.kb_snapshot, ctx.app_snapshot, ctx.run_dir / "unowned-backlog.jsonl"]
+              if config.backend == "codex" else [ctx.kb_snapshot]),
         budget_usd=config.budget.per_agent_usd,
         max_turns=config.budget.max_turns,
     )

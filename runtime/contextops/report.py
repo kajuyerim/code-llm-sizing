@@ -37,8 +37,10 @@ def render_report(
         f"- Application: `{ctx.app_label}` {ctx.ref} `{ctx.base_sha[:7]}..{ctx.head_sha[:7]}`",
         f"- Knowledge baseline: `{ctx.kb_baseline[:7]}`",
         f"- Mode: `{config.mode}`",
+        f"- Maintenance backend: `{config.backend}` (model `{config.default_model}`)",
         f"- Conversation window: {_when(ctx.since)} to {_when(ctx.cutoff)}",
-        f"- Estimated spend: ${ledger.spent:.2f} of ${config.budget.total_usd:.2f}",
+        (f"- Estimated spend: ${ledger.spent:.2f} of ${config.budget.total_usd:.2f}"
+         if config.backend == "claude" else "- Spend: unavailable for Codex subscription runs"),
         f"- Records: {len(review.accepted)} accepted, {len(review.deferred)} need review, "
         f"{len(review.rejected)} rejected, {len(review.no_change)} no change",
     ]
@@ -99,7 +101,8 @@ def render_completion(ctx: RunContext, outcome: Outcome, ledger: Ledger) -> str:
     lines = [status, f"Strategy: {ctx.strategy}",
              f"Records: {len(review.accepted)} accepted, {len(review.deferred)} deferred, "
              f"{len(review.rejected)} rejected, {len(review.no_change)} no change",
-             f"Estimated spend: ${ledger.spent:.2f}"]
+             (f"Estimated spend: ${ledger.spent:.2f}" if ctx.backend == "claude"
+              else "Spend: unavailable for Codex subscription runs")]
     if committed:
         changed = gitutil.git(ctx.kb_root, "diff", "--name-only", ctx.kb_baseline, ctx.branch).splitlines()
     else:
@@ -170,9 +173,10 @@ def _workers_table(workers: list[Worker], ledger: Ledger) -> list[str]:
     reasons = {w.label: w.reason for w in workers}
     lines = ["", "## Agents", "", "| Agent | Why | Status | Turns | Cost |", "| --- | --- | --- | --- | --- |"]
     for run in ledger.runs:
+        cost = f"${run.cost_usd:.2f}" if run.cost_usd is not None else "unavailable"
         lines.append(
             f"| {run.label} | {reasons.get(run.label, '')} | {run.status} "
-            f"| {run.num_turns} | ${run.cost_usd:.2f} |"
+            f"| {run.num_turns} | {cost} |"
         )
     return lines
 

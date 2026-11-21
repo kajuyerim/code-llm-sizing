@@ -25,6 +25,7 @@ class AgentSpec:
     model: str
     tools: list[str]
     max_turns: int | None = None
+    backend: str = "claude"
 
 
 @dataclass
@@ -32,7 +33,7 @@ class AgentRun:
     label: str
     status: str = "not-started"
     session_id: str | None = None
-    cost_usd: float = 0.0
+    cost_usd: float | None = 0.0
     num_turns: int = 0
     duration_ms: int = 0
     model_usage: dict | None = None
@@ -40,6 +41,7 @@ class AgentRun:
     error: str | None = None
     # Cost the SDK reported for the whole session; cost_usd may later hold only the increment.
     session_cost_usd: float | None = None
+    parent_session_id: str | None = None
 
 
 class Ledger:
@@ -56,19 +58,20 @@ class Ledger:
     def spent(self) -> float:
         # A forked session reports the parent's cost again; a strategy that forks
         # should subtract the inherited part before adding the run here.
-        return sum(run.cost_usd for run in self.runs)
+        return sum(run.cost_usd or 0.0 for run in self.runs)
 
     def has_room(self) -> bool:
         return self.spent < self.limit_usd
 
 
-def load_agent(path: Path, default_model: str) -> AgentSpec:
+def load_agent(path: Path, default_model: str, backend: str = "claude") -> AgentSpec:
     meta, body = frontmatter.read(path)
     return AgentSpec(
         name=meta.get("name", path.stem),
         path=path,
         prompt=body.strip(),
-        model=meta.get("model", default_model),
+        model=default_model if backend == "codex" else meta.get("model", default_model),
+        backend=backend,
         tools=list(meta.get("tools", READ_ONLY_TOOLS)),
         max_turns=meta.get("maxTurns"),
     )
@@ -104,11 +107,18 @@ async def run_agent(
     schema: dict,
     cwd: Path,
     dirs: list[Path],
+    run_dir: Path | None = None,
     budget_usd: float,
     max_turns: int,
     resume: str | None = None,
     fork: bool = False,
 ) -> AgentRun:
+    if spec.backend == "codex":
+        from contextops.codex import run_codex
+
+        return await run_codex(spec, label=label, system=system, prompt=prompt, schema=schema,
+                               cwd=cwd, dirs=dirs, run_dir=run_dir, resume=resume, fork=fork)
+
     options = ClaudeAgentOptions(
         system_prompt={"type": "preset", "preset": "claude_code", "append": system},
         model=spec.model,

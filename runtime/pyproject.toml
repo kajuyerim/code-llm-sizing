@@ -5,6 +5,8 @@ description = "Pre-push knowledge maintenance: sweeps the pushed diff, the devel
 requires-python = ">=3.11"
 dependencies = [
     "claude-agent-sdk==0.2.176",
+    "jsonschema==4.26.0",
+    "mcp==2.3.0",
     "pyyaml==6.0.3",
 ]
 

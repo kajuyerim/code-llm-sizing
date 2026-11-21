@@ -7,13 +7,13 @@ Context Ops is a CMPE 492 senior project at Boğaziçi University studying how a
 Clone this repository into a directory separate from your application, then open the clone in your coding agent:
 
 ```sh
-git clone --branch feat/team-knowledge-loop https://github.com/kajuyerim/code-llm-sizing.git
+git clone https://github.com/kajuyerim/code-llm-sizing.git
 cd code-llm-sizing
 ```
 
-This selects the branch containing the work under review. After it is merged, use the default branch instead. A remote clone includes only pushed commits.
+For the local Codex implementation, use the feature checkout. A remote clone includes only pushed commits.
 
-You need **Python 3.11+, Git, and an existing application with committed development changes and local Claude Code development sessions**. Running maintenance also requires **private Claude authentication**; installation, software tests, and preparation need no model calls. Your setup agent can be any coding agent; maintenance currently uses the Claude backend and Claude Code history. Inference runs on the configured Claude service.
+You need **Python 3.11+, Git, and an existing application with committed development changes and local Claude Code development sessions**. Maintenance uses Claude by default. To use your existing ChatGPT sign-in, install from the checkout containing the Codex backend and pass `--backend codex` to the manual sweep. Both backends use hosted inference and the same Claude Code development evidence. See [runtime setup and limits](runtime/README.md#codex-cli).
 
 Give your agent this prompt:
 
@@ -54,7 +54,7 @@ See [setup, step 8](setup.md#8-use-it-day-to-day-attach-your-application).
 
 Both maintain documentation only, use equivalent responsibilities and common checks, and keep independent output state. Four core specialists always run; tool specialists are selected by relevance. The [architecture](docs/architecture.md) explains the boundaries and actual call flow.
 
-Both **A, `sweeper-first`**, and **B, `fresh-specialists`**, are available through the shared Claude runtime. There is no default winner or implicit strategy choice.
+Both **A, `sweeper-first`**, and **B, `fresh-specialists`**, are available with either maintenance backend. There is no default winner or implicit strategy choice.
 
 ## Repository layout
 
@@ -67,7 +67,7 @@ Both **A, `sweeper-first`**, and **B, `fresh-specialists`**, are available throu
 | `skills/` | Reusable setup and issue-creation procedures |
 | `docs/` | Walkthrough, architecture, evaluation, provenance, and the first-run demo |
 | `reports/` | Dated project reports: pilot, v2, and the midterm report |
-| `runtime/` | Shared Claude runtime, operational guide, and tests |
+| `runtime/` | Shared maintenance runtime, operational guide, and tests |
 | `init.md` | Common run settings and instructions |
 
 [Knowledge index](index.md) · [Repository instructions](AGENTS.md) · [Change history](log.md)
@@ -107,7 +107,7 @@ The immediate priorities from the 6 November meeting are:
 
 These are planned deliverables. The downstream comparison studies whether generated knowledge helps application development; A/B maintenance evaluation studies how that knowledge is maintained. Application development remains outside the knowledge repository and outside maintenance-agent responsibilities.
 
-[#6: Codex runtime backend](https://github.com/kajuyerim/code-llm-sizing/issues/6) remains separate future work. The current package supports Claude; historical GPT evaluation results do not establish an installable Codex backend.
+The Codex backend for [issue #6](https://github.com/kajuyerim/code-llm-sizing/issues/6) has credential-free contract tests. Live verification of this integration is pending.
 
 ## Team
 

@@ -34,6 +34,7 @@ class RunContext:
     conversation_sha256: str | None = None
     scope: str = "team"
     app: str | None = None
+    backend: str = "claude"
 
     @property
     def app_label(self) -> str:
@@ -59,7 +60,7 @@ class RunContext:
 
 def create_run(
     app_root: Path, kb_root: Path, remote: str, ref: str, local_sha: str, remote_sha: str,
-    *, strategy: str | None = None, sessions: list[str] | None = None,
+    *, backend: str | None = None, strategy: str | None = None, sessions: list[str] | None = None,
     cutoff: datetime | None = None, app_name: str | None = None, auto_select: bool = False,
 ) -> RunContext | None:
     from contextops.strategies import STRATEGIES
@@ -70,7 +71,7 @@ def create_run(
     # Settings and roles must match the committed baseline used by orchestration.
     if gitutil.status(kb_root):
         raise ValueError("Commit or stash knowledge checkout changes before preparing a run")
-    config = load_config(kb_root)
+    config = load_config(kb_root, backend)
     strategy = strategy or config.mode
     if strategy not in STRATEGIES:
         raise ValueError("Choose an implemented strategy explicitly: " + ", ".join(STRATEGIES))
@@ -93,17 +94,20 @@ def create_run(
     if cutoff.tzinfo is None or cutoff > now:
         raise ValueError("Cutoff must include a timezone and must not be in the future")
     cutoff = cutoff.astimezone(timezone.utc)
+    parent = config.output.runs_dir.resolve()
+    # Preserve existing Claude cutoff/backlog paths. Codex keeps independent state.
+    if config.backend == "codex":
+        parent = parent / "codex"
+    runs_dir = (parent / strategy).resolve()
+    if runs_dir != parent / strategy:
+        raise ValueError("Strategy output directories must not be symlinks")
     if auto_select:
-        sessions = select_sessions(app_root, config, strategy, base, cutoff)
+        sessions = select_sessions(app_root, config, runs_dir, base, cutoff)
     sessions = sorted(set(sessions))
     # Explicit sessions include their complete retained history up to the cutoff.
     selected = transcripts.load_sessions(app_root, None, cutoff,
                                         config.conversation.include_sidechains, selected=sessions)
     frozen = json.dumps([asdict(s) for s in selected], indent=2).encode("utf-8")
-    parent = config.output.runs_dir.resolve()
-    runs_dir = (parent / strategy).resolve()
-    if runs_dir != parent / strategy:
-        raise ValueError("Strategy output directories must not be symlinks")
     if runs_dir.is_relative_to(kb_root) or runs_dir.is_relative_to(app_root):
         raise ValueError("Run artifacts must be outside application and knowledge checkouts")
     run_id = f"{now:%Y%m%d-%H%M%S}-{head[:7]}-{uuid4().hex[:8]}"
@@ -114,7 +118,7 @@ def create_run(
                                           date=f"{now:%Y-%m-%d}", short_sha=head[:7]),
         since=None, cutoff=cutoff, strategy=strategy, sessions=sessions,
         conversation_sha256=hashlib.sha256(frozen).hexdigest(),
-        scope=config.scope, app=app,
+        scope=config.scope, app=app, backend=config.backend,
     )
     if not gitutil.succeeds(kb_root, "check-ref-format", "--branch", ctx.branch):
         raise ValueError("init.md: output.branch produces an invalid Git branch")
@@ -126,9 +130,9 @@ def create_run(
     return ctx
 
 
-def select_sessions(app_root: Path, config, strategy: str, base: str, cutoff: datetime) -> list[str]:
+def select_sessions(app_root: Path, config, runs_dir: Path, base: str, cutoff: datetime) -> list[str]:
     """Sessions in this application with a message since the last run (or the pushed base commit)."""
-    since = last_cutoff(config.output.runs_dir / strategy, app_root) or gitutil.commit_time(app_root, base)
+    since = last_cutoff(runs_dir, app_root) or gitutil.commit_time(app_root, base)
     chosen = [s.session_id for s in transcripts.list_sessions(app_root, config.conversation.include_sidechains)
               if since is None or datetime.fromisoformat(s.last.replace("Z", "+00:00")) > since]
     chosen = [s for s in chosen if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", s)]

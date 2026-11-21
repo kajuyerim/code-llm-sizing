@@ -34,7 +34,7 @@ async def write_changes(
     accepted = ctx.run_dir / "accepted.json"
     accepted.write_text(json.dumps(review.accepted, indent=2), encoding="utf-8")
 
-    spec = load_agent(config.writer, config.default_model)
+    spec = load_agent(config.writer, config.default_model, config.backend)
     prompt = "\n".join([
         f"Run: {ctx.run_id}, application {ctx.app_label} at {ctx.head_sha[:7]}",
         f"Records to apply: {accepted}",
@@ -49,8 +49,9 @@ async def write_changes(
         system=system_prompt(config, spec),
         prompt=prompt,
         schema=WRITER_OUTPUT,
+        run_dir=ctx.run_dir,
         cwd=ctx.kb_snapshot,
-        dirs=[ctx.run_dir],
+        dirs=[accepted, ctx.pack, ctx.app_snapshot] if config.backend == "codex" else [ctx.run_dir],
         budget_usd=config.budget.per_agent_usd,
         max_turns=config.budget.max_turns,
     )
