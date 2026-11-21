@@ -1,0 +1,38 @@
+[
+  {
+    "git_blob": "86fe354e58c6afcdd4dfa2b90ce9217a1237ac23",
+    "path": "reports/2026-11-18-midterm/context-ops-midterm.pdf",
+    "sha256": "25f6362087d073c533195cf02476d466645e7311bb45a1c43c31c4f60db17364",
+    "pages": 64,
+    "text_metadata_credential_matches": 0,
+    "embedded_files_or_javascript": false,
+    "opening_action": "page-fit destination only"
+  },
+  {
+    "git_blob": "11bd965ab4f38e52c1ab3ed91a65061ab23377d2",
+    "path": "reports/2026-11-18-midterm/context-ops-supplement.pdf",
+    "sha256": "c323fea0afb64fa5678688fed50c7a90829507541f19a9f365f65652c3ff6926",
+    "pages": 21,
+    "text_metadata_credential_matches": 0,
+    "embedded_files_or_javascript": false,
+    "opening_action": "page-fit destination only"
+  },
+  {
+    "git_blob": "d666dc417cf954988200013bc44ecda4b2370de7",
+    "path": "reports/2026-11-18-midterm/context-ops-midterm.pdf",
+    "sha256": "91a922e968d608754d0f4aba13ea7b8748d2723aaf814af2adb11b49fe88cc4c",
+    "pages": 89,
+    "text_metadata_credential_matches": 0,
+    "embedded_files_or_javascript": false,
+    "opening_action": "page-fit destination only"
+  },
+  {
+    "git_blob": "2673ea07c64b4ec5dd5f21a8bd0252bebb049f79",
+    "path": "reports/2026-11-18-midterm/context-ops-midterm.pdf",
+    "sha256": "6a7f0789c59799297ad810f3656d4878a3fe5c7008c72a9d9c57a2414da774e7",
+    "pages": 67,
+    "text_metadata_credential_matches": 0,
+    "embedded_files_or_javascript": false,
+    "opening_action": "page-fit destination only"
+  }
+]
