@@ -49,7 +49,9 @@ Choose `fresh-specialists` for B. To make Codex the default, commit `backend: co
 
 B starts a new `codex exec` for each specialist. A runs the sweeper to completion and invokes `codex exec fork PARENT_ID` separately for each specialist. A failed fork appears in the report and the manual command exits with status 1. The CLI uses a read-only sandbox and a scoped file-tool server. Only the writer receives knowledge editing tools. Codex keeps private session state for forks in its normal store.
 
-Codex reports invocation token usage. The raw and incremental fork counts are the same. Subscription dollar costs are unavailable, and the Claude USD and turn limits do not apply. Each Codex call has a ten-minute timeout and uses the shared parallelism limit. The CLI interface was inspected on `0.167.0-alpha.3.2`. Tests use a fake executable. Live model access and inheritance on this integration await separate verification. The CLI transport and schema conversion derive from the historical GPT evaluation adapter, whose pilot scores belong to that earlier configuration.
+Codex reports invocation token usage. The raw and incremental fork counts are the same. Subscription dollar costs are unavailable, and the Claude USD and turn limits do not apply. Each Codex call has a ten-minute timeout and uses the shared parallelism limit. The CLI transport and schema conversion derive from the historical GPT evaluation adapter, whose pilot scores belong to that earlier configuration.
+
+On 21 November 2026, a five-call smoke test used ChatGPT sign-in, `gpt-6.1-terra`, and Codex CLI `0.167.0-alpha.3.2` at revision `a53e57a`. The sweeper completed a random marker in its final response. Both A specialists reproduced the exact marker from separate forks of that sweeper. Both B specialists reported it absent. Local CLI records confirmed five distinct threads, the model, the two fork parents, and two fresh B threads. This check used synthetic evidence and two specialists per strategy. Knowledge quality and writer behavior were outside its scope.
 
 ## Outputs
 

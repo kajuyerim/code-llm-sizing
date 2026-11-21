@@ -107,7 +107,7 @@ The immediate priorities from the 6 November meeting are:
 
 These are planned deliverables. The downstream comparison studies whether generated knowledge helps application development; A/B maintenance evaluation studies how that knowledge is maintained. Application development remains outside the knowledge repository and outside maintenance-agent responsibilities.
 
-The Codex backend for [issue #6](https://github.com/kajuyerim/code-llm-sizing/issues/6) has credential-free contract tests. Live verification of this integration is pending.
+The Codex backend for [issue #6](https://github.com/kajuyerim/code-llm-sizing/issues/6) has credential-free contract tests and a [live session-lineage check](runtime/README.md#codex-cli).
 
 ## Team
 
