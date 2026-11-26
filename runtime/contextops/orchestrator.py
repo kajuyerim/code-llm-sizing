@@ -32,6 +32,10 @@ async def orchestrate(run_dir: Path) -> Path:
         raise ValueError("Prepared strategy is unavailable in this runtime")
     if gitutil.succeeds(ctx.kb_root, "show-ref", "--verify", f"refs/heads/{ctx.branch}"):
         raise ValueError("Run branch already exists; existing branches are never replaced")
+    if ctx.backend == "codex":
+        home = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex").expanduser().resolve()
+        if any(home.is_relative_to(root) for root in (ctx.app_root, ctx.kb_root, ctx.run_dir)):
+            raise ValueError("Codex login and session storage must be outside both checkouts and the run")
     # Never overwrite an attempted run or reuse its branch/session state.
     with (ctx.run_dir / "started").open("x") as marker:
         marker.write("This run was attempted. Prepare a new run for another attempt.\n")
@@ -43,12 +47,13 @@ async def orchestrate(run_dir: Path) -> Path:
         kb_created = True
         gitutil.add_worktree(ctx.app_root, ctx.app_snapshot, ctx.head_sha)
         app_created = True
-        config = load_config(ctx.kb_snapshot)
+        config = load_config(ctx.kb_snapshot, ctx.backend)
         config.mode = ctx.strategy
         strategy = STRATEGIES.get(ctx.strategy)
         if strategy is None:
             raise ValueError(f"init.md: unknown mode '{config.mode}', known: {', '.join(STRATEGIES)}")
-        _prepare_auth(config)
+        if config.backend == "claude":
+            _prepare_auth(config)
 
         evidence = build_pack(ctx, config)
         workers, skipped = plan_workers(config, evidence)
@@ -60,6 +65,9 @@ async def orchestrate(run_dir: Path) -> Path:
             name = result.run.label.replace(":", "-")
             _dump(ctx.run_dir / "workers" / f"{name}.json", asdict(result.run))
         review = review_results(results, ctx, evidence)
+        for entry in handoff_pass:
+            if entry.get("error"):
+                review.failures.append(f"{entry['to']} handoff: {entry['error']}")
         _dump(ctx.run_dir / "review.json", asdict(review))
 
         outcome = Outcome(workers=workers, skipped=skipped, review=review, handoff_pass=handoff_pass)
@@ -108,7 +116,9 @@ def _write_metrics(ctx: RunContext, config: InitConfig, ledger: Ledger) -> None:
     _dump(ctx.run_dir / "metrics.json", {
         "run_id": ctx.run_id,
         "mode": config.mode,
-        "total_cost_usd": ledger.spent,
+        "backend": config.backend,
+        "model": config.default_model,
+        "total_cost_usd": ledger.spent if config.backend == "claude" else None,
         "total_duration_ms": sum(run.duration_ms for run in ledger.runs),
         "agents": agents,
     })

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from contextops import frontmatter
 
+BACKENDS = ("claude", "codex")
 RUN_POLICIES = ("always", "when-relevant")
 SCOPES = ("team", "repository")
 
@@ -61,6 +62,7 @@ class InitConfig:
     scope: str
     application: str | None
     auth: str
+    backend: str
     default_model: str
     shared_rules: Path
     workers: list[WorkerEntry]
@@ -73,11 +75,17 @@ class InitConfig:
     output: OutputSettings
 
 
-def load_config(kb_root: Path) -> InitConfig:
+def load_config(kb_root: Path, backend: str | None = None) -> InitConfig:
     meta, body = frontmatter.read(kb_root / "init.md")
     evidence = meta.get("evidence", {})
     after = meta.get("after", {})
     output = meta.get("output", {})
+
+    backend = backend if backend is not None else meta.get("backend", "claude")
+    if backend not in BACKENDS:
+        raise ValueError("Choose claude or codex as the maintenance backend")
+    if backend == "codex" and meta.get("auth", "subscription") != "subscription":
+        raise ValueError("Codex requires auth: subscription for ChatGPT sign-in")
 
     # Unknown keys in these sections raise TypeError on purpose, so typos in init.md surface early.
     config = InitConfig(
@@ -87,7 +95,9 @@ def load_config(kb_root: Path) -> InitConfig:
         scope=meta.get("scope", "team"),
         application=meta.get("application"),
         auth=meta.get("auth", "subscription"),
-        default_model=meta.get("model", "sonnet"),
+        backend=backend,
+        default_model=(meta.get("codex_model", "gpt-6.1-terra") if backend == "codex"
+                       else meta.get("model", "sonnet")),
         shared_rules=kb_root / meta.get("shared_rules", "agents/shared-rules.md"),
         workers=[_worker(kb_root, raw) for raw in meta.get("workers", [])],
         cartographer=kb_root / after["cartographer"] if after.get("cartographer") else None,
@@ -106,6 +116,8 @@ def load_config(kb_root: Path) -> InitConfig:
         ),
     )
 
+    if not isinstance(config.default_model, str) or not config.default_model.strip():
+        raise ValueError("The maintenance model must be a nonempty string")
     if not config.workers:
         raise ValueError("init.md lists no workers")
     if config.output.forge not in ("auto", "github", "gitlab", "none"):

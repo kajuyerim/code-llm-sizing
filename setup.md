@@ -1,15 +1,15 @@
 # Install, configure, and run Context Ops
 
-Keep this knowledge checkout separate from your application. You need Python 3.11+, Git, private Claude authentication, an existing application with committed development changes, and its local Claude Code sessions. Any coding agent can help with setup; the maintenance backend and conversation collector currently support Claude only.
+Keep this knowledge checkout separate from your application. You need Python 3.11+, Git, private authentication for your chosen maintenance backend, an existing application with committed development changes, and its local Claude Code sessions. Any coding agent can help with setup. To use Codex, install from the checkout containing this implementation and follow the [Codex CLI instructions](runtime/README.md#codex-cli).
 
 For agent-guided setup, use the prompt in the [README](README.md#set-up-with-your-agent). The [setup skill](skills/setup-shared-knowledge/SKILL.md) is the authoritative agent procedure. The commands below are the equivalent manual path. The agent prepares configuration and invokes the runtime; it does not prefill learned knowledge.
 
 ## 1. Install in a clean environment
 
-Until the first-run work is merged into the default branch, clone `feat/team-knowledge-loop` explicitly. After that merge, the default-branch clone is appropriate. Record the resolved implementation revision rather than assuming a branch name is immutable:
+For Codex, use the local checkout containing the backend. For a published version, clone the repository and record the implementation revision:
 
 ```sh
-git clone --branch feat/team-knowledge-loop https://github.com/kajuyerim/code-llm-sizing.git
+git clone https://github.com/kajuyerim/code-llm-sizing.git
 cd code-llm-sizing
 git rev-parse HEAD
 ```
@@ -90,7 +90,7 @@ For an existing installation, reuse the accepted knowledge branch and skip `init
 
 ## 5. Configure and commit the baseline
 
-Review [init.md](init.md). Keep `mode: null` and choose the strategy in the command. Defaults are `claude-sonnet-5-5`, $1.50 estimated per agent, a $10 estimated aggregate threshold, 30 turns, and up to three concurrent specialists. Change the model only when needed for your account or requested. Client estimates are not invoices; concurrent calls and the writer can exceed the threshold.
+Review [init.md](init.md). Keep `mode: null` and choose the strategy in the command. Claude defaults are `claude-sonnet-5-5`, $1.50 estimated per agent, a $10 estimated aggregate threshold, 30 turns, and up to three concurrent specialists. Change the model only when needed for your account or requested. Client estimates are not invoices; concurrent calls and the writer can exceed the threshold.
 
 Keep `open_pr: false`, auto-memory disabled, and run output outside both checkouts. The default output parent is `~/.contextops/runs`. Both repositories must be separate and non-nested. Firebase/Dataform folders are relevance categories, not assumptions about your application's stack.
 
@@ -111,7 +111,7 @@ Record the resulting baseline SHA and the Context Ops implementation revision. C
 
 Authentication means your own provider access, not a credential distributed with Context Ops. No authentication is needed to install, initialize, select evidence, or inspect recorded results. If access is unavailable, stop before step 6 and retain the prepared baseline and command; use the [recorded demo](docs/demo/README.md#present-the-recorded-result-without-inference).
 
-The checked-in `auth: subscription` mode uses an existing private Claude Code login and removes `ANTHROPIC_API_KEY` from the runtime process. For API-key execution, set `auth: api-key` in `init.md` **before committing the baseline**, and set `ANTHROPIC_API_KEY` privately in the shell that will run maintenance. The [official Agent SDK quickstart](https://code.claude.com/docs/en/agent-sdk/quickstart) documents this API-key path. Merely exporting a key while leaving subscription mode selected will not use it. Never paste a credential into chat, put it in tracked files, or copy authentication stores between people. The configured Claude service performs inference remotely.
+For the Claude backend, the checked-in `auth: subscription` mode uses an existing private Claude Code login and removes `ANTHROPIC_API_KEY` from the runtime process. For API-key execution, set `auth: api-key` in `init.md` **before committing the baseline**, and set `ANTHROPIC_API_KEY` privately in the shell that will run maintenance. The [official Agent SDK quickstart](https://code.claude.com/docs/en/agent-sdk/quickstart) documents this API-key path. Merely exporting a key while leaving subscription mode selected will not use it. Never paste a credential into chat, put it in tracked files, or copy authentication stores between people. The configured Claude service performs inference remotely.
 
 ## 6. Run A manually
 

@@ -91,6 +91,7 @@ async def run_worker(
         system=shared_system_prompt(config),
         prompt=prompt or role_message(worker.spec) + "\n\n" + worker_prompt(worker, ctx),
         schema=AGENT_OUTPUT,
+        run_dir=ctx.run_dir,
         cwd=ctx.pack,
         dirs=[ctx.app_snapshot, ctx.kb_snapshot],
         budget_usd=config.budget.per_agent_usd,
@@ -113,7 +114,21 @@ async def fresh_specialists(
                 return WorkerResult(worker, AgentRun(worker.label, status="skipped-budget"))
             return await run_worker(worker, ctx, config, ledger)
 
-    return list(await asyncio.gather(*(start(worker) for worker in workers)))
+    results = list(await asyncio.gather(*(start(worker) for worker in workers)))
+    if config.backend == "codex":
+        _check_session_ids(results)
+    return results
+
+
+def _check_session_ids(results: list[WorkerResult], parent: str | None = None) -> None:
+    ids = [result.run.session_id for result in results if result.run.session_id]
+    for result in results:
+        run = result.run
+        if run.status == "success" and (not run.session_id or run.session_id == parent
+                                         or ids.count(run.session_id) > 1):
+            run.status = "invalid-fork-lineage" if parent else "invalid-fresh-session"
+            run.output = None
+            run.error = "Expected an independent session ID for every specialist"
 
 
 TOKEN_FIELDS = ("inputTokens", "outputTokens", "cacheReadInputTokens", "cacheCreationInputTokens", "costUSD")
@@ -163,6 +178,8 @@ def _prefix(system: str, schema: dict, spec: AgentSpec) -> dict:
 
 def _subtract_parent(child: AgentRun, parent: AgentRun) -> dict:
     """Estimate incremental usage from cumulative fork reports, retaining raw values."""
+    if child.cost_usd is None:
+        return {"raw": asdict(child), "accounting": "Codex turn.completed usage for this invocation"}
     raw = {"raw": asdict(child), "accounting": "cumulative-parent subtraction estimate"}
     if child.cost_usd >= parent.cost_usd:
         child.cost_usd -= parent.cost_usd
@@ -183,7 +200,7 @@ def _subtract_parent(child: AgentRun, parent: AgentRun) -> dict:
 async def sweeper_first(
     workers: list[Worker], ctx: RunContext, config: InitConfig, ledger: Ledger
 ) -> list[WorkerResult]:
-    spec = load_agent(config.sweeper, config.default_model)
+    spec = load_agent(config.sweeper, config.default_model, config.backend)
     system = shared_system_prompt(config)
     sweeper = await run_agent(
         spec,
@@ -191,6 +208,7 @@ async def sweeper_first(
         system=system,
         prompt=sweeper_prompt(spec, workers, ctx),
         schema=AGENT_OUTPUT,
+        run_dir=ctx.run_dir,
         cwd=ctx.pack,
         dirs=[ctx.app_snapshot, ctx.kb_snapshot],
         budget_usd=config.budget.per_agent_usd,
@@ -216,10 +234,11 @@ async def sweeper_first(
                 system=system,
                 prompt=fork_prompt(worker, ctx),
                 schema=AGENT_OUTPUT,
+                run_dir=ctx.run_dir,
                 cwd=ctx.pack,
                 dirs=[ctx.app_snapshot, ctx.kb_snapshot],
                 # The SDK cap sees the inherited spend too, so give each fork the same headroom.
-                budget_usd=config.budget.per_agent_usd + sweeper.cost_usd,
+                budget_usd=config.budget.per_agent_usd + (sweeper.cost_usd or 0.0),
                 max_turns=config.budget.max_turns,
                 resume=sweeper.session_id,
                 fork=True,
@@ -235,17 +254,8 @@ async def sweeper_first(
             return WorkerResult(worker, run)
 
     results = list(await asyncio.gather(*(start(worker) for worker in workers)))
-    ids = [result.run.session_id for result in results if result.run.session_id]
-    for result in results:
-        run = result.run
-        if run.status == "success" and (not run.session_id or run.session_id == sweeper.session_id
-                                         or ids.count(run.session_id) > 1):
-            run.status = "invalid-fork-lineage"
-            run.output = None
-            run.error = "Fork must report a unique child session distinct from its parent"
-    handoff["independent_children"] = all(
-        r.run.status != "invalid-fork-lineage" for r in results
-    ) and len(ids) == len(set(ids)) and sweeper.session_id not in ids
+    _check_session_ids(results, sweeper.session_id)
+    handoff["independent_children"] = all(result.run.status == "success" for result in results)
     handoff["validated_children"] = [asdict(r.run) for r in results]
     _write(ctx.run_dir / "sweeper.json", handoff)
     return results
@@ -315,9 +325,10 @@ async def deliver_handoffs(
                 system=shared_system_prompt(config),
                 prompt=handoff_prompt(worker, notes),
                 schema=AGENT_OUTPUT,
+                run_dir=ctx.run_dir,
                 cwd=ctx.pack,
                 dirs=[ctx.app_snapshot, ctx.kb_snapshot],
-                budget_usd=config.budget.per_agent_usd + parent_cost,
+                budget_usd=config.budget.per_agent_usd + (parent_cost or 0.0),
                 max_turns=config.budget.max_turns,
                 resume=run.session_id,
                 fork=True,
@@ -325,7 +336,8 @@ async def deliver_handoffs(
         parent = AgentRun(run.label, cost_usd=parent_cost, model_usage=run.model_usage)
         _subtract_parent(child, parent)
         ledger.add(child)
-        entry.update(status=child.status, cost_usd=round(child.cost_usd, 4), session_id=child.session_id)
+        entry.update(status=child.status, session_id=child.session_id,
+                     cost_usd=round(child.cost_usd, 4) if child.cost_usd is not None else None)
         if child.status == "success" and child.output:
             added = [r for r in child.output.get("records", []) if r.get("op") != "NO_CHANGE"]
             run.output["records"] = list(run.output.get("records", [])) + added

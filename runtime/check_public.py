@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import html
 import json
 import re
@@ -64,7 +65,24 @@ def forbidden_file(name: str) -> bool:
             or p.suffix in {'.pem', '.key'} or any(x in {'.claude', '.codex', '.aws'} for x in p.parts))
 
 
+PDF_REVIEWS = Path(__file__).with_name('reviewed-pdfs.json')
+
+
+def scan_file(raw: bytes, name: str, label: str, reviews: set[tuple[str, str]]) -> list[str]:
+    is_pdf = Path(name).suffix.lower() == '.pdf' or raw.startswith(b'%PDF-')
+    try:
+        findings = scan_text(raw.decode('utf-8'), label)
+        if not is_pdf:
+            return findings
+    except UnicodeDecodeError:
+        findings = []
+    if not is_pdf or (name, hashlib.sha256(raw).hexdigest()) not in reviews:
+        findings.append(f'{label}: binary-file-requires-manual-review')
+    return findings
+
+
 def scan_repository(root: Path, history: bool = False) -> tuple[int, list[str]]:
+    reviews = {(item['path'], item['sha256']) for item in json.loads(PDF_REVIEWS.read_text(encoding='utf-8'))}
     findings, count = [], 0
     def git(*args):
         return subprocess.check_output(['git', '-C', str(root), *args])
@@ -79,29 +97,33 @@ def scan_repository(root: Path, history: bool = False) -> tuple[int, list[str]]:
         if path.is_symlink():
             findings.append(f'{name}: public-symlink-requires-review')
             continue
-        try:
-            findings += scan_text(path.read_text(encoding='utf-8'), name)
-        except UnicodeDecodeError:
-            findings.append(f'{name}: binary-file-requires-manual-review')
+        findings += scan_file(path.read_bytes(), name, name, reviews)
     if history:
-        for oid in git('rev-list', '--all').decode().splitlines():
+        trees = set()
+        for row in git('log', '--all', '--format=%H %T').decode().splitlines():
+            oid, tree = row.split()
+            trees.add(tree)
             count += 1
             findings += scan_text(git('show', '-s', '--format=%B', oid).decode('utf-8'),
                                   f'commit:{oid[:12]}')
-        objects = git('rev-list', '--objects', '--all').decode().splitlines()
-        for row in objects:
-            oid, _, name = row.partition(' ')
-            if git('cat-file', '-t', oid).strip() != b'blob':
-                continue
-            count += 1
-            label = f'history:{oid[:12]}:{name}'
-            if forbidden_file(name):
-                findings.append(f'{label}: forbidden-public-file')
-            raw = git('cat-file', 'blob', oid)
-            try:
-                findings += scan_text(raw.decode('utf-8'), label)
-            except UnicodeDecodeError:
-                findings.append(f'{label}: binary-file-requires-manual-review')
+
+        # rev-list --objects lists only one name per blob. A copied PDF needs its own path review.
+        seen = set()
+        for tree in sorted(trees):
+            for entry in git('ls-tree', '-r', '-z', tree).split(b'\0'):
+                if not entry:
+                    continue
+                metadata, path_bytes = entry.split(b'\t', 1)
+                _, kind, oid = metadata.decode().split()
+                name = path_bytes.decode()
+                if kind != 'blob' or (oid, name) in seen:
+                    continue
+                seen.add((oid, name))
+                count += 1
+                label = f'history:{oid[:12]}:{name}'
+                if forbidden_file(name):
+                    findings.append(f'{label}: forbidden-public-file')
+                findings += scan_file(git('cat-file', 'blob', oid), name, label, reviews)
     return count, sorted(set(findings))
 
 

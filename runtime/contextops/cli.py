@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import subprocess
 import sys
 from pathlib import Path
 from datetime import datetime
 
 from contextops import gitutil
+from contextops.config import BACKENDS
 from contextops.run import create_run
 
 from contextops.attach import HOOK
@@ -74,6 +76,7 @@ def main(argv: list[str] | None = None) -> None:
     sweep.add_argument("--head", default="HEAD")
     sweep.add_argument("--repo", type=Path, default=Path.cwd())
     sweep.add_argument("--kb", type=Path, help="defaults to the repo's contextops.kb setting")
+    sweep.add_argument("--backend", choices=BACKENDS, help="maintenance backend (default from init.md)")
     sweep.add_argument("--strategy", choices=["fresh-specialists", "sweeper-first"], required=True)
     sweep.add_argument("--session", action="append", required=True, help="Claude Code session ID; repeat to include more")
     sweep.add_argument("--cutoff", type=_cutoff, help="ISO 8601 timestamp with timezone; defaults to now")
@@ -232,7 +235,7 @@ def _sweep(args: argparse.Namespace) -> None:
         sys.exit("No knowledge base: pass --kb or run `contextops install` first.")
     ctx = create_run(
         app, Path(kb).expanduser(), "origin", "manual",
-        args.head, args.base, strategy=args.strategy, sessions=args.session, cutoff=args.cutoff,
+        args.head, args.base, backend=args.backend, strategy=args.strategy, sessions=args.session, cutoff=args.cutoff,
     )
     if ctx is None:
         sys.exit("Nothing to sweep: base and head are the same commit.")
@@ -243,6 +246,9 @@ def _execute(run_dir: Path, orchestrate) -> None:
     print(f"Run artifacts: {run_dir}", flush=True)
     asyncio.run(orchestrate(run_dir))
     print((run_dir / "completion.txt").read_text(encoding="utf-8"), end="")
+    metrics = json.loads((run_dir / "metrics.json").read_text(encoding="utf-8"))
+    if metrics.get("backend") == "codex" and any(a["status"] != "success" for a in metrics["agents"]):
+        raise SystemExit(1)
 
 
 def _spawn(run_dir: Path) -> None:
