@@ -138,8 +138,10 @@ async def _propose(
         raise ValueError("The committed configuration has no checks.agent")
     from contextops.orchestrator import _prepare_auth
 
-    _prepare_auth(config)
-    spec = replace(load_agent(config.checks.agent, config.default_model), tools=READ_ONLY_TOOLS)
+    if config.backend == "claude":
+        _prepare_auth(config)
+    spec = replace(load_agent(config.checks.agent, config.default_model, config.backend, config.model_override),
+                   tools=READ_ONLY_TOOLS)
     prompt = "\n".join([
         f"Application {ctx.app_label} at {ctx.head_sha}.",
         f"Evidence pack: {ctx.pack}",
@@ -149,7 +151,7 @@ async def _propose(
     with _worktree(ctx.app_root, ctx.head_sha, receipt.parent) as checkout:
         run = await run_agent(
             spec, label="check-proposer", system=spec.prompt, prompt=prompt, schema=PROPOSAL_SCHEMA,
-            cwd=checkout, dirs=[ctx.pack], budget_usd=min(config.budget.per_agent_usd, remaining),
+            cwd=checkout, dirs=[ctx.pack], run_dir=ctx.run_dir, budget_usd=min(config.budget.per_agent_usd, remaining),
             max_turns=config.budget.max_turns,
         )
         ledger.add(run)
@@ -157,7 +159,7 @@ async def _propose(
         if run.output is None:
             _write_json(receipt, {**result, "status": "failed", "reason": "Check proposer did not complete"})
             return
-        candidate = run.output["candidate"]
+        candidate = run.output.get("candidate")
         if candidate is None:
             _write_json(receipt, {**result, "reason": run.output["reason"]})
             return
@@ -194,7 +196,8 @@ async def propose_manually(run_dir: Path) -> Path:
         return receipt
     records = json.loads((ctx.run_dir / "review.json").read_text(encoding="utf-8"))["accepted"]
     with _worktree(ctx.kb_root, ctx.kb_baseline, ctx.run_dir) as checkout:
-        config = load_config(checkout)
+        config = load_config(checkout, ctx.backend)
+        config.model_override = ctx.model
         if not config.checks.agent:
             raise ValueError("This sweep's committed configuration has no checks.agent")
         return await propose(ctx, config, records, Ledger(config.budget.per_agent_usd), manual=True)
@@ -234,4 +237,5 @@ def apply(run_dir: Path, digest: str) -> Path:
     if (gitutil.rev_parse(ctx.app_root, "HEAD") != ctx.head_sha or gitutil.status(ctx.app_root)):
         raise ValueError("Application checkout must be clean and at the exact reviewed revision")
     _apply_patch(ctx.app_root, patch)
+    _write_json(ctx.run_dir / OUTPUT / "applied.json", {"patch_sha256": digest, "base": ctx.head_sha})
     return ctx.app_root

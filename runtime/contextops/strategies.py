@@ -21,7 +21,7 @@ from contextops.agents import AgentRun, AgentSpec, Ledger, load_agent, role_mess
 from contextops.config import InitConfig
 from contextops.initializer import Worker
 from contextops.run import RunContext
-from contextops.schemas import AGENT_OUTPUT
+from contextops.schemas import agent_output
 
 
 @dataclass
@@ -90,7 +90,7 @@ async def run_worker(
         label=worker.label,
         system=shared_system_prompt(config),
         prompt=prompt or role_message(worker.spec) + "\n\n" + worker_prompt(worker, ctx),
-        schema=AGENT_OUTPUT,
+        schema=agent_output(ctx.profile),
         run_dir=ctx.run_dir,
         cwd=ctx.pack,
         dirs=[ctx.app_snapshot, ctx.kb_snapshot],
@@ -200,14 +200,14 @@ def _subtract_parent(child: AgentRun, parent: AgentRun) -> dict:
 async def sweeper_first(
     workers: list[Worker], ctx: RunContext, config: InitConfig, ledger: Ledger
 ) -> list[WorkerResult]:
-    spec = load_agent(config.sweeper, config.default_model, config.backend)
+    spec = load_agent(config.sweeper, config.default_model, config.backend, config.model_override)
     system = shared_system_prompt(config)
     sweeper = await run_agent(
         spec,
         label="sweeper",
         system=system,
         prompt=sweeper_prompt(spec, workers, ctx),
-        schema=AGENT_OUTPUT,
+        schema=agent_output(ctx.profile),
         run_dir=ctx.run_dir,
         cwd=ctx.pack,
         dirs=[ctx.app_snapshot, ctx.kb_snapshot],
@@ -215,7 +215,7 @@ async def sweeper_first(
         max_turns=config.budget.max_turns,
     )
     ledger.add(sweeper)
-    parent_prefix = _prefix(system, AGENT_OUTPUT, spec)
+    parent_prefix = _prefix(system, agent_output(ctx.profile), spec)
     handoff = {"parent": asdict(sweeper), "children": [], "cache_prefix": parent_prefix}
     if sweeper.status != "success" or not sweeper.session_id:
         # No fresh-session fallback: that would turn this run into experiment B.
@@ -233,7 +233,7 @@ async def sweeper_first(
                 label=worker.label,
                 system=system,
                 prompt=fork_prompt(worker, ctx),
-                schema=AGENT_OUTPUT,
+                schema=agent_output(ctx.profile),
                 run_dir=ctx.run_dir,
                 cwd=ctx.pack,
                 dirs=[ctx.app_snapshot, ctx.kb_snapshot],
@@ -248,7 +248,7 @@ async def sweeper_first(
             handoff["children"].append({
                 "label": worker.label, "session_id": run.session_id, "status": run.status,
                 # False means this fork cannot read the inherited history from the cache.
-                "shares_cache_prefix": _prefix(system, AGENT_OUTPUT, worker.spec) == parent_prefix,
+                "shares_cache_prefix": _prefix(system, agent_output(ctx.profile), worker.spec) == parent_prefix,
                 "incremental": asdict(run), **raw,
             })
             return WorkerResult(worker, run)
@@ -324,7 +324,7 @@ async def deliver_handoffs(
                 label=f"{worker.label}:handoffs",
                 system=shared_system_prompt(config),
                 prompt=handoff_prompt(worker, notes),
-                schema=AGENT_OUTPUT,
+                schema=agent_output(ctx.profile),
                 run_dir=ctx.run_dir,
                 cwd=ctx.pack,
                 dirs=[ctx.app_snapshot, ctx.kb_snapshot],

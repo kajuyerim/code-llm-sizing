@@ -80,6 +80,8 @@ class InitConfig:
     memory: MemorySettings
     output: OutputSettings
     checks: CheckSettings = field(default_factory=CheckSettings)
+    model_override: str | None = None
+    profiles: dict = field(default_factory=dict)
 
 
 def load_config(kb_root: Path, backend: str | None = None) -> InitConfig:
@@ -121,6 +123,7 @@ def load_config(kb_root: Path, backend: str | None = None) -> InitConfig:
         conversation=ConversationSettings(**evidence.get("conversation", {})),
         memory=MemorySettings(**evidence.get("memory", {})),
         checks=checks,
+        profiles=meta.get("knowledge_profiles", {}),
         output=OutputSettings(
             runs_dir=Path(output.get("runs_dir", "~/.contextops/runs")).expanduser(),
             branch=output.get("branch", "contextops/{strategy}/{run_id}"),

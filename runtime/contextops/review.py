@@ -74,6 +74,15 @@ def _file(record: dict, owns: str, ctx: RunContext, evidence: Evidence, review: 
     problem = _problem(record, owns, ctx, evidence)
     if problem:
         review.rejected.append({**record, "rejected_because": problem})
+    elif ctx.profile is not None and record["op"] != "NEEDS_REVIEW":
+        categories = {item["id"]: item["enabled"] for item in ctx.profile["categories"]}
+        category = record.get("category")
+        if category not in categories:
+            review.deferred.append({**record, "policy_reason": "Missing or unknown profile category"})
+        elif not categories[category]:
+            review.rejected.append({**record, "rejected_because": "Category is disabled in the active profile"})
+        else:
+            review.accepted.append(record)
     elif record["op"] == "NEEDS_REVIEW":
         review.deferred.append(record)
     else:

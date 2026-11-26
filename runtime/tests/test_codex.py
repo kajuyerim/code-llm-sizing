@@ -32,7 +32,8 @@ assert args[:2] == ["exec", "--ignore-user-config"]
 assert args[args.index("-s")+1] == "read-only"
 assert "--ignore-rules" in args and "--strict-config" in args
 assert json.loads(settings["forced_login_method"]) == "chatgpt"
-assert {"memories", "shell_tool", "unified_exec", "plugins", "hooks", "multi_agent"} <= set(args)
+assert {"memories", "shell_tool", "unified_exec", "plugins", "hooks", "multi_agent", "code_mode"} <= set(args)
+assert "code_mode_host" not in args
 assert not {"OPENAI_API_KEY", "CODEX_API_KEY", "CODEX_THREAD_ID"} & set(os.environ)
 assert Path(os.environ["CODEX_HOME"]).name == "fake-login"
 scope = json.loads(json.loads(settings["mcp_servers.contextops_files.args"])[-1])
@@ -50,13 +51,19 @@ if parent and scenario == "parent-id":
     sid = parent
 output = dict(records=[], findings=[], handoffs=[], unowned=[], unresolved=[], contradictions=[],
               coverage=dict(sessions_read=[], files_read=[], notes=""))
-if writer:
+if scenario == "blocked-tools":
+    output["coverage"]["notes"] = "The code-mode host is disabled; I could not inspect evidence."
+elif writer:
     assert "Write" in tools and "Edit" in tools
     accepted = json.loads((run / "accepted.json").read_text())
     assert len(accepted) == 1
     path = Path(cwd) / accepted[0]["target"]
     path.write_text(path.read_text() + "\nTERM-999 Test definition\n")
     output = dict(applied=[], skipped=[], log_entry="")
+elif "Validated records in order" in prompt:
+    assert set(tools) == {"Read", "Glob", "Grep"}
+    assert str(run / "pack") in roots
+    output = dict(reason="No check needed for a terminology definition", candidate=None)
 elif "Unowned findings, newest last:" in prompt:
     assert set(tools) == {"Read", "Glob", "Grep"}
     assert str(run/"unowned-backlog.jsonl") in roots
@@ -74,7 +81,11 @@ else:
             text="Test definition", scope="app:application", reason="Developer definition",
             evidence=[dict(kind="conversation", session="chosen-session", message="message-1",
                            path=None, quote=None, line=None)]))
+        schema = json.loads(Path(args[args.index("--output-schema") + 1]).read_text())
+        if "category" in schema["properties"]["records"]["items"]["properties"]:
+            output["records"][0]["category"] = "domain"
 print(json.dumps(dict(type="thread.started", thread_id=sid)))
+print(json.dumps(dict(type="item.completed", item=dict(type="agent_message", text="Reviewing selected evidence"))))
 if scenario != "incomplete":
     print(json.dumps(dict(type="turn.completed", usage=dict(input_tokens=123, output_tokens=9))))
 Path(args[args.index("-o")+1]).write_text(json.dumps({} if scenario == "bad-schema" else output))
@@ -98,16 +109,47 @@ class CodexTests(unittest.TestCase):
         env.start()
         self.addCleanup(env.stop)
 
-    def sweep(self, strategy, *, expect_failure=False):
+    def sweep(self, strategy, *, expect_failure=False, model=None):
         exit_check = self.assertRaises(SystemExit) if expect_failure else contextlib.nullcontext()
         with contextlib.redirect_stdout(io.StringIO()), exit_check as error:
             main(["sweep", "--repo", str(self.app), "--kb", str(self.kb), "--base", self.base,
                   "--head", self.head, "--session", "chosen-session", "--backend", "codex",
-                  "--strategy", strategy, "--cutoff", self.cutoff.isoformat()])
+                  "--strategy", strategy, "--cutoff", self.cutoff.isoformat(),
+                  *(["--model", model] if model else [])])
         if expect_failure:
             self.assertEqual(error.exception.code, 1)
         states = list((self.root / "runs" / "codex" / strategy).glob("*/run.json"))
         return load_run(max(states, key=lambda p: p.stat().st_mtime_ns).parent)
+
+    def test_disabled_evidence_host_is_not_a_successful_empty_sweep(self):
+        self.scenario.write_text("blocked-tools")
+        ctx = self.sweep("sweeper-first", expect_failure=True)
+        metrics = json.loads((ctx.run_dir / "metrics.json").read_text())
+        self.assertEqual(metrics["agents"][0]["status"], "failed")
+        self.assertIn("tool host", metrics["agents"][0]["error"])
+
+    def test_profile_and_check_proposer_use_codex_and_publish_visible_messages(self):
+        from contextops import frontmatter
+        import yaml
+
+        meta, body = frontmatter.read(self.kb / "init.md")
+        meta["checks"]["automatic"] = True
+        meta["knowledge_profiles"] = {"application": {"categories": [
+            {"id": "domain", "name": "Domain", "description": "Keep domain definitions", "enabled": True},
+        ]}}
+        (self.kb / "init.md").write_text("---\n" + yaml.safe_dump(meta) + "---\n" + body)
+        self.commit(self.kb)
+
+        ctx = self.sweep("fresh-specialists", model="test-selected-model")
+        review = json.loads((ctx.run_dir / "review.json").read_text())
+        self.assertEqual(review["accepted"][0]["category"], "domain")
+        proposal = json.loads((ctx.run_dir / "check-proposals" / "proposal.json").read_text())
+        self.assertEqual(proposal["status"], "no-candidate")
+        events = [json.loads(line) for line in (ctx.run_dir / "events.jsonl").read_text().splitlines()]
+        self.assertTrue(any(item["kind"] == "agent_message" and item["agent"] == "check-proposer"
+                            for item in events))
+        self.assertEqual({item["model"] for item in events if item["kind"] == "agent_started"},
+                         {"test-selected-model"})
 
     def test_both_strategies_via_cli(self):
         claude = self.prepare()

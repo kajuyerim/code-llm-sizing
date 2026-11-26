@@ -18,12 +18,13 @@ import jsonschema
 
 from contextops.agents import AgentRun, AgentSpec, EDIT_TOOLS, READ_ONLY_TOOLS
 
-# With a read-only native sandbox, the only writer is the scoped stdio tool server.
+# The CLI host must stay available to transport scoped MCP tool calls. Shell
+# and native editing remain disabled, with writes limited to the scoped server.
 DISABLED = (
     "shell_tool", "unified_exec", "shell_snapshot", "apps", "plugins", "remote_plugin",
     "memories", "multi_agent", "multi_agent_v2", "browser_use", "computer_use",
     "image_generation", "view_image", "hooks", "skill_search", "workspace_dependencies",
-    "goals", "sleep_tool", "code_mode", "code_mode_host", "in_app_browser",
+    "goals", "sleep_tool", "code_mode", "in_app_browser",
 )
 TIMEOUT_SECONDS = 600
 
@@ -90,6 +91,10 @@ def _read_events(path: Path, run: AgentRun, model: str) -> None:
         for line in stream:
             event = json.loads(line)
             kind = event["type"]
+            item = event.get("item", {})
+            if kind in ("item.completed", "item.failed") and item.get("type") == "mcp_tool_call":
+                if "code-mode host is disabled" in json.dumps(item.get("error", "")).lower():
+                    raise CodexResponseError("Codex could not open the scoped evidence tools because its tool host is disabled")
             if kind == "thread.started":
                 session = str(UUID(event["thread_id"]))
                 if run.session_id:
@@ -107,6 +112,28 @@ def _read_events(path: Path, run: AgentRun, model: str) -> None:
                 raise CodexResponseError("Codex reported a failed turn")
     if not run.session_id or run.num_turns != 1:
         raise CodexResponseError("Expected a new Codex thread and one completed turn")
+
+
+async def _stream_messages(path, task, directory, label):
+    from contextops.events import message
+
+    with path.open(encoding="utf-8") as stream:
+        while True:
+            position = stream.tell()
+            line = stream.readline()
+            if line.endswith("\n"):
+                try:
+                    event = json.loads(line)
+                except ValueError:
+                    continue
+                item = event.get("item", {})
+                if event.get("type") == "item.completed" and item.get("type") == "agent_message":
+                    message(directory, label, item.get("text", ""))
+                continue
+            if task.done():
+                break
+            stream.seek(position)
+            await asyncio.sleep(.10)
 
 
 async def run_codex(spec: AgentSpec, *, label, system, prompt, schema, cwd, dirs, run_dir,
@@ -136,7 +163,8 @@ async def run_codex(spec: AgentSpec, *, label, system, prompt, schema, cwd, dirs
                     *cmd, cwd=work, env=env, stdin=asyncio.subprocess.PIPE, stdout=events,
                     stderr=asyncio.subprocess.DEVNULL, start_new_session=True)
                 try:
-                    await asyncio.wait_for(proc.communicate(prompt.encode()), TIMEOUT_SECONDS)
+                    task = asyncio.create_task(asyncio.wait_for(proc.communicate(prompt.encode()), TIMEOUT_SECONDS))
+                    await asyncio.gather(task, _stream_messages(scratch / "events", task, run_dir, label))
                 finally:
                     if proc.returncode is None:
                         try:
@@ -150,7 +178,11 @@ async def run_codex(spec: AgentSpec, *, label, system, prompt, schema, cwd, dirs
             _read_events(scratch / "events", run, spec.model)
             raw = json.loads((scratch / "output.json").read_text(encoding="utf-8"))
             jsonschema.validate(raw, strict)
-            run.output = _normalize(raw)
+            output = _normalize(raw)
+            notes = (output.get("coverage") or {}).get("notes", "")
+            if "code-mode host is disabled" in notes.lower():
+                raise CodexResponseError("Codex reported that its evidence tool host was disabled")
+            run.output = output
             run.status = "success"
     except TimeoutError:
         run.error = "Codex call timed out"

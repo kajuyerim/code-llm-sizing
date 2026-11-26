@@ -34,7 +34,7 @@ async def write_changes(
     accepted = ctx.run_dir / "accepted.json"
     accepted.write_text(json.dumps(review.accepted, indent=2), encoding="utf-8")
 
-    spec = load_agent(config.writer, config.default_model, config.backend)
+    spec = load_agent(config.writer, config.default_model, config.backend, config.model_override)
     prompt = "\n".join([
         f"Run: {ctx.run_id}, application {ctx.app_label} at {ctx.head_sha[:7]}",
         f"Records to apply: {accepted}",

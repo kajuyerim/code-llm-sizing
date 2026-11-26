@@ -21,6 +21,8 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="contextops")
     commands = parser.add_subparsers(dest="command", required=True)
 
+    commands.add_parser("ui", help="open the local web console")
+
     initialize = commands.add_parser("init", help="prepare empty knowledge on a new local branch")
     initialize.add_argument("--kb", type=Path, required=True)
     initialize.add_argument("--branch", required=True)
@@ -88,12 +90,13 @@ def main(argv: list[str] | None = None) -> None:
     sweep.add_argument("--repo", type=Path, default=Path.cwd())
     sweep.add_argument("--kb", type=Path, help="defaults to the repo's contextops.kb setting")
     sweep.add_argument("--backend", choices=BACKENDS, help="maintenance backend (default from init.md)")
+    sweep.add_argument("--model", help="override the model for every agent in this sweep")
     sweep.add_argument("--strategy", choices=["fresh-specialists", "sweeper-first"], required=True)
     sweep.add_argument("--session", action="append", required=True, help="Claude Code session ID; repeat to include more")
     sweep.add_argument("--cutoff", type=_cutoff, help="ISO 8601 timestamp with timezone; defaults to now")
 
     args = parser.parse_args(argv)
-    handlers = {"init": _init, "attach": _attach, "refresh": _refresh, "install": _install, "hook": _hook, "run": _run, "sweep": _sweep, "sessions": _sessions,
+    handlers = {"ui": _ui, "init": _init, "attach": _attach, "refresh": _refresh, "install": _install, "hook": _hook, "run": _run, "sweep": _sweep, "sessions": _sessions,
                 "export-session": _export_session, "import-session": _import_session, "checks": _checks}
     try:
         handlers[args.command](args)
@@ -101,6 +104,12 @@ def main(argv: list[str] | None = None) -> None:
         # Do not echo subprocess stderr, which can contain private source or auth data.
         message = "Git operation failed; check the repository and commit refs" if isinstance(exc, subprocess.CalledProcessError) else str(exc)
         parser.exit(2, f"contextops: {message}\n")
+
+
+def _ui(_args: argparse.Namespace) -> None:
+    from contextops.web_console import serve
+
+    serve()
 
 
 def _cutoff(value: str) -> datetime:
@@ -264,6 +273,7 @@ def _sweep(args: argparse.Namespace) -> None:
     ctx = create_run(
         app, Path(kb).expanduser(), "origin", "manual",
         args.head, args.base, backend=args.backend, strategy=args.strategy, sessions=args.session, cutoff=args.cutoff,
+        model=args.model,
     )
     if ctx is None:
         sys.exit("Nothing to sweep: base and head are the same commit.")
@@ -272,7 +282,14 @@ def _sweep(args: argparse.Namespace) -> None:
 
 def _execute(run_dir: Path, orchestrate) -> None:
     print(f"Run artifacts: {run_dir}", flush=True)
-    asyncio.run(orchestrate(run_dir))
+    was_started = (run_dir / "started").exists()
+    try:
+        asyncio.run(orchestrate(run_dir))
+    except Exception:
+        from contextops.events import emit
+        if not was_started and not (run_dir / "started").exists() and (run_dir / "run.json").is_file():
+            emit(run_dir, "run_finished", status="failed")
+        raise
     print((run_dir / "completion.txt").read_text(encoding="utf-8"), end="")
     metrics = json.loads((run_dir / "metrics.json").read_text(encoding="utf-8"))
     if metrics.get("backend") == "codex" and any(a["status"] != "success" for a in metrics["agents"]):

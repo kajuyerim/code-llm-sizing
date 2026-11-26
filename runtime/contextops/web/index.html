@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Context Ops</title>
+<link rel="stylesheet" href="/console.css">
+<script src="/console.js" defer></script>
+</head>
+<body>
+<header>
+  <strong class="brand">Context Ops<span>_</span></strong>
+  <nav aria-label="Console">
+    <button data-page="setup" aria-current="page">01 Setup</button>
+    <button data-page="agents">02 Agents</button>
+    <button data-page="review">03 Review</button>
+  </nav>
+  <details id="project-menu" class="project-menu">
+    <summary id="project-toggle"><span id="project-name">Projects</span><span class="project-caret" aria-hidden="true">⌄</span></summary>
+    <div class="project-popover">
+      <div id="projects"></div>
+      <button id="add-project">＋ Add project</button>
+    </div>
+  </details>
+</header>
+<main id="main" tabindex="-1"></main>
+<div id="notice" role="status" aria-live="polite" hidden></div>
+<div id="wipe" aria-hidden="true"></div>
+</body>
+</html>
