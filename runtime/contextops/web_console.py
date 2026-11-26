@@ -95,18 +95,46 @@ class Console:
             raise ValueError("Knowledge checkout moved. Reconnect the project.")
         return row, app, Path(selected).resolve()
 
+    @staticmethod
+    def branches(app: Path) -> tuple[list[dict], str]:
+        current = gitutil.git(app, "symbolic-ref", "--quiet", "HEAD", check=False)
+        rows = gitutil.git(app, "for-each-ref", "--format=%(refname)%09%(refname:short)%09%(symref)",
+                           "refs/heads", "refs/remotes").splitlines()
+        branches = []
+        for row in rows:
+            ref, label, *target = row.split("\t")
+            if not any(target):
+                branches.append({"ref": ref, "label": label})
+        if not current:
+            current = "HEAD"
+            branches.insert(0, {"ref": "HEAD", "label": "HEAD (detached)"})
+        return branches, current
+
+    @staticmethod
+    def commit_range(app: Path, branch: str) -> list[str]:
+        branches, _ = Console.branches(app)
+        if not any(item["ref"] == branch for item in branches):
+            raise ValueError("Choose a local or remote-tracking branch from this checkout")
+        tip = gitutil.rev_parse(app, branch)
+        return gitutil.git(app, "log", "--first-parent", "-30", "--format=%H%x09%s", tip, "--").splitlines()
+
+    def project_commits(self, key: str, branch: str) -> dict:
+        _, app, _ = self.roots(key)
+        return {"commits": self.commit_range(app, branch)}
+
     def load_project(self, key: str) -> dict:
         row, app, kb = self.roots(key)
         config = load_config(kb)
         slug = gitutil.config_get(app, "contextops.app") or app.name.lower()
         settings, _ = frontmatter.read(kb / "init.md")
+        branches, current_branch = self.branches(app)
         return {
             **row, "kb": str(kb), "app_name": slug, "backend": config.backend,
             "defaults": {"claude": settings.get("model", "sonnet"),
                          "codex": settings.get("codex_model", "gpt-6.1-terra")},
             "codex_available": bool(shutil.which("codex")), "auth": config.auth, "scope": config.scope,
             "categories": config.profiles.get(slug, config.profiles.get("*", {})).get("categories", []),
-            "commits": gitutil.git(app, "log", "-30", "--format=%H%x09%s").splitlines(),
+            "branches": branches, "branch": current_branch, "commits": self.commit_range(app, current_branch),
             "sessions": [asdict(item) for item in transcripts.list_sessions(app)[:40]],
             "dirty": bool(gitutil.status(kb)), "diff": gitutil.git(kb, "diff", "HEAD")[:200_000],
             "runs": list(self.runs(key).values()),
@@ -218,6 +246,12 @@ class Console:
             with self.lock:
                 if any(run["status"] in ("queued", "running") for run in self.runs(key).values()):
                     raise ValueError("This project already has an active run")
+                branch = data.get("branch")
+                if branch is not None:
+                    commits = [row.split("\t", 1)[0] for row in self.commit_range(app, branch)]
+                    head, base = data["head"], data["base"]
+                    if head not in commits or base not in commits or commits.index(base) <= commits.index(head):
+                        raise ValueError("Choose an earlier base and a later head from the selected branch")
                 ctx = create_run(app, kb, "origin", "manual", data["head"], data["base"],
                                  backend=backend, strategy=data["strategy"], sessions=data["sessions"],
                                  model=model, local_only=True)
@@ -276,15 +310,15 @@ class Handler(BaseHTTPRequestHandler):
         url = urlsplit(self.path)
         query = parse_qs(url.query)
         params = {key: values[0] for key, values in query.items()}
+        if (url.path == "/open" and self.headers.get("Host") == self.server.host
+                and hmac.compare_digest(params.get("token", ""), self.server.token)):
+            self.send_response(HTTPStatus.SEE_OTHER)
+            self.send_header("Set-Cookie", f"contextops_ui={self.server.token}; HttpOnly; SameSite=Strict; Path=/")
+            self.send_header("Location", "/")
+            self.send_header("Referrer-Policy", "no-referrer")
+            self.end_headers()
+            return
         if not self.authenticated():
-            if (url.path == "/open" and self.headers.get("Host") == self.server.host
-                    and hmac.compare_digest(params.get("token", ""), self.server.token)):
-                self.send_response(HTTPStatus.SEE_OTHER)
-                self.send_header("Set-Cookie", f"contextops_ui={self.server.token}; HttpOnly; SameSite=Strict; Path=/")
-                self.send_header("Location", "/")
-                self.send_header("Referrer-Policy", "no-referrer")
-                self.end_headers()
-                return
             self.respond(403, {"error": "Open the console from the local launcher."})
             return
         console = self.server.console
@@ -296,6 +330,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.respond(200, {"projects": console.projects()})
             elif url.path == "/api/project":
                 self.respond(200, console.load_project(params["project"]))
+            elif url.path == "/api/commits":
+                self.respond(200, console.project_commits(params["project"], params["branch"]))
             elif url.path == "/api/run":
                 self.respond(200, console.run_detail(params["project"], params["run"]))
             elif url.path == "/api/scan":

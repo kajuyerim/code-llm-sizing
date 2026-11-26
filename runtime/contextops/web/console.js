@@ -310,12 +310,44 @@ function renderAgents() {
   const setup = section("Start a sweep");
   const form = node("form");
   const grid = node("div", "", "form-grid");
-  const commits = details.commits.map((line) => {
-    const [sha, subject] = line.split("\t");
-    return [sha, sha.slice(0, 7) + " " + (subject || "")];
-  });
-  selector(grid, "Base commit", "base", commits, commits[1]?.[0]);
-  selector(grid, "Head commit", "head", commits, commits[0]?.[0]);
+  const branch = selector(grid, "Branch", "branch",
+    details.branches.map(({ref, label}) => [ref, label]), details.branch);
+  const head = selector(grid, "Through commit", "head", []);
+  const base = selector(grid, "Compare from", "base", []);
+  head.required = base.required = true;
+  let commits = [];
+  let branchRequest = 0;
+  function options(select, values, selected) {
+    select.replaceChildren(...values.map(([sha, subject]) => {
+      const option = node("option", subject);
+      option.value = sha;
+      option.selected = sha === selected;
+      return option;
+    }));
+  }
+  function fillBases() {
+    const before = commits.slice(commits.findIndex(([sha]) => sha === head.value) + 1);
+    options(base, before, before[0]?.[0]);
+    base.disabled = !before.length || !head.value;
+    form.querySelector('[type="submit"]').disabled = base.disabled;
+  }
+  function fillCommits(lines) {
+    commits = lines.map((line) => {
+      const [sha, subject] = line.split("\t", 2);
+      return [sha, sha.slice(0, 7) + " " + (subject || "")];
+    });
+    const heads = commits.slice(0, -1);
+    options(head, heads, heads[0]?.[0]);
+    head.disabled = !heads.length;
+    fillBases();
+  }
+  head.addEventListener("change", fillBases);
+  branch.addEventListener("change", () => guarded(async () => {
+    const version = ++branchRequest;
+    fillCommits([]);
+    const result = await query("commits", {project, branch: branch.value});
+    if (version === branchRequest && form.isConnected) fillCommits(result.commits);
+  }));
   selector(grid, "Strategy", "strategy", strategyChoices, details.strategy);
   providerFields(grid);
   const sessions = selector(grid, "Claude Code sessions", "sessions", details.sessions.map((entry) =>
@@ -331,6 +363,8 @@ function renderAgents() {
     activeAgent = "";
     await render();
   }, "Run sweep");
+  fillCommits(details.commits);
+  setup.append(node("small", "Defaults to the latest change on the selected branch. Choose an older starting commit to review a wider range."));
   if (details.dirty) setup.append(node("small", "Review and commit the knowledge setup before starting."));
   const history = section("Runs");
   history.append(button("Refresh", render));

@@ -52,6 +52,21 @@ class ConsoleTests(unittest.TestCase):
         self.assertEqual(result["run"], ctx.run_id)
         self.assertEqual(console.runs(key)[ctx.run_id]["status"], "queued")
 
+    def test_branch_picker_preserves_checkout_and_limits_commit_ranges(self):
+        console, key = self.connect()
+        gitutil.git(self.app, "branch", "older", self.base)
+        selected = console.load_project(key)
+        self.assertEqual(selected["branch"], "refs/heads/main")
+        self.assertIn({"ref": "refs/heads/older", "label": "older"}, selected["branches"])
+        rows = console.project_commits(key, "refs/heads/older")["commits"]
+        self.assertEqual([row.split("\t")[0] for row in rows], [self.base])
+        with self.assertRaisesRegex(ValueError, "selected branch"):
+            console.action("run", {"project": key, "branch": "refs/heads/older",
+                                   "head": self.head, "base": self.base})
+        self.assertEqual(gitutil.rev_parse(self.app, "HEAD"), self.head)
+        gitutil.git(self.app, "-c", "core.hooksPath=/dev/null", "switch", "--detach")
+        self.assertEqual(console.load_project(key)["branch"], "HEAD")
+
     def test_profile_review_gate(self):
         ctx = replace(self.prepare(), profile={"categories": CATEGORIES})
         record = {"op": "ADD", "target": "core/pitfalls.md", "scope": "company",

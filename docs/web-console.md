@@ -26,8 +26,10 @@ The editable category discovery role is in `agents/profile-discovery.md`.
 
 ## Run and review
 
-Choose source commits, development sessions, strategy, backend and optional
-model override under **Agents**. Both maintenance backends still read selected
+Choose an application branch under **Agents**. The console defaults to its
+latest change. **Compare from** is the older base and **Through commit** is the
+newer endpoint. Pick an older base to inspect a wider range. Then select the
+development sessions, strategy, backend and optional model override. Both maintenance backends still read selected
 Claude Code development sessions. The console records user-visible agent
 events in the run directory and replays them when a run is reopened. Raw
 provider logs and reasoning stay outside the browser stream. The review panel
