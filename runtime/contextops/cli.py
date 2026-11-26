@@ -90,6 +90,7 @@ def main(argv: list[str] | None = None) -> None:
     sweep.add_argument("--repo", type=Path, default=Path.cwd())
     sweep.add_argument("--kb", type=Path, help="defaults to the repo's contextops.kb setting")
     sweep.add_argument("--backend", choices=BACKENDS, help="maintenance backend (default from init.md)")
+    sweep.add_argument("--model", help="override the model for every agent in this sweep")
     sweep.add_argument("--strategy", choices=["fresh-specialists", "sweeper-first"], required=True)
     sweep.add_argument("--session", action="append", required=True, help="Claude Code session ID; repeat to include more")
     sweep.add_argument("--cutoff", type=_cutoff, help="ISO 8601 timestamp with timezone; defaults to now")
@@ -272,6 +273,7 @@ def _sweep(args: argparse.Namespace) -> None:
     ctx = create_run(
         app, Path(kb).expanduser(), "origin", "manual",
         args.head, args.base, backend=args.backend, strategy=args.strategy, sessions=args.session, cutoff=args.cutoff,
+        model=args.model,
     )
     if ctx is None:
         sys.exit("Nothing to sweep: base and head are the same commit.")

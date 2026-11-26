@@ -1,7 +1,8 @@
 #!/bin/sh
 set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-if [ -x "$root/.venv/bin/python" ]; then
+if [ -x "$root/.venv/bin/python" ] &&
+    "$root/.venv/bin/python" -c 'import contextops' >/dev/null 2>&1; then
     exec "$root/.venv/bin/python" -m contextops ui "$@"
 fi
 if command -v contextops >/dev/null 2>&1; then

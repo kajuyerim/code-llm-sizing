@@ -159,7 +159,7 @@ async def _propose(
         if run.output is None:
             _write_json(receipt, {**result, "status": "failed", "reason": "Check proposer did not complete"})
             return
-        candidate = run.output["candidate"]
+        candidate = run.output.get("candidate")
         if candidate is None:
             _write_json(receipt, {**result, "reason": run.output["reason"]})
             return
