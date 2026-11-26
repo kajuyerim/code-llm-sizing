@@ -92,3 +92,9 @@ pre { max-height:360px; overflow:auto; border:1px solid var(--line); color:#dfde
 @media (prefers-reduced-motion:reduce) {
   *, *::before, *::after {animation:none !important; transform:none !important;}
 }
+
+.sweep-dialog { width:min(460px, calc(100vw - 32px)); color:var(--ink); background:var(--panel); border:1px solid var(--muted); padding:1.15rem 1.35rem; box-shadow:8px 8px 0 #080909; }
+.sweep-dialog::backdrop { background:#080909b5; }
+.sweep-dialog h2 { margin-top:0; }
+.sweep-dialog button { margin-right:.55rem; }
+.sweep-dialog .state { margin:.7rem 0; }

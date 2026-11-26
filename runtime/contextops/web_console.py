@@ -118,9 +118,29 @@ class Console:
         tip = gitutil.rev_parse(app, branch)
         return gitutil.git(app, "log", "--first-parent", "-30", "--format=%H%x09%s", tip, "--").splitlines()
 
-    def project_commits(self, key: str, branch: str) -> dict:
-        _, app, _ = self.roots(key)
-        return {"commits": self.commit_range(app, branch)}
+    def sweep_range(self, key: str, branch: str) -> dict:
+        _, app, kb = self.roots(key)
+        commits = [row.split("\t", 1)[0] for row in self.commit_range(app, branch)]
+        head = commits[0]
+        config = load_config(kb)
+        app_name = gitutil.config_get(app, "contextops.app") or app.name.lower()
+        profile = config.profiles.get(app_name, config.profiles.get("*"))
+        kb_head = gitutil.rev_parse(kb, "HEAD")
+        for run in self.runs(key).values():
+            if run["status"] != "complete":
+                continue
+            directory = Path(run["dir"])
+            checkpoint = _json(directory / "checkpoint.json")
+            if not checkpoint:
+                continue
+            ctx = load_run(directory)
+            if ctx.source_branch != branch or ctx.profile != profile:
+                continue
+            if (gitutil.succeeds(kb, "merge-base", "--is-ancestor", checkpoint["knowledge_commit"], kb_head)
+                    and gitutil.succeeds(app, "merge-base", "--is-ancestor", ctx.head_sha, head)):
+                return {"head": head, "base": ctx.head_sha, "checkpoint": True, "ready": ctx.head_sha != head}
+        base = commits[1] if len(commits) > 1 else None
+        return {"head": head, "base": base, "checkpoint": False, "ready": bool(base)}
 
     def load_project(self, key: str) -> dict:
         row, app, kb = self.roots(key)
@@ -234,6 +254,17 @@ class Console:
         load_config(kb, backend)
         if model and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,119}", model):
             raise ValueError("Enter a valid provider model identifier")
+        if action == "sweep-defaults":
+            strategy = data["strategy"]
+            if strategy not in ("fresh-specialists", "sweeper-first"):
+                raise ValueError("Choose a supported sweep strategy")
+            with self.lock:
+                projects = self.projects()
+                projects[key].update(strategy=strategy, run_backend=backend, run_model=model)
+                stage = self.registry.with_suffix(".tmp")
+                stage.write_text(json.dumps(projects, indent=2) + "\n", encoding="utf-8")
+                stage.replace(self.registry)
+            return {"saved": True}
         if action == "scan":
             with self.lock:
                 if self.scans.get(key, {}).get("status") == "running":
@@ -247,14 +278,22 @@ class Console:
                 if any(run["status"] in ("queued", "running") for run in self.runs(key).values()):
                     raise ValueError("This project already has an active run")
                 branch = data.get("branch")
-                if branch is not None:
-                    commits = [row.split("\t", 1)[0] for row in self.commit_range(app, branch)]
+                if branch is None:
                     head, base = data["head"], data["base"]
-                    if head not in commits or base not in commits or commits.index(base) <= commits.index(head):
-                        raise ValueError("Choose an earlier base and a later head from the selected branch")
-                ctx = create_run(app, kb, "origin", "manual", data["head"], data["base"],
-                                 backend=backend, strategy=data["strategy"], sessions=data["sessions"],
-                                 model=model, local_only=True)
+                    strategy = data["strategy"]
+                else:
+                    span = self.sweep_range(key, branch)
+                    if not span["ready"]:
+                        raise ValueError("There are no new commits to sweep on this branch")
+                    if data.get("preview") != [span["base"], span["head"]]:
+                        raise ValueError("The suggested range changed. Reopen the sweep dialog to review it.")
+                    head, base = span["head"], span["base"]
+                    backend = row.get("run_backend", backend)
+                    model = row.get("run_model", model)
+                    strategy = row["strategy"]
+                ctx = create_run(app, kb, "origin", "manual", head, base,
+                                 backend=backend, strategy=strategy, sessions=data["sessions"],
+                                 model=model, local_only=True, source_branch=branch)
                 if ctx is None:
                     raise ValueError("Choose different base and head commits")
                 self.launch(ctx)
@@ -330,8 +369,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.respond(200, {"projects": console.projects()})
             elif url.path == "/api/project":
                 self.respond(200, console.load_project(params["project"]))
-            elif url.path == "/api/commits":
-                self.respond(200, console.project_commits(params["project"], params["branch"]))
+            elif url.path == "/api/sweep-range":
+                self.respond(200, console.sweep_range(params["project"], params["branch"]))
             elif url.path == "/api/run":
                 self.respond(200, console.run_detail(params["project"], params["run"]))
             elif url.path == "/api/scan":

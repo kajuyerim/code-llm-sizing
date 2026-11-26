@@ -39,6 +39,7 @@ class RunContext:
     model_default: str | None = None
     profile: dict | None = None
     local_only: bool = False
+    source_branch: str | None = None
 
     @property
     def app_label(self) -> str:
@@ -66,7 +67,7 @@ def create_run(
     app_root: Path, kb_root: Path, remote: str, ref: str, local_sha: str, remote_sha: str,
     *, backend: str | None = None, strategy: str | None = None, sessions: list[str] | None = None,
     cutoff: datetime | None = None, app_name: str | None = None, auto_select: bool = False,
-    model: str | None = None, local_only: bool = False,
+    model: str | None = None, local_only: bool = False, source_branch: str | None = None,
 ) -> RunContext | None:
     from contextops.strategies import STRATEGIES
 
@@ -126,7 +127,7 @@ def create_run(
         since=None, cutoff=cutoff, strategy=strategy, sessions=sessions,
         conversation_sha256=hashlib.sha256(frozen).hexdigest(),
         scope=config.scope, app=app, backend=config.backend, model=model, model_default=config.default_model, local_only=local_only,
-        profile=config.profiles.get(app, config.profiles.get("*")),
+        profile=config.profiles.get(app, config.profiles.get("*")), source_branch=source_branch,
     )
     if not gitutil.succeeds(kb_root, "check-ref-format", "--branch", ctx.branch):
         raise ValueError("init.md: output.branch produces an invalid Git branch")

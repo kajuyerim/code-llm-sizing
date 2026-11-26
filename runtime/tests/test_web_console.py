@@ -1,6 +1,7 @@
 """Test the browser-facing runtime without external inference."""
 
 import asyncio
+import json
 import unittest
 from dataclasses import replace
 from unittest.mock import AsyncMock, patch
@@ -58,14 +59,36 @@ class ConsoleTests(unittest.TestCase):
         selected = console.load_project(key)
         self.assertEqual(selected["branch"], "refs/heads/main")
         self.assertIn({"ref": "refs/heads/older", "label": "older"}, selected["branches"])
-        rows = console.project_commits(key, "refs/heads/older")["commits"]
-        self.assertEqual([row.split("\t")[0] for row in rows], [self.base])
-        with self.assertRaisesRegex(ValueError, "selected branch"):
+        span = console.sweep_range(key, "refs/heads/older")
+        self.assertEqual(span, {"base": None, "head": self.base, "ready": False, "checkpoint": False})
+        with self.assertRaisesRegex(ValueError, "no new commits"):
             console.action("run", {"project": key, "branch": "refs/heads/older",
                                    "head": self.head, "base": self.base})
         self.assertEqual(gitutil.rev_parse(self.app, "HEAD"), self.head)
         gitutil.git(self.app, "-c", "core.hooksPath=/dev/null", "switch", "--detach")
         self.assertEqual(console.load_project(key)["branch"], "HEAD")
+
+    def test_checkpoint_requires_the_knowledge_commit_in_the_checkout(self):
+        console, key = self.connect()
+        branch = "refs/heads/main"
+        ctx = self.prepare()
+        manifest = ctx.run_dir / "run.json"
+        state = json.loads(manifest.read_text())
+        state["source_branch"] = branch
+        manifest.write_text(json.dumps(state))
+        emit(ctx.run_dir, "run_finished", status="complete")
+        checkpoint = ctx.run_dir / "checkpoint.json"
+        checkpoint.write_text(json.dumps({"knowledge_commit": self.head}))
+        self.assertFalse(console.sweep_range(key, branch)["checkpoint"])
+        checkpoint.write_text(json.dumps({"knowledge_commit": ctx.kb_baseline}))
+        self.assertEqual(console.sweep_range(key, branch),
+                         {"base": self.head, "head": self.head, "ready": False, "checkpoint": True})
+        (self.app / "README.md").write_text("A later change")
+        self.commit(self.app)
+        updated = console.sweep_range(key, branch)
+        self.assertTrue(updated["ready"])
+        self.assertEqual(updated["base"], self.head)
+        self.assertNotEqual(updated["head"], self.head)
 
     def test_profile_review_gate(self):
         ctx = replace(self.prepare(), profile={"categories": CATEGORIES})

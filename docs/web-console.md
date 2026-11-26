@@ -26,10 +26,13 @@ The editable category discovery role is in `agents/profile-discovery.md`.
 
 ## Run and review
 
-Choose an application branch under **Agents**. The console defaults to its
-latest change. **Compare from** is the older base and **Through commit** is the
-newer endpoint. Pick an older base to inspect a wider range. Then select the
-development sessions, strategy, backend and optional model override. Both maintenance backends still read selected
+Open **New sweep** under **Agents** and choose an application branch and the
+development sessions. The console previews the range before starting. For a
+new branch or unavailable checkpoint, it uses the latest branch change.
+After a successful sweep, it resumes from the last confirmed commit for the
+branch and profile. If the sweep wrote knowledge, its commit must be present
+in the selected knowledge checkout's history. **Sweep defaults** under
+**Setup** holds the strategy, backend and optional model override. Both maintenance backends still read selected
 Claude Code development sessions. The console records user-visible agent
 events in the run directory and replays them when a run is reopened. Raw
 provider logs and reasoning stay outside the browser stream. The review panel

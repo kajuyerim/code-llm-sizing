@@ -121,6 +121,28 @@ async def orchestrate(run_dir: Path) -> Path:
         failed = bool(review.failures) or any(
             run.status != "success" for run in ledger.runs if run.label != "check-proposer"
         )
+        # The console skips work only after a complete evaluation. A written patch
+        # counts once its knowledge commit is in the selected checkout's history.
+        rejected = any(item["rejected_because"] != "Category is disabled in the active profile"
+                       for item in review.rejected)
+        applied = (outcome.writer_output or {}).get("applied", [])
+        fully_written = False
+        if ctx.source_branch and committed:
+            paths = set(gitutil.git(ctx.kb_snapshot, "diff", "--name-only", ctx.kb_baseline, "HEAD").splitlines())
+            fully_written = (
+                not (outcome.writer_output or {}).get("skipped")
+                and len(applied) == len(review.accepted)
+                and all(record["target"] in paths and any(
+                    item["target"] == record["target"] and item["op"] == record["op"]
+                    and (record["fact_id"] is None or item["fact_id"] == record["fact_id"])
+                    for item in applied
+                ) for record in review.accepted)
+            )
+        if (ctx.source_branch and not failed and not review.deferred and not rejected
+                and not review.unowned and (fully_written or not review.accepted)):
+            _dump(ctx.run_dir / "checkpoint.json", {
+                "knowledge_commit": gitutil.rev_parse(ctx.kb_snapshot, "HEAD") if committed else ctx.kb_baseline,
+            })
         emit(ctx.run_dir, "run_finished", status="failed" if failed else "complete")
         return report_path
     except Exception:

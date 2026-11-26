@@ -89,8 +89,11 @@ function submit(form, send, text) {
     });
   };
 }
-function heading(title, subtitle) {
-  main.append(node("h1", title), node("p", subtitle, "muted"));
+function heading(title) {
+  const row = node("div", "", "heading");
+  row.append(node("h1", title));
+  main.append(row);
+  return row;
 }
 function closeStream() {
   if (stream) stream.close();
@@ -156,7 +159,7 @@ async function render() {
   if (page === "checks") renderChecks();
 }
 function renderConnect(reconnect = "") {
-  heading("Connect a project", "Choose the application checkout and the knowledge repository.");
+  heading("Connect a project");
   const container = section("Local checkouts");
   const form = node("form");
   field(form, "Project name", "name", projects[reconnect]?.name || "");
@@ -193,7 +196,7 @@ function providerFields(form, onChange = () => {}) {
   return {backend, model};
 }
 function renderSetup() {
-  heading(details.name, "Connect and configure a local knowledge project.");
+  heading("Configure Project");
   const connection = section("01 · Connected checkouts");
   connection.append(node("p", details.app, "meta"), node("p", details.kb, "meta"));
   if (!details.codex_available) connection.append(node("small", "Codex CLI is unavailable on PATH."));
@@ -209,6 +212,20 @@ function renderSetup() {
     await render();
   }, "Initialize on a new branch");
   renderCategories();
+  const advanced = node("details", "", "card");
+  advanced.append(node("summary", "Sweep defaults"));
+  const defaults = node("form", "", "form-grid");
+  selector(defaults, "Strategy", "strategy", strategyChoices, details.strategy);
+  const {backend, model} = providerFields(defaults);
+  backend.value = details.run_backend || details.backend;
+  backend.dispatchEvent(new Event("change"));
+  model.value = details.run_model || "";
+  submit(defaults, async (data) => {
+    await api("sweep-defaults", {project, ...Object.fromEntries(data)});
+    notify("Sweep defaults saved");
+  }, "Save sweep defaults");
+  advanced.append(defaults);
+  main.append(advanced);
   if (details.diff) {
     const preview = section("04 · Review setup changes");
     preview.append(node("pre", details.diff));
@@ -305,67 +322,62 @@ function renderCategories() {
   categories.append(grid, actions, scanState, list, custom, save);
   draw();
 }
-function renderAgents() {
-  heading(details.name, "Review the evidence, agent activity and written knowledge.");
-  const setup = section("Start a sweep");
+function openSweep() {
+  const selected = project;
+  const dialog = node("dialog", "", "sweep-dialog");
+  dialog.append(node("h2", "New sweep"));
   const form = node("form");
-  const grid = node("div", "", "form-grid");
-  const branch = selector(grid, "Branch", "branch",
+  const branch = selector(form, "Branch", "branch",
     details.branches.map(({ref, label}) => [ref, label]), details.branch);
-  const head = selector(grid, "Through commit", "head", []);
-  const base = selector(grid, "Compare from", "base", []);
-  head.required = base.required = true;
-  let commits = [];
-  let branchRequest = 0;
-  function options(select, values, selected) {
-    select.replaceChildren(...values.map(([sha, subject]) => {
-      const option = node("option", subject);
-      option.value = sha;
-      option.selected = sha === selected;
-      return option;
-    }));
-  }
-  function fillBases() {
-    const before = commits.slice(commits.findIndex(([sha]) => sha === head.value) + 1);
-    options(base, before, before[0]?.[0]);
-    base.disabled = !before.length || !head.value;
-    form.querySelector('[type="submit"]').disabled = base.disabled;
-  }
-  function fillCommits(lines) {
-    commits = lines.map((line) => {
-      const [sha, subject] = line.split("\t", 2);
-      return [sha, sha.slice(0, 7) + " " + (subject || "")];
-    });
-    const heads = commits.slice(0, -1);
-    options(head, heads, heads[0]?.[0]);
-    head.disabled = !heads.length;
-    fillBases();
-  }
-  head.addEventListener("change", fillBases);
-  branch.addEventListener("change", () => guarded(async () => {
-    const version = ++branchRequest;
-    fillCommits([]);
-    const result = await query("commits", {project, branch: branch.value});
-    if (version === branchRequest && form.isConnected) fillCommits(result.commits);
-  }));
-  selector(grid, "Strategy", "strategy", strategyChoices, details.strategy);
-  providerFields(grid);
-  const sessions = selector(grid, "Claude Code sessions", "sessions", details.sessions.map((entry) =>
+  const sessions = selector(form, "Development sessions", "sessions", details.sessions.map((entry) =>
     [entry.session_id, entry.session_id.slice(0, 8) + " " + (entry.opening || "")]));
   sessions.multiple = true;
   sessions.required = true;
   if (sessions.options.length === 1) sessions.options[0].selected = true;
-  form.append(grid);
-  setup.append(form);
+  if (!sessions.options.length) form.append(node("small", "No local Claude Code sessions for this checkout."));
+  const range = node("p", "", "state");
+  form.append(range);
+  let preview, version = 0;
   submit(form, async (data) => {
-    const result = await api("run", {project, ...Object.fromEntries(data), sessions: data.getAll("sessions")});
-    currentRun = result.run;
-    activeAgent = "";
-    await render();
+    if (!preview?.ready) return;
+    const result = await api("run", {project: selected, branch: data.get("branch"),
+      sessions: data.getAll("sessions"), preview: [preview.base, preview.head]});
+    dialog.close();
+    if (project === selected) {
+      currentRun = result.run;
+      activeAgent = "";
+      await render();
+    }
   }, "Run sweep");
-  fillCommits(details.commits);
-  setup.append(node("small", "Defaults to the latest change on the selected branch. Choose an older starting commit to review a wider range."));
-  if (details.dirty) setup.append(node("small", "Review and commit the knowledge setup before starting."));
+  const submitButton = form.querySelector('[type="submit"]');
+  if (details.dirty) form.append(node("small", "Commit the knowledge setup before starting."));
+  form.append(button("Cancel", () => dialog.close()));
+  async function update() {
+    const request = ++version;
+    submitButton.disabled = true;
+    preview = null;
+    range.textContent = "Resolving range";
+    try {
+      const result = await query("sweep-range", {project: selected, branch: branch.value});
+      if (request !== version || !dialog.isConnected) return;
+      preview = result;
+      range.textContent = !result.ready ? "No new commits to sweep."
+        : (result.checkpoint ? "Since last confirmed sweep" : "Latest branch change")
+          + " · " + result.base.slice(0, 7) + " → " + result.head.slice(0, 7);
+      submitButton.disabled = details.dirty || !result.ready || !sessions.options.length;
+    } catch (error) {
+      if (request === version && dialog.isConnected) range.textContent = error.message;
+    }
+  }
+  branch.addEventListener("change", update);
+  dialog.addEventListener("close", () => dialog.remove(), {once: true});
+  dialog.append(form);
+  main.append(dialog);
+  dialog.showModal();
+  update();
+}
+function renderAgents() {
+  heading("Acquire Knowledge").append(button("New sweep", openSweep, "primary"));
   const history = section("Runs");
   history.append(button("Refresh", render));
   if (!details.runs.length) history.append(node("p", "No runs for this project.", "muted"));
@@ -378,7 +390,8 @@ function renderAgents() {
   }
   main.append(node("div", "", "run-detail"));
   $(".run-detail").id = "run-detail";
-  if (currentRun) selectRun(currentRun);
+  const selected = currentRun || details.runs[0]?.id;
+  if (selected) selectRun(selected);
 }
 function selectRun(id) {
   if (currentRun !== id) activeAgent = "";
@@ -490,7 +503,7 @@ function drawRun() {
   messages.scrollTop = follow ? messages.scrollHeight : oldTop;
 }
 function renderChecks() {
-  heading("Checks", "Review proposed lint rules and behavior tests.");
+  heading("Review Checks");
   const list = section("Application checks");
   for (const run of details.runs) {
     list.append(button(run.id, () => guarded(async () => {
