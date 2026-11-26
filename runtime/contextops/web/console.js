@@ -284,6 +284,15 @@ function renderSetup() {
 }
 function renderCategories() {
   const currentProject = project;
+  const draftKey = "contextops-category-draft:" + currentProject;
+  const originalProfile = JSON.stringify(details.categories);
+  const savedDraft = JSON.parse(sessionStorage.getItem(draftKey) || "null");
+  if (savedDraft?.profile === originalProfile && Array.isArray(savedDraft.categories)) {
+    draftCategories = savedDraft.categories;
+  }
+  function rememberDraft() {
+    sessionStorage.setItem(draftKey, JSON.stringify({profile: originalProfile, categories: draftCategories}));
+  }
   const categories = section("What should we track?");
   categories.classList.add("category-setup");
   const profileStatus = node("p", details.profile_scope === "team" ? "Using the team profile."
@@ -318,77 +327,129 @@ function renderCategories() {
     const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 70) || "custom";
     if (draftCategories.some((existing) => existing.id === id)) throw new Error("A category with that name already exists");
     draftCategories.push({id, name, description, enabled: true});
+    rememberDraft();
     custom.reset();
     draw();
   }, "Add category");
-  function draw() {
-    list.replaceChildren();
+  function updateCount() {
     const count = draftCategories.filter((item) => item.enabled).length;
     counter.textContent = count + " of " + draftCategories.length + " selected";
+  }
+  function openCategory(item, updateTile) {
+    const dialog = node("dialog", "", "category-dialog");
+    dialog.append(node("h2", item.name), node("h3", "What to collect"),
+      node("p", item.description));
+    if (item.reason || item.path) {
+      dialog.append(node("h3", "Why this category?"));
+      if (item.reason) dialog.append(node("p", item.reason));
+      if (item.path) dialog.append(node("code", item.path));
+    }
+    const actions = node("div", "", "actions");
+    const selection = button("", () => {
+      item.enabled = !item.enabled;
+      rememberDraft();
+      updateTile();
+      updateCount();
+      updateSelection();
+    });
+    function updateSelection() {
+      selection.textContent = item.enabled ? "Remove from profile" : "Keep category";
+      selection.setAttribute("aria-pressed", String(item.enabled));
+    }
+    updateSelection();
+    actions.append(selection, button("Close", () => dialog.close()));
+    dialog.append(actions);
+    dialog.addEventListener("close", () => dialog.remove(), {once:true});
+    document.body.append(dialog);
+    dialog.showModal();
+  }
+  function draw() {
+    list.replaceChildren();
+    updateCount();
     empty.hidden = draftCategories.length > 0;
     save.hidden = !draftCategories.length && !details.profile_scope;
     recommendations.hidden = !draftCategories.some((item) => item.recommended);
     for (const item of draftCategories) {
-      const section = node("div", "", "category");
-      const label = node("label");
-      const selected = document.createElement("input");
-      selected.type = "checkbox";
-      selected.checked = item.enabled;
-      selected.onchange = () => {
-        item.enabled = selected.checked;
-        counter.textContent = draftCategories.filter((entry) => entry.enabled).length + " of " + draftCategories.length + " selected";
-      };
-      label.append(selected, node("strong", item.name));
-      if (item.recommended) label.append(node("small", "Recommended", "category-badge"));
-      section.append(label, node("p", item.description, "muted"));
-      if (item.reason || item.path) {
-        const evidence = togglePanel("Why this category?", false);
-        if (item.reason) evidence.content.append(node("p", item.reason));
-        if (item.path) evidence.content.append(node("code", item.path));
-        section.append(evidence.wrapper);
+      const tile = node("div", "", "category-tile");
+      const title = button(item.name, () => openCategory(item, updateTile), "category-title");
+      title.setAttribute("aria-haspopup", "dialog");
+      const keep = button("", () => {
+        item.enabled = !item.enabled;
+        rememberDraft();
+        updateTile();
+        updateCount();
+      }, "category-keep");
+      function updateTile() {
+        tile.classList.toggle("selected", item.enabled);
+        keep.textContent = item.enabled ? "Selected" : "Keep";
+        keep.setAttribute("aria-pressed", String(item.enabled));
+        keep.setAttribute("aria-label", "Keep " + item.name);
       }
-      list.append(section);
+      updateTile();
+      tile.append(title, keep);
+      list.append(tile);
     }
+  }
+  function showScan(result) {
+    const previous = new Map(draftCategories.map((item) => [item.id, item]));
+    for (const item of result.categories || []) {
+      const existing = previous.get(item.id);
+      previous.set(item.id, existing ? {...item, ...existing, reason:item.reason, path:item.path,
+                                          recommended:item.recommended} : item);
+    }
+    draftCategories = [...previous.values()];
+    scanState.textContent = result.categories?.length ? "Scanned " + result.revision.slice(0, 8)
+      : "No categories suggested. You can add one manually.";
+    draw();
+  }
+  async function waitForScan(result) {
+    if (result.status === "running") {
+      scan.disabled = true;
+      scanState.textContent = "Scanning committed repository";
+    }
+    while (result.status === "running" && currentProject === project && categories.isConnected) {
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      result = await query("scan", {project: currentProject});
+    }
+    if (currentProject !== project || !categories.isConnected) return;
+    if (result.status === "failed") {
+      scanState.textContent = "";
+      throw new Error(result.error);
+    }
+    if (result.status === "complete") showScan(result);
   }
   const actions = node("div", "", "actions");
   const scan = button("Scan repository", () => guarded(async () => {
     scan.disabled = true;
     scanState.textContent = "Scanning committed repository";
     try {
-      await api("scan", {project, backend: backend.value, model: model.value,
+      const result = await api("scan", {project: currentProject, backend: backend.value, model: model.value,
                          sessions: Array.from(scanSessions.selectedOptions, (option) => option.value)});
-      while (currentProject === project && categories.isConnected) {
-        await new Promise((resolve) => setTimeout(resolve, 700));
-        const result = await query("scan", {project: currentProject});
-        if (result.status === "running") continue;
-        if (result.status === "failed") throw new Error(result.error);
-        const previous = new Map(draftCategories.map((item) => [item.id, item]));
-        for (const item of result.categories || []) {
-          const existing = previous.get(item.id);
-          previous.set(item.id, existing ? {...item, enabled: existing.enabled} : item);
-        }
-        draftCategories = [...previous.values()];
-        scanState.textContent = result.categories?.length ? "Scanned " + result.revision.slice(0, 8)
-          : "No categories suggested. You can add one manually.";
-        draw();
-        break;
-      }
+      await waitForScan(result);
     } finally { scan.disabled = false; }
   }), "primary");
   const recommendations = button("Use recommendations", () => {
     draftCategories.forEach((item) => { if ("recommended" in item) item.enabled = item.recommended; });
+    rememberDraft();
     draw();
   });
   actions.append(scan, recommendations, counter);
   const save = node("form", "", "profile-save");
   field(save, "Save as the team default", "team", false, "checkbox");
   submit(save, async (data) => {
-    await api("profile", {project, categories: draftCategories, team: data.has("team")});
+    await api("profile", {project: currentProject, categories: draftCategories, team: data.has("team")});
+    sessionStorage.removeItem(draftKey);
     notify("Profile saved to setup diff. Review and commit it.");
     await render();
   }, "Save profile");
   categories.append(actions, scanState, empty, list, customPanel.wrapper, scanOptions.wrapper, save);
   draw();
+  guarded(async () => {
+    const result = await query("scan", {project: currentProject});
+    if (result.status === "failed") return;
+    try { await waitForScan(result); }
+    finally { scan.disabled = false; }
+  });
 }
 function openSweep() {
   if ($(".sweep-dialog")) return;

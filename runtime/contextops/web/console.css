@@ -139,12 +139,18 @@ pre { max-height:360px; overflow:auto; border:1px solid var(--line); color:#dfde
 .category-setup .state:empty { display:none; }
 .category-empty { padding:.65rem .75rem; border-left:2px solid var(--line); background:#131414; }
 .category-count { margin-left:auto; }
-.category-list { margin:.65rem 0; }
-.category-list .category { padding:.7rem 0; }
-.category-list label { display:flex; align-items:center; flex-wrap:wrap; gap:.65rem; margin:0; cursor:pointer; }
-.category-list label input { margin:0; }
-.category-list p { margin:.25rem 0 0 1.55rem; }
-.category-badge { border:1px solid var(--line); padding:.05rem .3rem; font-size:.65rem; }
+.category-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,205px),1fr)); gap:.6rem; margin:.65rem 0; }
+.category-tile { min-width:0; display:flex; flex-direction:column; align-items:stretch; gap:.45rem; border:1px solid var(--line); background:#181919; padding:.6rem; }
+.category-tile.selected { background:#202d25; border-color:#718977; box-shadow:inset 3px 0 #a9c4ac; }
+.category-title { flex:1; border-color:transparent; background:transparent; padding:.2rem .35rem; text-align:left; font-weight:650; overflow-wrap:anywhere; }
+.category-title:hover { border-color:#888a82; }
+.category-keep { align-self:flex-start; padding:.15rem .45rem; color:var(--muted); font-size:.72rem; }
+.category-keep[aria-pressed="true"] { color:#d9e9da; border-color:#718977; background:#2b4132; }
+.category-dialog { width:min(540px,calc(100% - 2rem)); color:var(--ink); background:var(--panel); border:1px solid var(--muted); padding:1.1rem 1.35rem; box-shadow:8px 8px #080909; overflow-wrap:anywhere; }
+.category-dialog::backdrop { background:#080909b5; }
+.category-dialog h2 { margin-top:0; }
+.category-dialog h3 { margin-bottom:.35rem; color:var(--muted); }
+.category-dialog code { font-size:.8rem; }
 .profile-save { margin-top:1rem; padding-top:.55rem; border-top:1px solid var(--line); }
 .profile-save label { display:flex; align-items:center; gap:.5rem; }
 .profile-save label input { order:-1; margin:0; }
