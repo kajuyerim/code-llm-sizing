@@ -115,18 +115,32 @@ function chooseProject(key) {
   closeStream();
   render();
 }
+let projectRevealTimers = [];
+
+function revealProjects() {
+  for (const timer of projectRevealTimers) clearTimeout(timer);
+  projectRevealTimers = [];
+  const menu = $("#project-menu");
+  const rows = menu.querySelectorAll(".project-popover button");
+  rows.forEach((row) => row.classList.remove("revealed"));
+  if (!menu.open) return;
+  rows.forEach((row, index) => {
+    projectRevealTimers.push(setTimeout(() => {
+      if (menu.open) row.classList.add("revealed");
+    }, index * 110));
+  });
+}
+
 function renderProjects() {
   const list = $("#projects");
   list.replaceChildren();
   const name = projects[project]?.name || "Projects";
   $("#project-name").textContent = name;
   $("#project-toggle").title = name;
-  Object.entries(projects).forEach(([key, row], index) => {
-    const entry = button(row.name, () => chooseProject(key), key === project ? "active" : "");
-    entry.style.setProperty("--row", Math.min(index, 8));
-    list.append(entry);
-  });
-  $("#add-project").style.setProperty("--row", Math.min(list.childElementCount, 9));
+  for (const [key, row] of Object.entries(projects)) {
+    list.append(button(row.name, () => chooseProject(key), key === project ? "active" : ""));
+  }
+  if ($("#project-menu").open) revealProjects();
 }
 function selectPage(next) {
   if (next === page) return;
@@ -508,6 +522,16 @@ function togglePanel(label, expanded, onToggle) {
   return {wrapper, content};
 }
 
+function mergedSpans(spans) {
+  const merged = [];
+  for (const [start, end] of spans.sort(([a], [b]) => a - b)) {
+    const last = merged.at(-1);
+    if (last && start <= last[1]) last[1] = Math.max(last[1], end);
+    else merged.push([start, end]);
+  }
+  return merged;
+}
+
 function drawEdges(graph, canvas, positions, edges, active) {
   const outer = graph.getBoundingClientRect();
   if (!outer.width || !outer.height) return;
@@ -517,60 +541,72 @@ function drawEdges(graph, canvas, positions, edges, active) {
   const context = canvas.getContext("2d");
   if (!context) return;
   context.scale(scale, scale);
+  const snap = (n) => Math.round(n * scale) / scale + .5 / scale;
   const groups = new Map();
   for (const [from, to] of edges) {
-    const a = positions.get(from);
-    const b = positions.get(to);
-    if (!a || !b || a.closest(".graph-lane") === b.closest(".graph-lane")) continue;
-    const groupKey = a.closest(".graph-lane").dataset.lane + ":" + b.closest(".graph-lane").dataset.lane;
-    if (!groups.has(groupKey)) groups.set(groupKey, new Map());
-    const group = groups.get(groupKey);
-    if (!group.has(from)) group.set(from, []);
-    group.get(from).push(to);
-  }
-  const snap = (n) => Math.round(n * scale) / scale + .5 / scale;
-  const lines = [], arrows = [];
-  for (const group of groups.values()) {
-    const origins = [...group.keys()];
-    origins.forEach((from, index) => {
-      const a = positions.get(from).getBoundingClientRect();
-      const targets = group.get(from).map((to) => [to, positions.get(to).getBoundingClientRect()]);
-      const x1 = snap(a.left + a.width / 2 - outer.left);
-      const y1 = snap(a.bottom - outer.top);
-      const top = Math.min(...targets.map(([, rect]) => rect.top - outer.top));
-      if (top <= y1 + 8) return;
-      const rail = snap(y1 + (top - y1) * (.28 + .44 * (index + 1) / (origins.length + 1)));
-      for (const [to, b] of targets) {
-        const x2 = snap(b.left + b.width / 2 - outer.left);
-        const y2 = snap(b.top - outer.top - 3);
-        const highlighted = active.has(from) && active.has(to);
-        lines.push({highlighted, points:[[x1,y1],[x1,rail],[x2,rail],[x2,y2]]});
-        arrows.push({x:x2, y:y2, highlighted});
-      }
+    const origin = positions.get(from);
+    const target = positions.get(to);
+    if (!origin || !target) continue;
+    const upper = origin.closest(".graph-lane");
+    const lower = target.closest(".graph-lane");
+    if (upper === lower) continue;
+    const groupKey = upper.dataset.lane + ":" + lower.dataset.lane;
+    if (!groups.has(groupKey)) {
+      const bottom = upper.getBoundingClientRect().bottom;
+      const top = lower.getBoundingClientRect().top;
+      if (top <= bottom) continue;
+      groups.set(groupKey, {rail: snap((bottom + top) / 2 - outer.top), routes: []});
+    }
+    const a = origin.getBoundingClientRect();
+    const b = target.getBoundingClientRect();
+    groups.get(groupKey).routes.push({
+      x1: snap(a.left + a.width / 2 - outer.left), y1: snap(a.bottom - outer.top),
+      x2: snap(b.left + b.width / 2 - outer.left), y2: snap(b.top - outer.top - 3),
+      active: active.has(from) && active.has(to),
     });
   }
-  lines.sort((a,b) => Number(a.highlighted) - Number(b.highlighted));
-  for (const line of lines) {
-    context.strokeStyle = line.highlighted ? "#e2e2d9" : "#686b66";
-    context.lineWidth = 1;
-    context.setLineDash(line.highlighted ? [] : [3, 3]);
-    context.beginPath();
-    context.moveTo(...line.points[0]);
-    for (const point of line.points.slice(1)) context.lineTo(...point);
-    context.stroke();
-    if (line.highlighted) {
-      context.fillStyle = "#e2e2d9";
-      context.fillRect(line.points[1][0] - 1, line.points[1][1] - 1, 2, 2);
+
+  context.lineWidth = 1;
+  for (const {rail, routes} of groups.values()) {
+    for (const highlight of [false, true]) {
+      const visible = highlight ? routes.filter((route) => route.active) : routes;
+      context.strokeStyle = highlight ? "#e2e2d9" : "#686b66";
+      context.setLineDash([]);
+      context.beginPath();
+      for (const [left, right] of mergedSpans(visible.map(({x1, x2}) => [Math.min(x1,x2), Math.max(x1,x2)]))) {
+        context.moveTo(left, rail);
+        context.lineTo(right, rail);
+      }
+      context.stroke();
+      context.setLineDash(highlight ? [] : [3, 3]);
+      const stems = new Map();
+      function stem(x, from, to) {
+        if (!stems.has(x)) stems.set(x, []);
+        stems.get(x).push([Math.min(from, to), Math.max(from, to)]);
+      }
+      for (const {x1, y1, x2, y2} of visible) {
+        stem(x1, y1, rail);
+        stem(x2, rail, y2);
+      }
+      context.beginPath();
+      for (const [x, spans] of stems) {
+        for (const [top, bottom] of mergedSpans(spans)) {
+          context.moveTo(x, top);
+          context.lineTo(x, bottom);
+        }
+      }
+      context.stroke();
+      context.setLineDash([]);
+      const arrows = new Map(visible.map(({x2,y2}) => [x2 + ":" + y2, [x2,y2]]));
+      context.fillStyle = highlight ? "#e2e2d9" : "#888a82";
+      for (const [x,y] of arrows.values()) {
+        context.beginPath();
+        context.moveTo(x - 3, y - 4);
+        context.lineTo(x + 3, y - 4);
+        context.lineTo(x, y);
+        context.fill();
+      }
     }
-  }
-  context.setLineDash([]);
-  for (const arrow of arrows) {
-    context.fillStyle = arrow.highlighted ? "#e2e2d9" : "#888a82";
-    context.beginPath();
-    context.moveTo(arrow.x - 3, arrow.y - 4);
-    context.lineTo(arrow.x + 3, arrow.y - 4);
-    context.lineTo(arrow.x, arrow.y);
-    context.fill();
   }
 }
 
@@ -832,6 +868,7 @@ function drawCheck(run) {
 }
 
 document.querySelectorAll("nav button").forEach((tab) => tab.onclick = () => selectPage(tab.dataset.page));
+$("#project-menu").addEventListener("toggle", revealProjects);
 $("#add-project").onclick = () => { $("#project-menu").open = false; project = ""; selectPage("setup"); render(); };
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") $("#project-menu").open = false;
