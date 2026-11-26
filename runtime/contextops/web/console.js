@@ -5,6 +5,7 @@ const pages = ["setup", "agents", "checks"];
 let page = "setup", project = "", projects = {}, details = null;
 let currentRun = "", stream = null, runData = null, draftCategories = [];
 let graphFilter = "", selectedFinding = "", graphObserver;
+let openEvidence = new Set(), evidenceCache = new Map(), openDiff = false, fileFocus = "";
 let requestEpoch = 0, noticeTimer, navigationTimer;
 
 function node(tag, text = "", className = "") {
@@ -403,7 +404,14 @@ function renderAgents() {
   if (selected) selectRun(selected);
 }
 function selectRun(id) {
-  if (currentRun !== id) { graphFilter = ""; selectedFinding = ""; }
+  if (currentRun !== id) {
+    graphFilter = "";
+    selectedFinding = "";
+    openEvidence = new Set();
+    evidenceCache = new Map();
+    openDiff = false;
+    fileFocus = "";
+  }
   currentRun = id;
   closeStream();
   const selected = project;
@@ -632,22 +640,33 @@ function drawRun() {
       const citation = source.path ? source.path + (source.line ? ":" + source.line : "")
         : [source.session, source.message].filter(Boolean).join(" · ");
       disclosure.append(node("summary", (sourceNames[source.kind] || "Evidence") + (citation ? " · " + citation : "")));
-      const excerpt = node("pre", source.quote || "");
+      const key = focused.id + ":" + i;
+      const excerpt = node("pre", evidenceCache.get(key) || source.quote || "");
       disclosure.append(excerpt);
+      disclosure.open = openEvidence.has(key);
       disclosure.addEventListener("toggle", () => {
-        if (!disclosure.open || disclosure.dataset.loaded) return;
+        if (!disclosure.isConnected) return;
+        if (!disclosure.open) { openEvidence.delete(key); return; }
+        openEvidence.add(key);
+        if (evidenceCache.has(key) || disclosure.dataset.loaded) return;
         disclosure.dataset.loaded = "true";
+        const runId = runData.id;
         guarded(async () => {
-          const result = await query("evidence", {project, run: runData.id, status, index, evidence:i});
-          excerpt.textContent = result.heading + "\n\n" + result.text;
+          const result = await query("evidence", {project, run: runId, status, index, evidence:i});
+          if (runData.id !== runId) return;
+          const content = result.heading + "\n\n" + result.text;
+          evidenceCache.set(key, content);
+          excerpt.textContent = content;
         });
       });
       body.append(disclosure);
     });
     if (matched(focused)) body.append(button("View written file diff", () => {
-      fileSelect.value = record.target;
+      fileFocus = record.target;
+      fileSelect.value = fileFocus;
       showPatch();
       diff.open = true;
+      openDiff = true;
     }));
   } else {
     body.append(node("p", graphFilter === "agent:sweeper" && runData.sweeper_findings?.length
@@ -676,9 +695,12 @@ function drawRun() {
   all.value = "";
   fileSelect.append(all);
   for (const name of files.keys()) fileSelect.append(node("option", name));
-  fileSelect.onchange = showPatch;
+  fileSelect.value = files.has(fileFocus) ? fileFocus : "";
+  showPatch();
+  fileSelect.onchange = () => { fileFocus = fileSelect.value; showPatch(); };
   diff.append(node("summary", "Knowledge diff"), fileSelect, patch);
-  if (graphFilter === "files") diff.open = true;
+  diff.open = openDiff || graphFilter === "files";
+  diff.addEventListener("toggle", () => { if (diff.isConnected) openDiff = diff.open; });
   if (files.size) body.append(diff);
   panel.append(list, body);
   block.append(graph, panel);
