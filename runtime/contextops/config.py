@@ -54,6 +54,12 @@ class OutputSettings:
 
 
 @dataclass
+class CheckSettings:
+    automatic: bool = False
+    agent: Path | None = None
+
+
+@dataclass
 class InitConfig:
     kb_root: Path
     instructions: str
@@ -71,6 +77,7 @@ class InitConfig:
     conversation: ConversationSettings
     memory: MemorySettings
     output: OutputSettings
+    checks: CheckSettings = field(default_factory=CheckSettings)
 
 
 def load_config(kb_root: Path) -> InitConfig:
@@ -78,6 +85,13 @@ def load_config(kb_root: Path) -> InitConfig:
     evidence = meta.get("evidence", {})
     after = meta.get("after", {})
     output = meta.get("output", {})
+    checks = CheckSettings(**meta.get("checks", {}))
+    if not isinstance(checks.automatic, bool):
+        raise ValueError("init.md: checks.automatic must be true or false")
+    if checks.agent:
+        checks.agent = kb_root / checks.agent
+    if checks.automatic and not checks.agent:
+        raise ValueError("init.md: automatic checks require checks.agent")
 
     # Unknown keys in these sections raise TypeError on purpose, so typos in init.md surface early.
     config = InitConfig(
@@ -96,6 +110,7 @@ def load_config(kb_root: Path) -> InitConfig:
         budget=Budget(**meta.get("budget", {})),
         conversation=ConversationSettings(**evidence.get("conversation", {})),
         memory=MemorySettings(**evidence.get("memory", {})),
+        checks=checks,
         output=OutputSettings(
             runs_dir=Path(output.get("runs_dir", "~/.contextops/runs")).expanduser(),
             branch=output.get("branch", "contextops/{strategy}/{run_id}"),
@@ -126,7 +141,7 @@ def load_config(kb_root: Path) -> InitConfig:
         raise ValueError("init.md: budgets and limits must be positive")
     if not all(token in config.output.branch for token in ("{strategy}", "{run_id}")):
         raise ValueError("init.md: output.branch must include {strategy} and {run_id}")
-    for path in [config.shared_rules, config.writer, config.cartographer, config.sweeper,
+    for path in [config.shared_rules, config.writer, config.cartographer, config.sweeper, config.checks.agent,
                  *(w.agent for w in config.workers)]:
         if path and (not path.is_file() or not path.resolve().is_relative_to(kb_root.resolve())):
             raise ValueError("init.md: agent definitions must exist inside the knowledge checkout")

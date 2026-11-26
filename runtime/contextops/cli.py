@@ -56,6 +56,17 @@ def main(argv: list[str] | None = None) -> None:
     run = commands.add_parser("run", help="run a prepared run directory in the foreground")
     run.add_argument("run_dir", type=Path)
 
+    checks = commands.add_parser("checks", help="propose, verify, or apply a local application check")
+    check_commands = checks.add_subparsers(dest="action", required=True)
+    for action in ("propose", "verify", "apply"):
+        check = check_commands.add_parser(action)
+        check.add_argument("run_dir", type=Path)
+        if action != "propose":
+            check.add_argument("sha256", help="digest of the reviewed check.patch")
+        if action == "verify":
+            check.add_argument("verification_command", nargs=argparse.REMAINDER,
+                               metavar="COMMAND", help="explicit command and arguments to run")
+
     sessions = commands.add_parser("sessions", help="list Claude Code sessions for an application, to pick --session IDs")
     sessions.add_argument("--repo", type=Path, default=Path.cwd())
     sessions.add_argument("--limit", type=int, default=20)
@@ -80,7 +91,7 @@ def main(argv: list[str] | None = None) -> None:
 
     args = parser.parse_args(argv)
     handlers = {"init": _init, "attach": _attach, "refresh": _refresh, "install": _install, "hook": _hook, "run": _run, "sweep": _sweep, "sessions": _sessions,
-                "export-session": _export_session, "import-session": _import_session}
+                "export-session": _export_session, "import-session": _import_session, "checks": _checks}
     try:
         handlers[args.command](args)
     except (ValueError, FileNotFoundError, subprocess.CalledProcessError) as exc:
@@ -189,6 +200,23 @@ def _run(args: argparse.Namespace) -> None:
     from contextops.orchestrator import orchestrate
 
     _execute(args.run_dir.expanduser(), orchestrate)
+
+
+def _checks(args: argparse.Namespace) -> None:
+    from contextops import checks
+
+    run_dir = args.run_dir.expanduser().resolve()
+    if args.action == "propose":
+        print(asyncio.run(checks.propose_manually(run_dir)))
+    elif args.action == "apply":
+        print(f"Staged the reviewed patch in {checks.apply(run_dir, args.sha256)}")
+    else:
+        command = args.verification_command
+        if command and command[0] == "--":
+            command = command[1:]
+        code = checks.verify(run_dir, args.sha256, command)
+        if code:
+            raise SystemExit(code if code > 0 else 128 - code)
 
 
 def _sessions(args: argparse.Namespace) -> None:

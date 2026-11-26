@@ -40,6 +40,10 @@ after:
   cartographer: agents/cartographer.md
   writer: agents/writer.md
 
+checks:
+  automatic: false
+  agent: agents/check-proposer.md
+
 budget:
   per_agent_usd: 1.5
   total_usd: 10.0
