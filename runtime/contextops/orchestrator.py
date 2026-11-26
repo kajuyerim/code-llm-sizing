@@ -7,12 +7,14 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 from dataclasses import asdict
 from pathlib import Path
 
 from contextops import gitutil
 from contextops.agents import Ledger
 from contextops.cartographer import run_cartographer
+from contextops.checks import propose
 from contextops.config import InitConfig, load_config
 from contextops.evidence import build_pack
 from contextops.initializer import plan_workers
@@ -80,6 +82,14 @@ async def orchestrate(run_dir: Path) -> Path:
             outcome.publication, outcome.writer_output = await write_changes(ctx, config, review, ledger)
             committed = outcome.publication.committed
 
+        check_summary = ""
+        if config.checks.automatic:
+            try:
+                proposal = await propose(ctx, config, review.accepted, ledger)
+                status = json.loads(proposal.read_text(encoding="utf-8"))["status"]
+                check_summary = f"{status}. Local record at {proposal.relative_to(ctx.run_dir)}."
+            except (OSError, ValueError, subprocess.CalledProcessError):
+                check_summary = "Preparation failed. Run the manual command to retry."
         report = render_report(ctx, config, outcome, ledger, evidence)
         if committed and config.output.open_pr:
             published = publish(ctx, config, report)
@@ -90,8 +100,12 @@ async def orchestrate(run_dir: Path) -> Path:
 
         _write_metrics(ctx, config, ledger)
         report_path = ctx.run_dir / "report.md"
+        completion = render_completion(ctx, outcome, ledger)
+        if check_summary:
+            report += f"\n## Application check proposal\n\n{check_summary}\n"
+            completion += f"\nApplication check proposal. {check_summary}\n"
         report_path.write_text(report, encoding="utf-8")
-        (ctx.run_dir / "completion.txt").write_text(render_completion(ctx, outcome, ledger), encoding="utf-8")
+        (ctx.run_dir / "completion.txt").write_text(completion, encoding="utf-8")
         record_cutoff(ctx.runs_dir, ctx.app_root, ctx.cutoff)
         return report_path
     finally:
