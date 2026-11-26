@@ -224,37 +224,56 @@ function providerFields(form, onChange = () => {}) {
 }
 function renderSetup() {
   heading("Configure Project");
-  const connection = section("01 · Connected checkouts");
-  connection.append(node("p", details.app, "meta"), node("p", details.kb, "meta"));
-  if (!details.codex_available) connection.append(node("small", "Codex CLI is unavailable on PATH."));
-  const form = node("form");
-  const grid = node("div", "", "form-grid");
-  field(grid, "New knowledge branch", "branch", "knowledge/" + details.app_name);
-  selector(grid, "Knowledge scope", "scope", [["team", "Team"], ["repository", "Application"]], details.scope);
-  form.append(grid);
-  const init = section("02 · Initialize knowledge");
-  init.append(form);
-  submit(form, async (data) => {
-    await api("init", {project, ...Object.fromEntries(data)});
-    await render();
-  }, "Initialize on a new branch");
   renderCategories();
-  const advanced = node("details", "", "card");
-  advanced.append(node("summary", "Sweep defaults"));
-  const defaults = node("form", "", "form-grid");
-  selector(defaults, "Strategy", "strategy", strategyChoices, details.strategy);
-  const {backend, model} = providerFields(defaults);
+
+  const connection = section("Connected repositories");
+  const locations = node("dl", "", "checkout-list");
+  for (const [name, location] of [["Application", details.app], ["Knowledge", details.kb]]) {
+    const path = node("dd", location, "checkout-path");
+    path.title = location;
+    locations.append(node("dt", name), path);
+  }
+  if (details.knowledge_branch) {
+    locations.append(node("dt", "Knowledge branch"), node("dd", details.knowledge_branch));
+  }
+  connection.append(locations);
+
+  const controls = node("div", "", "setup-controls");
+  const branch = togglePanel("Create an empty knowledge branch", false);
+  branch.content.append(node("p", "Start fresh in the connected knowledge repo. This creates a local branch with empty knowledge templates. Your current branch’s history is preserved.", "muted"));
+  const initForm = node("form");
+  const initGrid = node("div", "", "form-grid");
+  field(initGrid, "Name for the new branch", "branch", "knowledge/" + details.app_name).required = true;
+  selector(initGrid, "Knowledge scope", "scope", [["team", "Team"], ["repository", "Application"]], details.scope);
+  initForm.append(initGrid);
+  submit(initForm, async (data) => {
+    await api("init", {project, ...Object.fromEntries(data)});
+    notify("Empty branch created. Review and commit below.");
+    await render();
+  }, "Create empty branch");
+  branch.content.append(initForm);
+  controls.append(branch.wrapper);
+
+  const advanced = togglePanel("Sweep defaults", false);
+  const defaults = node("form");
+  const defaultsGrid = node("div", "", "form-grid");
+  selector(defaultsGrid, "Strategy", "strategy", strategyChoices, details.strategy);
+  const {backend, model} = providerFields(defaultsGrid);
   backend.value = details.run_backend || details.backend;
   backend.dispatchEvent(new Event("change"));
   model.value = details.run_model || "";
+  defaults.append(defaultsGrid);
+  if (!details.codex_available) defaults.append(node("small", "Codex CLI is unavailable on PATH."));
   submit(defaults, async (data) => {
     await api("sweep-defaults", {project, ...Object.fromEntries(data)});
     notify("Sweep defaults saved");
   }, "Save sweep defaults");
-  advanced.append(defaults);
-  main.append(advanced);
+  advanced.content.append(defaults);
+  controls.append(advanced.wrapper);
+  connection.append(controls);
+
   if (details.diff) {
-    const preview = section("04 · Review setup changes");
+    const preview = section("Review setup changes");
     preview.append(node("pre", details.diff));
     preview.append(button("Commit setup", () => guarded(async () => {
       await api("commit", {project, preview: details.diff});
@@ -265,19 +284,33 @@ function renderSetup() {
 }
 function renderCategories() {
   const currentProject = project;
-  const categories = section("03 · What should we track?");
+  const categories = section("What should we track?");
+  categories.classList.add("category-setup");
+  const profileStatus = node("p", details.profile_scope === "team" ? "Using the team profile."
+    : details.profile_scope === "application" ? "Using this application’s profile."
+    : "No category profile saved. Sweeps use the repository’s default policy.", "muted");
+  categories.append(profileStatus);
   const grid = node("div", "", "form-grid");
   const {backend, model} = providerFields(grid);
+  backend.value = details.run_backend || details.backend;
+  backend.dispatchEvent(new Event("change"));
+  model.value = details.run_model || "";
   const scanSessions = selector(grid, "Optional scan evidence", "scan_sessions", details.sessions.map((entry) =>
     [entry.session_id, entry.session_id.slice(0, 8) + " " + (entry.opening || "")]));
   scanSessions.multiple = true;
   for (const option of scanSessions.options) option.selected = false;
-  const list = node("div");
-  const counter = node("small");
+  const list = node("div", "", "category-list");
+  const counter = node("small", "", "category-count");
+  const empty = node("p", "Scan the repository to suggest categories, or add one yourself.", "category-empty muted");
   const scanState = node("p", "", "state");
+  scanState.setAttribute("role", "status");
+  const customPanel = togglePanel("Add a category manually", false);
+  const scanOptions = togglePanel("Scan options", false);
+  scanOptions.content.append(grid);
   const custom = node("form", "", "form-grid");
-  field(custom, "Custom category", "name");
-  field(custom, "What should it collect?", "description");
+  field(custom, "Category name", "name").required = true;
+  field(custom, "What should it collect?", "description").required = true;
+  customPanel.content.append(custom);
   submit(custom, (data) => {
     const name = String(data.get("name")).trim();
     const description = String(data.get("description")).trim();
@@ -290,7 +323,11 @@ function renderCategories() {
   }, "Add category");
   function draw() {
     list.replaceChildren();
-    counter.textContent = draftCategories.filter((item) => item.enabled).length + " selected";
+    const count = draftCategories.filter((item) => item.enabled).length;
+    counter.textContent = count + " of " + draftCategories.length + " selected";
+    empty.hidden = draftCategories.length > 0;
+    save.hidden = !draftCategories.length && !details.profile_scope;
+    recommendations.hidden = !draftCategories.some((item) => item.recommended);
     for (const item of draftCategories) {
       const section = node("div", "", "category");
       const label = node("label");
@@ -299,14 +336,16 @@ function renderCategories() {
       selected.checked = item.enabled;
       selected.onchange = () => {
         item.enabled = selected.checked;
-        counter.textContent = draftCategories.filter((entry) => entry.enabled).length + " selected";
+        counter.textContent = draftCategories.filter((entry) => entry.enabled).length + " of " + draftCategories.length + " selected";
       };
-      label.append(selected, document.createTextNode(" " + item.name + (item.recommended ? " · Recommended" : "")));
+      label.append(selected, node("strong", item.name));
+      if (item.recommended) label.append(node("small", "Recommended", "category-badge"));
       section.append(label, node("p", item.description, "muted"));
       if (item.reason || item.path) {
-        const evidence = node("details");
-        evidence.append(node("summary", "Why this category?"), node("p", item.reason || ""), node("code", item.path || ""));
-        section.append(evidence);
+        const evidence = togglePanel("Why this category?", false);
+        if (item.reason) evidence.content.append(node("p", item.reason));
+        if (item.path) evidence.content.append(node("code", item.path));
+        section.append(evidence.wrapper);
       }
       list.append(section);
     }
@@ -329,24 +368,26 @@ function renderCategories() {
           previous.set(item.id, existing ? {...item, enabled: existing.enabled} : item);
         }
         draftCategories = [...previous.values()];
-        scanState.textContent = "Scanned " + result.revision.slice(0, 8);
+        scanState.textContent = result.categories?.length ? "Scanned " + result.revision.slice(0, 8)
+          : "No categories suggested. You can add one manually.";
         draw();
         break;
       }
     } finally { scan.disabled = false; }
-  }));
-  actions.append(scan, button("Use recommendations", () => {
+  }), "primary");
+  const recommendations = button("Use recommendations", () => {
     draftCategories.forEach((item) => { if ("recommended" in item) item.enabled = item.recommended; });
     draw();
-  }), counter);
-  const save = node("form");
+  });
+  actions.append(scan, recommendations, counter);
+  const save = node("form", "", "profile-save");
   field(save, "Save as the team default", "team", false, "checkbox");
   submit(save, async (data) => {
     await api("profile", {project, categories: draftCategories, team: data.has("team")});
     notify("Profile saved to setup diff. Review and commit it.");
     await render();
   }, "Save profile");
-  categories.append(grid, actions, scanState, list, custom, save);
+  categories.append(actions, scanState, empty, list, customPanel.wrapper, scanOptions.wrapper, save);
   draw();
 }
 function openSweep() {

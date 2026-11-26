@@ -154,6 +154,8 @@ class Console:
             "defaults": {"claude": settings.get("model", "sonnet"),
                          "codex": settings.get("codex_model", "gpt-6.1-terra")},
             "codex_available": bool(shutil.which("codex")), "auth": config.auth, "scope": config.scope,
+            "knowledge_branch": gitutil.git(kb, "branch", "--show-current") or "Detached HEAD",
+            "profile_scope": "application" if slug in config.profiles else "team" if "*" in config.profiles else None,
             "categories": config.profiles.get(slug, config.profiles.get("*", {})).get("categories", []),
             "branches": branches, "branch": current_branch, "commits": self.commit_range(app, current_branch),
             "sessions": [asdict(item) for item in transcripts.list_sessions(app)[:40]],
