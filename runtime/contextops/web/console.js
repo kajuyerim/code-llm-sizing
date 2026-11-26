@@ -106,6 +106,7 @@ async function getProject() {
 }
 function chooseProject(key) {
   $(".sweep-dialog")?.close();
+  $(".knowledge-diff-dialog")?.close();
   project = key;
   localStorage.setItem("contextops-project", key);
   $("#project-menu").open = false;
@@ -143,6 +144,7 @@ function renderProjects() {
 function selectPage(next) {
   if (next === page) return;
   $(".sweep-dialog")?.close();
+  $(".knowledge-diff-dialog")?.close();
   const direction = pages.indexOf(next) > pages.indexOf(page) ? 1 : -1;
   page = next;
   setNav();
@@ -784,13 +786,15 @@ function drawRun() {
   if (files.size) outcome.push(files.size + (files.size === 1 ? " file changed" : " files changed"));
   else if (runData.status === "complete") outcome.push("no knowledge changes");
   summary.append(node("p", outcome.join(" · "), "muted"));
-  if (files.size || runData.status === "complete" || runData.check) {
-    const runId = runData.id;
-    summary.append(button(files.size ? "Review changes" : "Open review", () => {
-      setCurrentRun(runId);
+  if (files.size) {
+    const review = button("Review changes", () => {
       if (files.has(focused?.record.target)) reviewFile = focused.record.target;
-      selectPage("review");
-    }, files.size ? "primary" : ""));
+      openKnowledgeDiff(files);
+    }, "primary");
+    review.setAttribute("aria-haspopup", "dialog");
+    summary.append(review);
+  } else if (runData.status === "complete" || runData.check) {
+    summary.append(button("Open review", () => selectPage("review")));
   }
   const active = new Set(graphFilter ? [graphFilter] : []);
   if (focused) {
@@ -946,7 +950,7 @@ function renderReview() {
       const run = await query("run", {project: runProject, run: id});
       if (!loading.isConnected || project !== runProject || page !== "review") return;
       view.replaceChildren();
-      drawKnowledgeDiff(view, run);
+      drawKnowledgeDiff(section("Knowledge diff", view), patchFiles(run.patch), run.status);
       drawCheck(section("Application check proposal", view), run, runProject);
     });
   }
@@ -955,12 +959,27 @@ function renderReview() {
   main.append(view);
   load(selected);
 }
-function drawKnowledgeDiff(view, run) {
-  const card = section("Knowledge diff", view);
-  const files = patchFiles(run.patch);
+function openKnowledgeDiff(files) {
+  const dialog = node("dialog", "", "knowledge-diff-dialog");
+  const title = node("h2", "Knowledge diff");
+  title.id = "knowledge-diff-title";
+  dialog.setAttribute("aria-labelledby", title.id);
+  const close = button("Close", () => dialog.close());
+  close.autofocus = true;
+  const actions = node("div", "", "actions");
+  actions.append(button("Open full review", () => selectPage("review")), close);
+  const header = node("div", "", "knowledge-diff-header");
+  header.append(title, actions);
+  dialog.append(header);
+  drawKnowledgeDiff(dialog, files);
+  dialog.addEventListener("close", () => dialog.remove(), {once:true});
+  document.body.append(dialog);
+  dialog.showModal();
+}
+function drawKnowledgeDiff(card, files, status) {
   if (!files.size) {
-    const message = run.status === "complete" ? "No knowledge changes for this run."
-      : run.status === "failed" ? "No knowledge diff was recorded."
+    const message = status === "complete" ? "No knowledge changes for this run."
+      : status === "failed" ? "No knowledge diff was recorded."
       : "Knowledge changes will appear here after the writer finishes. Refresh to check for updates.";
     card.append(node("p", message, "muted"));
     return;

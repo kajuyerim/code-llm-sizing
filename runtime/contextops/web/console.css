@@ -132,6 +132,11 @@ pre { max-height:360px; overflow:auto; border:1px solid var(--line); color:#dfde
 .diff-line { display:grid; grid-template-columns:1.6rem minmax(0,1fr); gap:.25rem; padding:.22rem .52rem; white-space:pre-wrap; overflow-wrap:anywhere; }
 .diff-line.addition { color:#a9dfb3; background:#18291f; }
 .diff-line.deletion { color:#f4abae; background:#321e22; }
+.knowledge-diff-dialog { width:min(900px,calc(100% - 2rem)); color:var(--ink); background:var(--panel); border:1px solid var(--muted); padding:1rem 1.2rem; box-shadow:8px 8px #080909; }
+.knowledge-diff-dialog::backdrop { background:#080909b5; }
+.knowledge-diff-header { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.5rem; }
+.knowledge-diff-header h2, .knowledge-diff-header .actions { margin:0; }
+.knowledge-diff-dialog .diff-lines { max-height:min(430px,55dvh); }
 
 .checkout-list { display:grid; grid-template-columns:max-content minmax(0,1fr); gap:.35rem .9rem; margin:.65rem 0 1rem; font-size:.8rem; }
 .checkout-list dt { color:var(--muted); }

@@ -40,13 +40,14 @@ provider logs and reasoning stay outside the browser stream. **Agents** shows
 the outcome and the evidence behind the decisions. Browser-started sweeps
 retain output locally.
 
-Use **Review changes** to open that sweep's knowledge diff in **Review**.
-Choose a changed file to see its additions and deletions. You can also select
+In **Agents**, **Review changes** opens that sweep's knowledge diff in a
+dialog. Choose a changed file to see its additions and deletions. Use **Open
+full review** to carry the selected sweep and file to **Review**, or select
 a sweep directly from **Review**. The optional application lint or test
-proposal has its own section. Review its patch, pass the exact verification
-command as an argument array, and explicitly stage the reviewed patch. The
-command runs with your local permissions in a disposable worktree. See
-[application checks](application-checks.md).
+proposal has its own section there. Review its patch, pass the exact
+verification command as an argument array, and explicitly stage the reviewed
+patch. The command runs with your local permissions in a disposable
+worktree. See [application checks](application-checks.md).
 
 ## Browser acceptance
 
