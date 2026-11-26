@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hindsight and Context Ops | Interactive comparison</title>
+<meta name="description" content="Follow the same project decision through Hindsight and Context Ops, from source evidence to what the next coding agent sees.">
+<style>
+  :root {
+    color-scheme: light;
+    --paper: #faf6ed;
+    --ink: #25221f;
+    --muted: #5f574e;
+    --hindsight: #24557a;
+    --context-ops: #943b2b;
+    --rule: #d3c9ba;
+    --serif: Iowan Old Style, Baskerville, Georgia, serif;
+    --mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 1rem/1.62 system-ui, sans-serif; }
+  h1, h2, h3, p, ul, ol, dl, dd, blockquote { margin: 0; }
+  h1, h2, h3, blockquote { font-family: var(--serif); }
+  h1, h2 { font-weight: 500; letter-spacing: -.045em; line-height: .99; }
+  h1 { font-size: clamp(3.5rem, 7vw, 6.6rem); }
+  h1 em { font-weight: inherit; }
+  h2 { font-size: clamp(2.45rem, 4.45vw, 4.15rem); }
+  h3 { font-size: 1.32rem; font-weight: 600; line-height: 1.2; }
+  p + p, ul + p, blockquote + p { margin-top: .65rem; }
+  ul { padding-inline-start: 1.2rem; }
+  li + li { margin-top: .34rem; }
+  a { color: var(--ink); text-underline-offset: .24em; }
+  a:hover { text-decoration-thickness: 2px; }
+  :focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
+  code { font: .85em var(--mono); overflow-wrap: anywhere; }
+  small { font: .82rem/1.45 system-ui, sans-serif; }
+  .shell { width: min(100% - 5rem, 72rem); margin-inline: auto; }
+  .skip { position: fixed; z-index: 3; top: .75rem; left: .75rem; translate: 0 -220%; background: var(--paper); padding: .55rem; }
+  .skip:focus { translate: 0; }
+  .masthead { display: flex; justify-content: space-between; align-items: center; gap: 1rem; min-height: 3.65rem; border-bottom: 1px solid var(--ink); }
+  .masthead-name { font-family: var(--serif); font-size: 1.15rem; font-weight: 600; }
+  .hindsight { --product: var(--hindsight); }
+  .context { --product: var(--context-ops); }
+  .product-name { color: var(--product); }
+  .masthead a { min-height: 44px; display: inline-flex; align-items: center; gap: .45rem; font-size: .84rem; white-space: nowrap; }
+  .hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(12rem, 17rem); align-items: end; gap: 2rem 3rem; padding-block: clamp(2.2rem, 4.35vw, 3.9rem) clamp(1.85rem, 3.35vw, 2.85rem); border-bottom: 2px solid var(--ink); }
+  .hero h1 span, .hero h1 em { display: block; }
+  .hero .deck { max-width: 36rem; margin-top: 1rem; color: var(--muted); font-size: clamp(.98rem, 1.85vw, 1.22rem); }
+  .handoffs { align-self: end; border-top: 1px solid var(--ink); padding-top: .7rem; padding-bottom: .28rem; }
+  .handoffs h2 { font: 650 .74rem/1.4 var(--mono); letter-spacing: .035em; color: var(--muted); text-transform: uppercase; }
+  .handoffs dl { display: grid; gap: .8rem; margin-top: .6rem; }
+  .handoffs dt { font: 600 1.27rem/1.22 var(--serif); }
+  .handoffs dd { margin-top: .1rem; color: var(--muted); font-size: .87rem; line-height: 1.4; }
+  .product-heading::before { content: ''; width: .65em; height: .15em; display: inline-block; margin-right: .44em; vertical-align: .22em; background: var(--product); }
+  .layout { display: grid; grid-template-columns: 10.25rem minmax(0, 1fr); gap: clamp(1.4rem, 5vw, 4.5rem); align-items: start; }
+  .contents { position: sticky; top: 1.4rem; padding-block: 1.35rem; }
+  .contents p { color: var(--muted); font: .73rem/1.35 var(--mono); text-transform: uppercase; letter-spacing: .08em; }
+  .contents ol { list-style: none; padding: .53rem 0 0; }
+  .contents li { margin: 0; }
+  .contents a { display: flex; align-items: center; gap: .64rem; min-height: 44px; padding-block: .3rem; color: var(--muted); text-decoration: none; font-size: .88rem; line-height: 1.25; }
+  .contents a:hover, .contents [aria-current="location"] { color: var(--ink); }
+  .contents [aria-current="location"] { font-weight: 720; text-decoration: underline; }
+  .number { color: var(--muted); font: .72rem var(--mono); }
+  main { padding-top: 1.45rem; min-width: 0; }
+  .controls { border-bottom: 1px solid var(--rule); padding-bottom: .62rem; margin-bottom: 1.15rem; }
+  .case-bar { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 1.25rem; }
+  .control-label { color: var(--muted); font: .72rem var(--mono); text-transform: uppercase; letter-spacing: .06em; }
+  .choice-set { display: flex; flex-wrap: wrap; gap: 0 1rem; margin: 0; padding: 0; border: 0; min-width: 0; }
+  .choice { position: relative; display: flex; }
+  .choice input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  .choice span { display: flex; align-items: center; min-height: 44px; padding: .18rem 0; border-bottom: 2px solid transparent; font-size: .9rem; font-weight: 620; line-height: 1.25; cursor: pointer; color: var(--muted); }
+  .choice:hover span { color: var(--ink); border-bottom-color: var(--rule); }
+  .choice input:checked + span { color: var(--ink); border-bottom-color: var(--ink); }
+  .choice input:focus-visible + span { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .timeline { margin-top: .24rem; }
+  .timeline .choice-set { position: relative; gap: 0 1.35rem; }
+  .timeline .choice span { gap: .43rem; font-size: .83rem; }
+  .timeline .choice span::before { content: ''; width: .49rem; height: .49rem; flex: none; border: 1px solid currentColor; border-radius: 50%; }
+  .timeline .choice input:checked + span::before { background: currentColor; }
+  .step { scroll-margin-top: 1.35rem; }
+  .step + .step { margin-top: 2.35rem; padding-top: 1.85rem; border-top: 1px solid var(--ink); }
+  .step-header { margin-bottom: 1rem; }
+  .step-header p { max-width: 62ch; margin-top: .55rem; color: var(--muted); }
+  .case-heading { margin-block: 1.15rem .63rem; }
+  .case-heading h3, h3.case-heading { font-size: 1.52rem; }
+  .case-heading small { display: block; color: var(--muted); margin-top: .15rem; }
+  .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--rule); }
+  .comparison-side { min-width: 0; padding: .9rem clamp(1rem, 2.3vw, 2rem) .8rem 0; }
+  .comparison-side + .comparison-side { padding: .9rem 0 .8rem clamp(1rem, 2.3vw, 2rem); border-left: 1px solid var(--rule); }
+  .comparison-side h3 { margin-bottom: .5rem; }
+  .product-heading { color: var(--product); }
+  .product-heading small { color: var(--muted); }
+  .hindsight a, .context a, .hindsight summary, .context summary { color: var(--product); }
+  .reading { max-width: 69ch; }
+  .case-record { padding-top: .8rem; border-top: 1px solid var(--rule); }
+  .case-record h3, .study-note h3 { margin-bottom: .42rem; }
+  .study-note { padding-block: .95rem; border-top: 1px solid var(--rule); }
+  .annotation { color: var(--muted); font-size: .89rem; margin-top: .65rem; }
+  .callout { padding-left: .88rem; border-left: 2px solid var(--rule); margin-block: .7rem; max-width: 67ch; font-size: .94rem; }
+  blockquote { color: var(--ink); padding-left: .72rem; border-left: 2px solid var(--product, var(--rule)); font-size: 1.23rem; line-height: 1.35; }
+  .excerpt { font: .84rem/1.55 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; padding: .45rem 0 0; margin-top: .33rem; border-top: 1px dotted var(--rule); }
+  .excerpt del { color: var(--muted); text-decoration: none; }
+  .excerpt ins { font-weight: 650; text-decoration: none; }
+  details { margin-top: .67rem; border-top: 1px dotted var(--rule); }
+  summary { padding: .55rem 0; min-height: 44px; cursor: pointer; font-size: .91rem; font-weight: 650; }
+  details[open] { padding-bottom: .32rem; }
+  .flow { display: flex; flex-wrap: wrap; gap: .38rem 1rem; justify-content: space-between; margin-top: .7rem; }
+  .flow-link { display: inline-flex; align-items: center; gap: .42rem; min-height: 44px; font-size: .89rem; color: var(--muted); }
+  .flow-link.forward { margin-left: auto; color: var(--ink); font-weight: 690; }
+  .source-links { display: flex; flex-wrap: wrap; align-items: center; gap: .2rem 1rem; margin-top: .6rem; font-size: .85rem; }
+  .source-links a { padding-block: .4rem; }
+  footer { margin-block: 2rem 1.3rem; border-top: 1px solid var(--ink); padding-top: .75rem; font-size: .86rem; }
+  [hidden] { display: none !important; }
+  .js-only { display: none; }
+  .interactive .js-only { display: block; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  html:not(.interactive) [data-case] + [data-case], html:not(.interactive) [data-time] + [data-time] { margin-top: .85rem; }
+  @media (max-width: 850px) {
+    .shell { width: calc(100% - 3rem); }
+    .layout { grid-template-columns: 8.8rem minmax(0, 1fr); gap: 1.4rem; }
+    .hero { gap: 1.6rem; grid-template-columns: minmax(0, 1fr) minmax(10rem, 12rem); }
+  }
+  @media (max-width: 650px) {
+    body { font-size: .96rem; }
+    .shell { width: calc(100% - 2rem); }
+    .masthead { min-height: 3rem; }
+    .masthead-name { font-size: 1rem; }
+    .hero { display: block; padding-block: 1.75rem 1.45rem; }
+    h1 { font-size: clamp(3.12rem, 10vw, 4.85rem); }
+    .hero .deck { margin-top: .65rem; }
+    .handoffs { margin-top: 1.15rem; border-top-color: var(--rule); }
+    .handoffs dl { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
+    .handoffs dt { font-size: 1.15rem; }
+    .handoffs dd { font-size: .8rem; }
+    .layout { display: block; }
+    .contents { position: static; padding-block: .35rem; border-bottom: 1px solid var(--rule); }
+    .contents p { display: none; }
+    .contents ol { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0; }
+    .contents a { gap: .43rem; padding: .18rem 0; font-size: .83rem; }
+    main { padding-top: .87rem; }
+    .controls { margin-bottom: 1.3rem; }
+    .timeline .choice-set { gap: 0 .55rem; }
+    .timeline .choice span { gap: .25rem; font-size: .75rem; min-height: 44px; }
+    .timeline .choice span::before { width: .37rem; height: .37rem; }
+    .pair { grid-template-columns: minmax(0, 1fr); }
+    .comparison-side, .comparison-side + .comparison-side { padding: .75rem 0; }
+    .comparison-side + .comparison-side { border-left: 0; border-top: 1px solid var(--rule); }
+    .step + .step { margin-top: 1.55rem; padding-top: 1.35rem; }
+    .flow-link { font-size: .83rem; }
+  }
+  @media print {
+    body { background: white; }
+    .contents, .flow, .controls, .skip { display: none !important; }
+    .layout, [data-case][hidden], article [data-time][hidden], .callout[hidden] { display: block !important; }
+    .pair[data-time][hidden] { display: grid !important; }
+    .shell { width: 100%; }
+    .comparison-side { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#evidence">Skip to the comparison</a>
+<header class="shell">
+  <div class="masthead">
+    <span class="masthead-name"><span class="product-name hindsight">Hindsight</span> / <span class="product-name context">Context Ops</span></span>
+    <a href="../README.md">All reports <span aria-hidden="true">↗</span></a>
+  </div>
+  <div class="hero">
+    <div>
+      <h1><span>What the code</span> <em>leaves out</em></h1>
+      <p class="deck">How Hindsight and Context Ops carry a team’s decisions into the next coding session.</p>
+    </div>
+    <aside class="handoffs" aria-labelledby="handoffs-title">
+      <h2 id="handoffs-title">The two systems</h2>
+      <dl>
+        <div class="hindsight">
+          <dt class="product-name product-heading">Hindsight</dt>
+          <dd>The external memory system. It stores project history and retrieves relevant context for coding agents.</dd>
+        </div>
+        <div class="context">
+          <dt class="product-name product-heading">Context Ops</dt>
+          <dd>Our senior project. It proposes reviewable changes to a shared Git knowledge repository.</dd>
+        </div>
+      </dl>
+    </aside>
+  </div>
+</header>
+
+<div class="shell layout">
+  <nav class="contents" aria-label="Contents">
+    <p aria-hidden="true">Contents</p>
+    <ol>
+      <li><a href="#evidence" data-step-link><span class="number" aria-hidden="true">01</span> Evidence</a></li>
+      <li><a href="#stored" data-step-link><span class="number" aria-hidden="true">02</span> Stored knowledge</a></li>
+      <li><a href="#next-session" data-step-link><span class="number" aria-hidden="true">03</span> Next session</a></li>
+      <li><a href="#results" data-step-link><span class="number" aria-hidden="true">04</span> Study notes</a></li>
+    </ol>
+  </nav>
+
+<main>
+  <section class="step" id="evidence" aria-labelledby="evidence-title">
+    <header class="step-header">
+      <h2 id="evidence-title" tabindex="-1">Start with the evidence</h2>
+      <p>A developer’s statement explains the decision. The diff shows what was implemented.</p>
+    </header>
+
+    <div class="controls js-only" id="case-controls">
+      <div class="case-bar">
+        <span class="control-label" id="case-label">Choose a case</span>
+        <fieldset class="choice-set" aria-labelledby="case-label">
+          <label class="choice"><input type="radio" name="case" value="billing" checked><span>Billing timeout</span></label>
+          <label class="choice"><input type="radio" name="case" value="actual"><span>Actual Budget correction</span></label>
+        </fieldset>
+      </div>
+      <div class="timeline" id="timeline-controls">
+        <fieldset class="choice-set" aria-label="Billing decision timeline">
+          <label class="choice"><input type="radio" name="time" value="default"><span>Original rule</span></label>
+          <label class="choice"><input type="radio" name="time" value="exception" checked><span>Approved exception</span></label>
+          <label class="choice"><input type="radio" name="time" value="correction"><span>Later correction</span></label>
+        </fieldset>
+      </div>
+      <p class="sr-only" id="case-status" role="status"></p>
+    </div>
+
+    <div data-case="billing">
+      <div class="case-heading"><h3>Billing timeout</h3><small>Illustrative case · each stage changes the available evidence</small></div>
+      <div class="pair" data-time="default">
+        <article class="comparison-side"><h3>Developer decision</h3><blockquote>Use a 10-second outbound timeout across the company.</blockquote></article>
+        <article class="comparison-side"><h3>Repository snapshot</h3><p>Billing uses the 10-second default.</p><div class="excerpt">timeoutMs: 10_000</div></article>
+      </div>
+      <div class="pair" data-time="exception">
+        <article class="comparison-side"><h3>Developer decision</h3><blockquote>Approved for Billing only. Set the timeout to 5 seconds.</blockquote></article>
+        <article class="comparison-side"><h3>Git diff</h3><p>Billing implements the approved exception.</p><div class="excerpt"><del>- timeoutMs: 10_000</del>
+<ins>+ timeoutMs: 5_000</ins></div></article>
+      </div>
+      <div class="pair" data-time="correction">
+        <article class="comparison-side"><h3>Developer decision</h3><blockquote>Retire the 5-second exception. Billing should use the company default again.</blockquote></article>
+        <article class="comparison-side"><h3>Git diff</h3><p>Billing returns to the 10-second default.</p><div class="excerpt"><del>- timeoutMs: 5_000</del>
+<ins>+ timeoutMs: 10_000</ins></div></article>
+      </div>
+    </div>
+
+    <div data-case="actual">
+      <div class="case-heading"><h3>Actual Budget snapshot download</h3><small>Archived Context Ops pilot · sanitized simulated development session</small></div>
+      <div class="pair">
+        <article class="comparison-side"><h3>Developer correction</h3><p>The developer requested <code>snapdom</code> in place of <code>html-to-image</code>. When the agent initially used <code>snapdom.download</code>, the developer asked for <code>snapdom.toPng</code> and the existing anchor download flow.</p></article>
+        <article class="comparison-side"><h3>Git diff</h3><p>The implementation assigns the returned image’s <code>src</code> to the download link. Firefox behavior remained unverified in this session.</p></article>
+      </div>
+      <p class="source-links"><a href="../../docs/walkthrough/README.md#the-tool-changes-so-does-its-usage">Read the archived case</a></p>
+    </div>
+
+    <div class="flow" aria-label="Continue the walkthrough">
+      <a class="flow-link forward" href="#stored" data-step-link>Continue to stored knowledge <span aria-hidden="true">→</span></a>
+    </div>
+  </section>
+
+  <section class="step" id="stored" aria-labelledby="stored-title">
+    <header class="step-header">
+      <h2 id="stored-title" tabindex="-1">Compare what each system stores</h2>
+      <p>Hindsight retains evidence in a memory bank. Context Ops proposes an evidence-linked change to a shared Git knowledge repository.</p>
+    </header>
+
+    <div data-case="billing">
+      <h3 class="case-heading">Billing timeout <small>Illustrative outputs</small></h3>
+      <div class="pair">
+        <article class="comparison-side hindsight">
+          <h3 class="product-heading">Hindsight</h3>
+          <div data-time="default"><p>A retained fact can record the company’s 10-second default and its source.</p></div>
+          <div data-time="exception"><p>Retained facts can record the approval and the code change separately. An observation can consolidate them as a Billing-only exception.</p></div>
+          <div data-time="correction"><p>The new decision and code change can be retained. Consolidation and retrieval need to resolve the older 5-second fact against the later correction.</p></div>
+          <details><summary>How the memory is organized</summary><p>Hindsight links facts through entities and can consolidate them into observations. Its coding integration can also maintain curated project pages and attach provenance tags to documents.</p><p class="source-links"><a href="https://hindsight.vectorize.io/developer/observations">Observation scopes</a><a href="https://github.com/vectorize-io/hindsight/blob/main/hindsight-integrations/coding-agents/README.md">Coding integration</a></p></details>
+        </article>
+        <article class="comparison-side context">
+          <h3 class="product-heading">Context Ops</h3>
+          <div data-time="default"><p>A proposed Markdown entry records the 10-second standard with <code>company</code> scope and cites the developer’s decision.</p></div>
+          <div data-time="exception"><p>A separate proposed entry records the 5-second exception with <code>app:billing</code> scope and links the approval and diff. The company rule is still applicable elsewhere.</p></div>
+          <div data-time="correction"><p>A proposed patch retires the Billing exception using the new decision and diff. The company rule governs again after the change is accepted. Git retains the earlier revision.</p></div>
+          <details><summary>How a proposal becomes shared knowledge</summary><p>The run freezes source, diff, and conversation evidence. Strategy A investigates first and forks specialists. Strategy B starts fresh specialists on the same evidence. Shared validation and a single writer produce a reviewable knowledge patch.</p><p class="source-links"><a href="../../docs/architecture.md">Context Ops architecture</a></p></details>
+        </article>
+      </div>
+    </div>
+
+    <div data-case="actual">
+      <h3 class="case-heading">Actual Budget snapshot download</h3>
+      <article class="case-record reading context">
+        <h3 class="product-heading">Context Ops <small>· archived GPT outputs</small></h3>
+        <p>The sweeper-first run found the <code>src</code> detail and generalized it to using an anchor in its accepted wording. The fresh-specialist run preserved the returned image source and the anchor flow, while leaving Firefox verification open.</p>
+        <details><summary>Why the outputs differ</summary><p>The two strategies had the same evidence. The difference was what the specialists carried into the accepted records and what the writer preserved in the final documents.</p><p class="source-links"><a href="../../docs/walkthrough/README.md#the-same-conversation-different-accepted-records">Inspect the recorded findings</a></p></details>
+      </article>
+    </div>
+
+    <div class="flow" aria-label="Walkthrough navigation">
+      <a class="flow-link" href="#evidence" data-step-link><span aria-hidden="true">←</span> Evidence</a>
+      <a class="flow-link forward" href="#next-session" data-step-link>Continue to the next session <span aria-hidden="true">→</span></a>
+    </div>
+  </section>
+
+  <section class="step" id="next-session" aria-labelledby="next-session-title">
+    <header class="step-header">
+      <h2 id="next-session-title" tabindex="-1">See what reaches the next agent</h2>
+      <p>Compare the context that could appear at the start of the next development task.</p>
+    </header>
+
+    <div data-case="billing">
+      <h3 class="case-heading">What timeout applies to Billing? <small>Illustrative outputs for the selected point in the timeline</small></h3>
+      <div class="pair">
+        <article class="comparison-side hindsight">
+          <h3 class="product-heading">Hindsight</h3>
+          <div data-time="default"><blockquote>Use the company’s 10-second default for Billing.</blockquote></div>
+          <div data-time="exception"><blockquote>Billing has an approved 5-second timeout. The company default remains 10 seconds.</blockquote></div>
+          <div data-time="correction"><blockquote>Use 10 seconds. The later decision retired Billing’s 5-second exception.</blockquote></div>
+          <p class="annotation">Recall can surface matching records. Reflect can synthesize an answer using the evidence. The coding integration can inject context for the incoming task.</p>
+        </article>
+        <article class="comparison-side context">
+          <h3 class="product-heading">Context Ops</h3>
+          <div data-time="default"><blockquote>10-second outbound timeout · <code>company</code></blockquote></div>
+          <div data-time="exception"><blockquote>10-second outbound timeout · <code>company</code><br>5-second timeout exception · <code>app:billing</code></blockquote></div>
+          <div data-time="correction"><blockquote>10-second outbound timeout · <code>company</code></blockquote></div>
+          <p class="annotation">The optional session-start digest summarizes entries from the shared checkout. The agent can open the full Markdown and follow the evidence. The new digest reflects the change after the shared branch is updated.</p>
+        </article>
+      </div>
+      <p class="callout" data-time="exception">For another app, the 10-second company standard still applies. The Billing exception depends on that scope being respected.</p>
+      <p class="source-links"><a class="product-name hindsight" href="https://hindsight.vectorize.io/developer/reflect">Hindsight Reflect</a><a class="product-name context" href="../../runtime/README.md">Context Ops session setup</a><a href="#case-controls" class="js-only">Change the case or timeline</a></p>
+    </div>
+
+    <div data-case="actual">
+      <h3 class="case-heading">How should I download another report snapshot?</h3>
+      <article class="case-record reading context">
+        <h3 class="product-heading">Context Ops <small>· based on the archived patch</small></h3>
+        <blockquote>Use the image source returned by <code>snapdom</code> in the existing anchor download flow.</blockquote>
+        <p class="annotation">This paraphrases the detail preserved by the fresh-specialist run. The archived pilot assessed the knowledge output. Here it illustrates what a later agent could read.</p>
+      </article>
+      <p class="callout">The earlier correction is useful when a later task needs the exact API behavior. The patch evidence still leaves Firefox support open.</p>
+      <p class="source-links"><a href="../../docs/walkthrough/README.md#knowledge-now-lives-beyond-the-conversation">Follow the archived patch</a></p>
+    </div>
+
+    <div class="flow" aria-label="Walkthrough navigation">
+      <a class="flow-link" href="#stored" data-step-link><span aria-hidden="true">←</span> Stored knowledge</a>
+      <a class="flow-link forward" href="#results" data-step-link>Read the study notes <span aria-hidden="true">→</span></a>
+    </div>
+  </section>
+
+  <section class="step" id="results" aria-labelledby="results-title">
+    <header class="step-header">
+      <h2 id="results-title" tabindex="-1">What each study measured</h2>
+      <p>The studies used different tasks, models, and scoring criteria. Each finding applies to the conditions of its own study.</p>
+    </header>
+
+    <article class="study-note reading hindsight">
+      <h3 class="product-heading">Hindsight · SDE-Bench</h3>
+      <p>Can a coding agent fix a bug while honoring a decision recorded earlier? SDE-Bench grades code patches on bug-fix tasks in <code>boltons</code>, including tests for prior decisions. Hindsight’s published results track coding-agent costs and correction rounds with and without memory.</p>
+      <p class="source-links"><a href="https://raw.githubusercontent.com/vectorize-io/hindsight-datasets/main/sdebench/README.md">Benchmark protocol</a><a href="https://github.com/vectorize-io/hindsight/blob/main/hindsight-integrations/coding-agents/README.md#does-it-work">Published results</a></p>
+    </article>
+    <article class="study-note reading context">
+      <h3 class="product-heading">Context Ops · Feature sequence</h3>
+      <p>Do decisions from earlier features carry into later sessions? The study followed chains of simulated feature tasks with no shared knowledge, repository knowledge, or team knowledge. It scored whether earlier decisions were followed and reported development and maintenance costs separately.</p>
+      <p class="source-links"><a href="../../docs/evaluation.md">Study results and limitations</a></p>
+    </article>
+
+    <details class="reading"><summary>What would a shared evaluation require?</summary><p>Use the same conversation history, repo revision, development task, agent, and scoring criteria. Measure both the knowledge produced and the resulting patch. Record ingestion or maintenance cost separately from retrieval and development cost, along with time and correction rounds. An amended rule and an application-specific exception are good cases for testing freshness and scope.</p></details>
+
+    <div class="flow" aria-label="Walkthrough navigation">
+      <a class="flow-link" href="#next-session" data-step-link><span aria-hidden="true">←</span> Next session</a>
+      <a class="flow-link forward" href="#evidence" data-step-link>Revisit the evidence <span aria-hidden="true">↺</span></a>
+    </div>
+  </section>
+</main>
+</div>
+
+<footer class="shell"><a href="../README.md">Context Ops reports</a></footer>
+
+<script>
+  const steps = Array.from(document.querySelectorAll('.step'));
+  const contentsLinks = document.querySelectorAll('.contents a');
+  const timelineControls = document.querySelector('#timeline-controls');
+  const caseStatus = document.querySelector('#case-status');
+  const casePanels = document.querySelectorAll('[data-case]');
+  const timelinePanels = document.querySelectorAll('[data-time]');
+  let activeStep;
+  let scrollFrame;
+
+  function syncExample() {
+    const chosenCase = document.querySelector('input[name="case"]:checked');
+    const chosenTime = document.querySelector('input[name="time"]:checked');
+    timelineControls.hidden = chosenCase.value !== 'billing';
+    casePanels.forEach(panel => { panel.hidden = panel.dataset.case !== chosenCase.value; });
+    timelinePanels.forEach(panel => { panel.hidden = panel.dataset.time !== chosenTime.value; });
+    const timeLabel = timelineControls.hidden ? '' : ' · ' + chosenTime.nextElementSibling.textContent;
+    caseStatus.textContent = 'Showing ' + chosenCase.nextElementSibling.textContent + timeLabel;
+  }
+
+  function markCurrentStep(step) {
+    if (step === activeStep) return;
+    activeStep = step;
+    contentsLinks.forEach(link => {
+      if (link.hash === '#' + step.id) link.setAttribute('aria-current', 'location');
+      else link.removeAttribute('aria-current');
+    });
+  }
+
+  function trackReadingPosition() {
+    if (scrollFrame) return;
+    scrollFrame = requestAnimationFrame(() => {
+      scrollFrame = null;
+      const atEnd = window.scrollY > 0 && window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2;
+      const current = atEnd ? steps.at(-1) : steps.findLast(step => step.getBoundingClientRect().top <= 112);
+      markCurrentStep(current || steps[0]);
+    });
+  }
+
+  function focusLinkedStep() {
+    const target = steps.find(step => '#' + step.id === location.hash);
+    if (!target) return;
+    target.scrollIntoView({block: 'start'});
+    target.querySelector('h2').focus({preventScroll: true});
+    markCurrentStep(target);
+  }
+
+  document.querySelectorAll('.choice input').forEach(input => input.addEventListener('change', syncExample));
+  document.querySelectorAll('[data-step-link], .skip').forEach(link => {
+    link.addEventListener('click', event => {
+      if (link.hash === location.hash && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+        event.preventDefault();
+        focusLinkedStep();
+      }
+    });
+  });
+  window.addEventListener('hashchange', () => requestAnimationFrame(focusLinkedStep));
+  window.addEventListener('scroll', trackReadingPosition, {passive: true});
+  window.addEventListener('resize', trackReadingPosition);
+  syncExample();
+  document.documentElement.classList.add('interactive');
+  markCurrentStep(steps[0]);
+  requestAnimationFrame(focusLinkedStep);
+</script>
+</body>
+</html>
