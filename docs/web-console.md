@@ -1,0 +1,52 @@
+# Local web console
+
+Run `./start-ui.sh` from the project checkout after installing the runtime
+with [setup](../setup.md). The script uses the checkout's virtual environment
+or the installed command. From an installed package, run `contextops ui`.
+Both open an authenticated loopback-only page. Keep the launcher running while
+using the browser. The console uses the existing private provider login.
+
+## Set up a project
+
+Choose the application and knowledge checkouts under **Setup**. Use an
+existing knowledge baseline or initialize a new branch, review the local
+changes, and commit them from the page. The project list is stored locally
+under `~/.contextops`; the binding is read from the application's Git
+configuration. The default connection leaves the pre-push hook disabled.
+
+Scan the committed application snapshot for candidate knowledge categories.
+The scan can include selected Claude Code sessions. Choose the recommended
+categories, customize the list or add a category and collection description.
+Save the profile on the application or team scope and review and commit the
+configuration. An application override takes precedence over the team default.
+The sweep freezes its profile against the committed knowledge baseline. A
+proposal for a disabled category is recorded as rejected. An unclassified
+proposal is deferred. A checkout with no profile uses its existing policy.
+The editable category discovery role is in `agents/profile-discovery.md`.
+
+## Run and review
+
+Choose source commits, development sessions, strategy, backend and optional
+model override under **Agents**. Both maintenance backends still read selected
+Claude Code development sessions. The console records user-visible agent
+events in the run directory and replays them when a run is reopened. Raw
+provider logs and reasoning stay outside the browser stream. The review panel
+distinguishes accepted proposals, rejected or deferred records, and the actual
+knowledge patch. Browser-started sweeps retain output locally.
+
+**Checks** shows the optional application lint or test proposal. Review its
+patch, pass the exact verification command as an argument array, and explicitly
+stage the reviewed patch. The command runs with your local permissions in a
+disposable worktree. See [application checks](application-checks.md).
+
+## Browser acceptance
+
+The deterministic browser acceptance uses a separate checkout of
+[MarkupSafe 3.0.2](https://github.com/pallets/markupsafe/releases/tag/3.0.2)
+at `28ace20b140d15c083e1cbc163ee6b7778ba098c` plus a local documentation
+commit. A synthetic session states a compatibility decision for the exercise.
+The browser connects both repositories, initializes the knowledge branch,
+scans categories, saves the profile, runs a sweep, and opens the knowledge
+diff. A second candidate from an unselected category is rejected. Replaying
+this fixture with simulated model messages establishes UI and runtime wiring.
+Provider authentication and live generated output require a separate run.

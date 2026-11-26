@@ -26,7 +26,7 @@ async def run_cartographer(
     recent = backlog.read_text(encoding="utf-8").splitlines()[-BACKLOG_WINDOW:]
     (ctx.run_dir / "unowned-backlog.jsonl").write_text("\n".join(recent) + "\n", encoding="utf-8")
 
-    spec = load_agent(config.cartographer, config.default_model, config.backend)
+    spec = load_agent(config.cartographer, config.default_model, config.backend, config.model_override)
     prompt = "\n".join([
         f"Run: {ctx.run_id}, application {ctx.app_label} at {ctx.head_sha[:7]}",
         f"Unowned findings, newest last: {ctx.run_dir / 'unowned-backlog.jsonl'}",

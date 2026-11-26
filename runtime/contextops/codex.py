@@ -109,6 +109,28 @@ def _read_events(path: Path, run: AgentRun, model: str) -> None:
         raise CodexResponseError("Expected a new Codex thread and one completed turn")
 
 
+async def _stream_messages(path, task, directory, label):
+    from contextops.events import message
+
+    with path.open(encoding="utf-8") as stream:
+        while True:
+            position = stream.tell()
+            line = stream.readline()
+            if line.endswith("\n"):
+                try:
+                    event = json.loads(line)
+                except ValueError:
+                    continue
+                item = event.get("item", {})
+                if event.get("type") == "item.completed" and item.get("type") == "agent_message":
+                    message(directory, label, item.get("text", ""))
+                continue
+            if task.done():
+                break
+            stream.seek(position)
+            await asyncio.sleep(.10)
+
+
 async def run_codex(spec: AgentSpec, *, label, system, prompt, schema, cwd, dirs, run_dir,
                     resume=None, fork=False) -> AgentRun:
     run = AgentRun(label, status="failed", cost_usd=None, parent_session_id=resume)
@@ -136,7 +158,8 @@ async def run_codex(spec: AgentSpec, *, label, system, prompt, schema, cwd, dirs
                     *cmd, cwd=work, env=env, stdin=asyncio.subprocess.PIPE, stdout=events,
                     stderr=asyncio.subprocess.DEVNULL, start_new_session=True)
                 try:
-                    await asyncio.wait_for(proc.communicate(prompt.encode()), TIMEOUT_SECONDS)
+                    task = asyncio.create_task(asyncio.wait_for(proc.communicate(prompt.encode()), TIMEOUT_SECONDS))
+                    await asyncio.gather(task, _stream_messages(scratch / "events", task, run_dir, label))
                 finally:
                     if proc.returncode is None:
                         try:

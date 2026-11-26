@@ -82,6 +82,19 @@ AGENT_OUTPUT = {
 
 WORKER_OUTPUT = AGENT_OUTPUT
 
+
+def agent_output(profile: dict | None) -> dict:
+    if profile is None:
+        return AGENT_OUTPUT
+    from copy import deepcopy
+
+    schema = deepcopy(AGENT_OUTPUT)
+    record = schema["properties"]["records"]["items"]
+    record["properties"]["category"] = {
+        "type": "string", "description": "Category ID from the active knowledge profile",
+    }
+    return schema
+
 CARTOGRAPHER_OUTPUT = {
     "type": "object",
     "properties": {

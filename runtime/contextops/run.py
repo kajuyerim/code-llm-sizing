@@ -35,6 +35,10 @@ class RunContext:
     scope: str = "team"
     app: str | None = None
     backend: str = "claude"
+    model: str | None = None
+    model_default: str | None = None
+    profile: dict | None = None
+    local_only: bool = False
 
     @property
     def app_label(self) -> str:
@@ -62,6 +66,7 @@ def create_run(
     app_root: Path, kb_root: Path, remote: str, ref: str, local_sha: str, remote_sha: str,
     *, backend: str | None = None, strategy: str | None = None, sessions: list[str] | None = None,
     cutoff: datetime | None = None, app_name: str | None = None, auto_select: bool = False,
+    model: str | None = None, local_only: bool = False,
 ) -> RunContext | None:
     from contextops.strategies import STRATEGIES
 
@@ -72,6 +77,8 @@ def create_run(
     if gitutil.status(kb_root):
         raise ValueError("Commit or stash knowledge checkout changes before preparing a run")
     config = load_config(kb_root, backend)
+    if model is not None and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,119}", model):
+        raise ValueError("Enter a valid provider model identifier")
     strategy = strategy or config.mode
     if strategy not in STRATEGIES:
         raise ValueError("Choose an implemented strategy explicitly: " + ", ".join(STRATEGIES))
@@ -118,7 +125,8 @@ def create_run(
                                           date=f"{now:%Y-%m-%d}", short_sha=head[:7]),
         since=None, cutoff=cutoff, strategy=strategy, sessions=sessions,
         conversation_sha256=hashlib.sha256(frozen).hexdigest(),
-        scope=config.scope, app=app, backend=config.backend,
+        scope=config.scope, app=app, backend=config.backend, model=model, model_default=config.default_model, local_only=local_only,
+        profile=config.profiles.get(app, config.profiles.get("*")),
     )
     if not gitutil.succeeds(kb_root, "check-ref-format", "--branch", ctx.branch):
         raise ValueError("init.md: output.branch produces an invalid Git branch")

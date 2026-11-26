@@ -2,6 +2,8 @@
 
 Start with [setup](../setup.md) for installation and tests without credentials. The supported first-use path is a manual run against a separate application. The shared pipeline registers both `fresh-specialists` and `sweeper-first` with explicit selection.
 
+Open the [local web console](../docs/web-console.md) with `contextops ui`.
+
 To propose a local lint or test patch from a completed sweep, see [application checks](../docs/application-checks.md).
 
 ## Commands

@@ -39,7 +39,7 @@ def plan_workers(config: InitConfig, evidence: Evidence) -> tuple[list[Worker], 
     conversation = evidence.conversation_text().lower()
     planned, skipped = [], []
     for entry in config.workers:
-        spec = load_agent(entry.agent, config.default_model, config.backend)
+        spec = load_agent(entry.agent, config.default_model, config.backend, config.model_override)
         for owns, tool in _assignments(entry, config.kb_root):
             label = f"{spec.name}:{tool}" if tool else spec.name
             if entry.run == "always":

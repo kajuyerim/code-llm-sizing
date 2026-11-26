@@ -17,6 +17,8 @@ from contextops.cartographer import run_cartographer
 from contextops.checks import propose
 from contextops.config import InitConfig, load_config
 from contextops.evidence import build_pack
+from contextops.events import emit
+from contextops.profiles import apply_profile
 from contextops.initializer import plan_workers
 from contextops.report import Outcome, render_report, render_completion
 from contextops.review import review_results
@@ -41,6 +43,7 @@ async def orchestrate(run_dir: Path) -> Path:
     # Never overwrite an attempted run or reuse its branch/session state.
     with (ctx.run_dir / "started").open("x") as marker:
         marker.write("This run was attempted. Prepare a new run for another attempt.\n")
+    emit(ctx.run_dir, "run_started")
     committed = False
     kb_created = app_created = False
     try:
@@ -51,6 +54,12 @@ async def orchestrate(run_dir: Path) -> Path:
         app_created = True
         config = load_config(ctx.kb_snapshot, ctx.backend)
         config.mode = ctx.strategy
+        config.model_override = ctx.model
+        if ctx.model:
+            config.default_model = ctx.model
+        if ctx.local_only:
+            config.output.open_pr = False
+        config.instructions += apply_profile(ctx.profile)
         strategy = STRATEGIES.get(ctx.strategy)
         if strategy is None:
             raise ValueError(f"init.md: unknown mode '{config.mode}', known: {', '.join(STRATEGIES)}")
@@ -67,6 +76,8 @@ async def orchestrate(run_dir: Path) -> Path:
             name = result.run.label.replace(":", "-")
             _dump(ctx.run_dir / "workers" / f"{name}.json", asdict(result.run))
         review = review_results(results, ctx, evidence)
+        emit(ctx.run_dir, "review_finished", accepted=len(review.accepted), deferred=len(review.deferred),
+             rejected=len(review.rejected))
         for entry in handoff_pass:
             if entry.get("error"):
                 review.failures.append(f"{entry['to']} handoff: {entry['error']}")
@@ -107,7 +118,14 @@ async def orchestrate(run_dir: Path) -> Path:
         report_path.write_text(report, encoding="utf-8")
         (ctx.run_dir / "completion.txt").write_text(completion, encoding="utf-8")
         record_cutoff(ctx.runs_dir, ctx.app_root, ctx.cutoff)
+        failed = bool(review.failures) or any(
+            run.status != "success" for run in ledger.runs if run.label != "check-proposer"
+        )
+        emit(ctx.run_dir, "run_finished", status="failed" if failed else "complete")
         return report_path
+    except Exception:
+        emit(ctx.run_dir, "run_finished", status="failed")
+        raise
     finally:
         if app_created:
             gitutil.remove_worktree(ctx.app_root, ctx.app_snapshot)

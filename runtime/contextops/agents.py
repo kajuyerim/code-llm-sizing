@@ -5,11 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, HookMatcher, query
+from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, ResultMessage, TextBlock, HookMatcher, query
 
 from contextops import frontmatter
 from contextops.access import file_guard
 from contextops.config import InitConfig
+from contextops.events import emit, message as emit_message
 
 READ_ONLY_TOOLS = ["Read", "Grep", "Glob"]
 EDIT_TOOLS = ["Edit", "Write"]
@@ -64,13 +65,13 @@ class Ledger:
         return self.spent < self.limit_usd
 
 
-def load_agent(path: Path, default_model: str, backend: str = "claude") -> AgentSpec:
+def load_agent(path: Path, default_model: str, backend: str = "claude", model_override: str | None = None) -> AgentSpec:
     meta, body = frontmatter.read(path)
     return AgentSpec(
         name=meta.get("name", path.stem),
         path=path,
         prompt=body.strip(),
-        model=default_model if backend == "codex" else meta.get("model", default_model),
+        model=model_override or (default_model if backend == "codex" else meta.get("model", default_model)),
         backend=backend,
         tools=list(meta.get("tools", READ_ONLY_TOOLS)),
         max_turns=meta.get("maxTurns"),
@@ -112,12 +113,16 @@ async def run_agent(
     max_turns: int,
     resume: str | None = None,
     fork: bool = False,
+    subscription: bool = False,
 ) -> AgentRun:
+    emit(run_dir, "agent_started", agent=label, backend=spec.backend, model=spec.model)
     if spec.backend == "codex":
         from contextops.codex import run_codex
 
-        return await run_codex(spec, label=label, system=system, prompt=prompt, schema=schema,
+        run = await run_codex(spec, label=label, system=system, prompt=prompt, schema=schema,
                                cwd=cwd, dirs=dirs, run_dir=run_dir, resume=resume, fork=fork)
+        emit(run_dir, "agent_finished", agent=label, status=run.status)
+        return run
 
     options = ClaudeAgentOptions(
         system_prompt={"type": "preset", "preset": "claude_code", "append": system},
@@ -140,7 +145,8 @@ async def run_agent(
         # (a fork re-wrote its whole inherited history); maintenance agents need none of them.
         mcp_servers={},
         strict_mcp_config=True,
-        env={"ENABLE_CLAUDEAI_MCP_SERVERS": "false"},
+        env={"ENABLE_CLAUDEAI_MCP_SERVERS": "false",
+             **({"ANTHROPIC_API_KEY": ""} if subscription else {})},
         resume=resume,
         fork_session=fork,
     )
@@ -148,6 +154,10 @@ async def run_agent(
     run = AgentRun(label)
     try:
         async for message in query(prompt=prompt, options=options):
+            if isinstance(message, AssistantMessage):
+                for block in message.content:
+                    if isinstance(block, TextBlock):
+                        emit_message(run_dir, label, block.text)
             if isinstance(message, ResultMessage):
                 run.status = message.subtype
                 run.session_id = message.session_id
@@ -159,4 +169,5 @@ async def run_agent(
                 run.output = message.structured_output if message.subtype == "success" else None
     except Exception as exc:  # one broken agent should not sink the whole run
         run.status, run.error = "crashed", f"{type(exc).__name__}: SDK call failed; inspect private local diagnostics"
+    emit(run_dir, "agent_finished", agent=label, status=run.status)
     return run
