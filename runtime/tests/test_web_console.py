@@ -90,6 +90,18 @@ class ConsoleTests(unittest.TestCase):
         self.assertEqual(updated["base"], self.head)
         self.assertNotEqual(updated["head"], self.head)
 
+    def test_evidence_inspector_reads_only_the_cited_frozen_message(self):
+        console, key = self.connect()
+        ctx = self.prepare()
+        review = {"accepted": [{"evidence": [{"kind": "conversation", "session": "chosen-session",
+                                              "message": "message-1"}]}]}
+        (ctx.run_dir / "review.json").write_text(json.dumps(review))
+        excerpt = console.evidence(key, ctx.run_id, "accepted", 0, 0)
+        self.assertEqual(excerpt["heading"], "user")
+        self.assertIn("Firebase", excerpt["text"])
+        with self.assertRaises(ValueError):
+            console.evidence(key, ctx.run_id, "accepted", -1, 0)
+
     def test_profile_review_gate(self):
         ctx = replace(self.prepare(), profile={"categories": CATEGORIES})
         record = {"op": "ADD", "target": "core/pitfalls.md", "scope": "company",

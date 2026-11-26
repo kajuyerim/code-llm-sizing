@@ -22,6 +22,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from contextops import checks, frontmatter, gitutil, profiles, transcripts
+from contextops.access import sensitive
 from contextops.attach import attach
 from contextops.config import load_config
 from contextops.onboarding import initialize_knowledge
@@ -201,12 +202,58 @@ class Console:
 
     def run_detail(self, key: str, run_id: str) -> dict:
         path, row = self.run_path(key, run_id)
-        return {**row, "events": self.read_events(path), "review": _json(path / "review.json", {}),
+        lineage = _json(path / "sweeper.json", {})
+        review = _json(path / "review.json", {})
+        worker_notes = {}
+        for worker_file in (path / "workers").glob("*.json"):
+            run = _json(worker_file)
+            if run:
+                worker_notes[run["label"]] = (run.get("output") or {}).get("coverage", {}).get("notes") or run.get("error")
+        return {**row, "events": self.read_events(path), "review": review, "worker_notes": worker_notes,
+                "forks": [child["label"] for child in lineage.get("validated_children", [])
+                          if child.get("status") == "success" and child.get("session_id")],
+                "sweeper_findings": ((lineage.get("parent") or {}).get("output") or {}).get("findings", []),
                 "patch": _text(path / "knowledge.patch"), "report": _text(path / "report.md"),
+                "writer": _json(path / "writer-result.json"),
                 "check": _json(path / checks.OUTPUT / "proposal.json"),
                 "check_patch": _text(path / checks.OUTPUT / "check.patch"),
                 "verification": _json(path / checks.OUTPUT / "verification.json"),
                 "applied": _json(path / checks.OUTPUT / "applied.json")}
+
+    def evidence(self, key: str, run_id: str, status: str, index: int, evidence_index: int) -> dict:
+        path, _ = self.run_path(key, run_id)
+        if status not in {"accepted", "rejected", "deferred", "no_change"} or min(index, evidence_index) < 0:
+            raise ValueError("Choose a displayed finding and evidence reference")
+        review = _json(path / "review.json", {})
+        locator = review[status][index]["evidence"][evidence_index]
+        kind = locator["kind"]
+        ctx = load_run(path)
+        if kind == "conversation":
+            session = locator.get("session", "").removesuffix(".md")
+            for recorded in _json(path / "conversation.json", []):
+                if recorded["session_id"] == session:
+                    for message in recorded["messages"]:
+                        if message["uuid"] == locator.get("message"):
+                            return {"heading": message["role"], "text": message["text"][:3500]}
+        else:
+            name = locator.get("path", "")
+            relative = Path(name)
+            if name and not relative.is_absolute() and ".." not in relative.parts and not sensitive(relative):
+                if kind == "diff":
+                    if name in {"diff/commits.txt", "commits.txt"}:
+                        text = _text(ctx.pack / "diff" / "commits.txt")
+                    else:
+                        text = gitutil.git(ctx.app_root, "diff", ctx.base_sha, ctx.head_sha, "--", name)
+                    return {"heading": name, "text": text[:3500]}
+                if kind == "source" and gitutil.file_exists(ctx.app_root, ctx.head_sha, name):
+                    text = gitutil.git(ctx.app_root, "show", f"{ctx.head_sha}:{name}")
+                    line = locator.get("line")
+                    if isinstance(line, int) and line > 0:
+                        lines = text.splitlines()
+                        start = max(0, line - 5)
+                        text = "\n".join(f"{i + 1:4}  {lines[i]}" for i in range(start, min(len(lines), line + 4)))
+                    return {"heading": name, "text": text[:3500]}
+        return {"heading": "Recorded citation", "text": locator.get("quote") or "No excerpt was retained."}
 
     def launch(self, ctx):
         with (ctx.run_dir / "run.log").open("ab") as log:
@@ -373,6 +420,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.respond(200, console.sweep_range(params["project"], params["branch"]))
             elif url.path == "/api/run":
                 self.respond(200, console.run_detail(params["project"], params["run"]))
+            elif url.path == "/api/evidence":
+                self.respond(200, console.evidence(params["project"], params["run"], params["status"],
+                                                    int(params["index"]), int(params["evidence"])))
             elif url.path == "/api/scan":
                 self.respond(200, console.scans.get(params["project"], {"status": "idle"}))
             elif url.path == "/api/events":
@@ -396,7 +446,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.respond(404, {"error": "Page not found"})
         except (BrokenPipeError, ConnectionResetError):
             return
-        except (ValueError, KeyError, OSError, subprocess.SubprocessError):
+        except (ValueError, KeyError, IndexError, OSError, subprocess.SubprocessError):
             if url.path != "/api/events":
                 self.respond(400, {"error": "Unable to read the project. Check or reconnect its local paths."})
 

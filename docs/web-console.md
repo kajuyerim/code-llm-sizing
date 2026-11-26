@@ -8,7 +8,7 @@ using the browser. The console uses the existing private provider login.
 
 ## Set up a project
 
-Choose the application and knowledge checkouts under **Setup**. Use an
+Choose the application and knowledge checkouts under **Setup**. Use the header project menu to switch projects. Use an
 existing knowledge baseline or initialize a new branch, review the local
 changes, and commit them from the page. The project list is stored locally
 under `~/.contextops`; the binding is read from the application's Git
@@ -55,3 +55,13 @@ scans categories, saves the profile, runs a sweep, and opens the knowledge
 diff. A second candidate from an unselected category is rejected. Replaying
 this fixture with simulated model messages establishes UI and runtime wiring.
 Provider authentication and live generated output require a separate run.
+
+## Inspect a finding
+
+The evidence graph links a cited source to the specialist who proposed the
+record and to its review outcome. Select an agent, evidence type, or verdict
+to filter the findings. Open a finding to read its text, the decision reason,
+and the cited excerpt. The writer consumes accepted records. A written record
+is linked to a file diff when the writer receipt and the patch both support
+the link. Opening the file list also shows diffs from older runs without a
+writer receipt.

@@ -3,7 +3,8 @@ const $ = (selector) => document.querySelector(selector);
 const main = $("#main");
 const pages = ["setup", "agents", "checks"];
 let page = "setup", project = "", projects = {}, details = null;
-let currentRun = "", activeAgent = "", stream = null, runData = null, draftCategories = [];
+let currentRun = "", stream = null, runData = null, draftCategories = [];
+let graphFilter = "", selectedFinding = "", graphObserver;
 let requestEpoch = 0, noticeTimer, navigationTimer;
 
 function node(tag, text = "", className = "") {
@@ -103,22 +104,27 @@ async function getProject() {
   return query("project", {project});
 }
 function chooseProject(key) {
+  $(".sweep-dialog")?.close();
   project = key;
   localStorage.setItem("contextops-project", key);
+  $("#project-menu").open = false;
   currentRun = "";
-  activeAgent = "";
+  graphFilter = "";
+  selectedFinding = "";
   closeStream();
   render();
 }
 function renderProjects() {
   const list = $("#projects");
   list.replaceChildren();
+  $("#project-toggle").textContent = projects[project]?.name || "Projects";
   for (const [key, row] of Object.entries(projects)) {
     list.append(button(row.name, () => chooseProject(key), key === project ? "active" : ""));
   }
 }
 function selectPage(next) {
   if (next === page) return;
+  $(".sweep-dialog")?.close();
   const direction = pages.indexOf(next) > pages.indexOf(page) ? 1 : -1;
   page = next;
   setNav();
@@ -143,6 +149,7 @@ function setNav() {
 async function render() {
   const epoch = ++requestEpoch;
   closeStream();
+  graphObserver?.disconnect();
   setNav();
   renderProjects();
   main.replaceChildren();
@@ -323,6 +330,7 @@ function renderCategories() {
   draw();
 }
 function openSweep() {
+  if ($(".sweep-dialog")) return;
   const selected = project;
   const dialog = node("dialog", "", "sweep-dialog");
   dialog.append(node("h2", "New sweep"));
@@ -345,7 +353,8 @@ function openSweep() {
     dialog.close();
     if (project === selected) {
       currentRun = result.run;
-      activeAgent = "";
+      graphFilter = "";
+      selectedFinding = "";
       await render();
     }
   }, "Run sweep");
@@ -372,7 +381,7 @@ function openSweep() {
   branch.addEventListener("change", update);
   dialog.addEventListener("close", () => dialog.remove(), {once: true});
   dialog.append(form);
-  main.append(dialog);
+  document.body.append(dialog);
   dialog.showModal();
   update();
 }
@@ -394,7 +403,7 @@ function renderAgents() {
   if (selected) selectRun(selected);
 }
 function selectRun(id) {
-  if (currentRun !== id) activeAgent = "";
+  if (currentRun !== id) { graphFilter = ""; selectedFinding = ""; }
   currentRun = id;
   closeStream();
   const selected = project;
@@ -409,8 +418,20 @@ function selectRun(id) {
     stream = new EventSource("/api/events?" + new URLSearchParams({project: selected, run: id}));
     stream.onmessage = (event) => {
       const item = JSON.parse(event.data);
-      if (!runData.events.some((previous) => previous.id === item.id)) runData.events.push(item);
+      if (runData.events.some((previous) => previous.id === item.id)) return;
+      runData.events.push(item);
       drawRun();
+      if (item.kind === "review_finished") {
+        guarded(async () => {
+          const updated = await query("run", {project: selected, run: id});
+          if (project === selected && currentRun === id && page === "agents") {
+            runData.review = updated.review;
+            runData.forks = updated.forks;
+            runData.sweeper_findings = updated.sweeper_findings;
+            drawRun();
+          }
+        });
+      }
       if (item.kind === "run_finished") {
         closeStream();
         selectRun(id);
@@ -418,90 +439,255 @@ function selectRun(id) {
     };
   });
 }
+const sourceNames = {conversation:"Conversation", diff:"Git diff", source:"Source code", memory:"Repo memory"};
+const verdictNames = {accepted:"Accepted", rejected:"Rejected", deferred:"Needs review", no_change:"No change"};
+
+function findingCopy(record) {
+  const text = (record.text || "").trim();
+  if (!text.startsWith("|") || !text.endsWith("|")) {
+    return {title: text || record.reason || record.target || "No change", details: []};
+  }
+  const cells = text.slice(1, -1).trim().split(/\s+\|\s+/);
+  if (cells.length < 5) return {title: text, details: []};
+  const [id, title, ...rest] = cells;
+  const details = rest.slice(0, -1).filter((cell) => !/^(company|app:\S+|tool:\S+)$/.test(cell));
+  return {title: title || id, details};
+}
+
+function agentName(label) {
+  return (label || "").replace(/:handoffs$/, "");
+}
+
+function patchFiles(text) {
+  const files = new Map();
+  for (const chunk of (text || "").split(/(?=^diff --git )/m)) {
+    const path = chunk.match(/^diff --git a\/.* b\/(.*)$/m)?.[1];
+    if (path) files.set(path, chunk);
+  }
+  return files;
+}
+
+function drawEdges(graph, canvas, positions, edges, active) {
+  const outer = graph.getBoundingClientRect();
+  if (!outer.width || !outer.height) return;
+  const scale = window.devicePixelRatio || 1;
+  canvas.width = outer.width * scale;
+  canvas.height = outer.height * scale;
+  const context = canvas.getContext("2d");
+  if (!context) return;
+  context.scale(scale, scale);
+  for (const [from, to] of edges) {
+    const a = positions.get(from)?.getBoundingClientRect();
+    const b = positions.get(to)?.getBoundingClientRect();
+    if (!a || !b) continue;
+    const x1 = a.left + a.width / 2 - outer.left;
+    const y1 = a.bottom - outer.top;
+    const x2 = b.left + b.width / 2 - outer.left;
+    const y2 = b.top - outer.top - 2;
+    const middle = (y1 + y2) / 2;
+    context.strokeStyle = active.has(from) && active.has(to) ? "#deded9" : "#646664";
+    context.lineWidth = active.has(from) && active.has(to) ? 1.4 : 1;
+    context.beginPath();
+    context.moveTo(x1, y1);
+    context.bezierCurveTo(x1, middle, x2, middle, x2, y2);
+    context.lineTo(x2 - 3, y2 - 5);
+    context.moveTo(x2, y2);
+    context.lineTo(x2 + 3, y2 - 5);
+    context.stroke();
+  }
+}
+
 function drawRun() {
   const view = $("#run-detail");
   if (!view || !runData) return;
-  const previous = view.querySelector(".messages");
-  const oldTop = previous?.scrollTop || 0;
-  const follow = !previous || previous.scrollHeight - previous.scrollTop - previous.clientHeight < 28;
-  const oldOpen = [...view.querySelectorAll("details[open]")].map((item) => item.dataset.key);
+  graphObserver?.disconnect();
   view.replaceChildren();
   const block = node("section", "", "card");
-  block.append(node("h2", "Run " + runData.id));
+  block.append(node("h2", "Evidence flow"));
+  const blocked = Object.values(runData.worker_notes || {}).some((note) =>
+    /tool host (?:was|is) disabled|no evidence was inspected/i.test(note || ""));
+  if (blocked) block.append(node("p", "Evidence inspection was blocked for at least one specialist. An empty result from that specialist does not mean there was nothing worth keeping.", "muted"));
+  const findings = Object.entries(verdictNames).flatMap(([status]) =>
+    (runData.review[status] || []).map((record, index) => ({
+      status, index, record, id: status + ":" + index,
+      sources: Array.from(new Set((record.evidence || []).map((ref) => ref.kind).filter(Boolean))),
+    })));
   const agents = new Map();
-  for (const item of runData.events) {
-    if (!item.agent) continue;
-    if (!agents.has(item.agent)) agents.set(item.agent, {status: "", messages: []});
-    const agent = agents.get(item.agent);
-    if (item.kind === "agent_started") agent.status = "running";
-    if (item.kind === "agent_message") agent.messages.push(item.text);
-    if (item.kind === "agent_finished") agent.status = item.status;
+  for (const event of runData.events) {
+    if (!event.agent) continue;
+    const name = agentName(event.agent);
+    if (!agents.has(name)) agents.set(name, {status:"", messages:[]});
+    const agent = agents.get(name);
+    if (event.kind === "agent_started") agent.status = "running";
+    if (event.kind === "agent_message") agent.messages.push(event.text);
+    if (event.kind === "agent_finished") agent.status = event.status;
   }
-  if (!activeAgent && agents.size) activeAgent = agents.keys().next().value;
-  const tabs = node("div", "", "tabs");
-  const done = node("div", "", "done");
-  done.append(node("h3", "Done"));
-  const content = node("div");
-  const messages = node("div", "", "messages");
-  const explanation = node("p", "", "muted");
-  for (const [name, agent] of agents) {
-    const status = agent.status === "running" ? " ◌" : agent.status === "success" ? " ✓" : " −";
-    const tab = button(name + status, () => { activeAgent = name; drawRun(); },
-                       agent.status === "running" ? "tab-running" : "");
-    tab.setAttribute("aria-selected", String(activeAgent === name));
-    tabs.append(tab);
-    if (agent.status && agent.status !== "running") done.append(button(name + " · " + agent.status, () => {
-      activeAgent = name; drawRun();
+  for (const {record} of findings) {
+    const name = agentName(record.agent);
+    if (name && !agents.has(name)) agents.set(name, {status:"", messages:[]});
+  }
+  const files = patchFiles(runData.patch);
+  const applied = runData.writer?.applied || [];
+  const matched = ({status, record}) => status === "accepted" && runData.writer?.committed && files.has(record.target)
+    && applied.some((item) => item.target === record.target && item.op === record.op
+                            && record.fact_id && record.fact_id === item.fact_id);
+  const subset = findings.filter(({status, record, sources}) => !graphFilter
+    || graphFilter === status || graphFilter === "agent:" + agentName(record.agent)
+    || sources.includes(graphFilter) || (graphFilter === "writer" && status === "accepted")
+    || (graphFilter === "files" && matched({status, record})));
+  const focused = subset.find((item) => item.id === selectedFinding) || subset[0];
+  const active = new Set(graphFilter ? [graphFilter] : []);
+  if (focused) {
+    for (const key of [...focused.sources, "agent:" + agentName(focused.record.agent), focused.status]) active.add(key);
+    if (matched(focused)) { active.add("writer"); active.add("files"); }
+  }
+  const graph = node("div", "", "run-graph");
+  const canvas = node("canvas");
+  canvas.setAttribute("aria-hidden", "true");
+  graph.append(canvas);
+  const positions = new Map(), edges = [], edgeKeys = new Set();
+  function edge(from,to) {
+    const key = JSON.stringify([from,to]);
+    if (!edgeKeys.has(key)) { edges.push([from,to]); edgeKeys.add(key); }
+  }
+  function lane(title, entries) {
+    if (!entries.length) return;
+    const row = node("div", "", "graph-lane");
+    const nodes = node("div", "", "graph-nodes");
+    row.append(node("h3", title), nodes);
+    for (const [key, title, meta, running] of entries) {
+      const chip = button("", () => {
+        graphFilter = graphFilter === key ? "" : key;
+        selectedFinding = "";
+        drawRun();
+      }, "graph-node" + (running ? " tab-running" : ""));
+      chip.setAttribute("aria-pressed", String(graphFilter === key));
+      chip.append(node("span", title));
+      if (meta) chip.append(node("small", meta));
+      positions.set(key, chip);
+      nodes.append(chip);
+    }
+    graph.append(row);
+  }
+  const sourceKeys = Array.from(new Set(findings.flatMap((finding) => finding.sources)));
+  lane("Cited evidence", sourceKeys.map((kind) => [
+    kind, sourceNames[kind] || kind, findings.filter((item) => item.sources.includes(kind)).length + " findings",
+  ]));
+  const sweeper = agents.get("sweeper");
+  if (sweeper) lane("Survey", [["agent:sweeper", "Sweeper", sweeper.status, sweeper.status === "running"]]);
+  lane("Specialists", [...agents].filter(([name]) => !["sweeper", "writer", "cartographer", "check-proposer"].includes(name))
+    .map(([name, agent]) => {
+      const count = findings.filter((item) => agentName(item.record.agent) === name && item.status !== "no_change").length;
+      return ["agent:" + name, name, agent.status === "running" ? "working" : agent.status && agent.status !== "success"
+        ? agent.status : (count + (count === 1 ? " proposal" : " proposals")),
+              agent.status === "running"];
     }));
+  lane("Review", Object.entries(verdictNames).map(([status, title]) => [
+    status, title, findings.filter((item) => item.status === status).length + " records",
+  ]).filter(([status]) => findings.some((item) => item.status === status)));
+  const writer = agents.get("writer");
+  if (writer || runData.writer || files.size) {
+    lane("Write", [["writer", "Writer", writer?.status === "running" ? "working" :
+      runData.writer ? applied.length + " reported applied" : "result not recorded", writer?.status === "running"]]);
   }
-  for (const text of agents.get(activeAgent)?.messages || []) messages.append(node("p", text));
-  if (!messages.childNodes.length) messages.append(node("p", "No messages from this agent yet.", "muted"));
-  for (const state of ["accepted", "rejected", "deferred"]) {
-    for (const record of runData.review[state] || []) {
-      done.append(button(state + " · " + (record.fact_id || record.target), () => {
-        explanation.replaceChildren(node("strong", record.text), node("p", record.rejected_because || record.policy_reason || record.reason || ""));
-        for (const source of record.evidence || []) {
-          const ref = node("details");
-          ref.append(node("summary", source.path || [source.session, source.message].filter(Boolean).join(" · ")),
-                     node("pre", source.quote || JSON.stringify(source, null, 2)));
-          explanation.append(ref);
-        }
-        if (runData.patch) explanation.append(button("View file diff", () => {
-          diff.open = true;
-          chooseFile(record.target);
-        }));
-      }));
+  if (files.size) lane("Files", [["files", runData.writer?.committed ? "Knowledge commit" : "Written diff",
+                                files.size + " changed files"]]);
+  for (const finding of findings) {
+    const agent = "agent:" + agentName(finding.record.agent);
+    finding.sources.forEach((kind) => edge(kind, agent));
+    edge(agent, finding.status);
+  }
+  for (const child of runData.forks || []) edge("agent:sweeper", "agent:" + child);
+  if (writer || runData.writer) edge("accepted", "writer");
+  if (files.size) edge("writer", "files");
+
+  const panel = node("div", "", "findings");
+  const list = node("div", "", "finding-list");
+  const body = node("div", "", "finding-body");
+  const selectedAgent = graphFilter.startsWith("agent:") ? agents.get(graphFilter.slice(6)) : null;
+  if (graphFilter === "agent:sweeper") {
+    for (const item of runData.sweeper_findings || []) {
+      list.append(node("p", item.summary || item.text));
+      if (item.suggested_home) list.append(node("small", item.suggested_home));
     }
   }
+  for (const item of subset) {
+    const {record, status, id} = item;
+    const copy = findingCopy(record);
+    const row = button("", () => { selectedFinding = id; drawRun(); });
+    row.setAttribute("aria-pressed", String(focused?.id === id));
+    row.append(node("small", verdictNames[status] + (record.fact_id ? " · " + record.fact_id : "")),
+               node("div", copy.title));
+    list.append(row);
+  }
+  if (focused) {
+    const {record, status, index} = focused;
+    const copy = findingCopy(record);
+    body.append(node("span", verdictNames[status], "state"), node("h3", copy.title));
+    for (const detail of copy.details) body.append(node("p", detail));
+    const reason = record.rejected_because || record.policy_reason || record.reason;
+    if (reason && reason !== copy.title) body.append(node("p", reason));
+    (record.evidence || []).forEach((source, i) => {
+      const disclosure = node("details", "", "evidence-detail");
+      const citation = source.path ? source.path + (source.line ? ":" + source.line : "")
+        : [source.session, source.message].filter(Boolean).join(" · ");
+      disclosure.append(node("summary", (sourceNames[source.kind] || "Evidence") + (citation ? " · " + citation : "")));
+      const excerpt = node("pre", source.quote || "");
+      disclosure.append(excerpt);
+      disclosure.addEventListener("toggle", () => {
+        if (!disclosure.open || disclosure.dataset.loaded) return;
+        disclosure.dataset.loaded = "true";
+        guarded(async () => {
+          const result = await query("evidence", {project, run: runData.id, status, index, evidence:i});
+          excerpt.textContent = result.heading + "\n\n" + result.text;
+        });
+      });
+      body.append(disclosure);
+    });
+    if (matched(focused)) body.append(button("View written file diff", () => {
+      fileSelect.value = record.target;
+      showPatch();
+      diff.open = true;
+    }));
+  } else {
+    body.append(node("p", graphFilter === "agent:sweeper" && runData.sweeper_findings?.length
+      ? "These are leads the sweeper passed to the specialists." :
+        agents.size ? "No review findings for this selection yet." : "Waiting for the first agent event.", "muted"));
+  }
+  const coverage = graphFilter.startsWith("agent:") && runData.worker_notes?.[graphFilter.slice(6)];
+  if (coverage) {
+    body.append(node("h3", "Coverage"), node("p", coverage));
+  }
+  if (selectedAgent?.messages.length) {
+    const messages = node("details");
+    messages.append(node("summary", "Agent messages"));
+    const text = node("div", "", "messages");
+    selectedAgent.messages.forEach((line) => text.append(node("p", line)));
+    messages.append(text);
+    body.append(messages);
+  }
+
   const diff = node("details");
-  diff.dataset.key = "diff";
-  diff.open = oldOpen.includes("diff");
   const fileSelect = document.createElement("select");
   fileSelect.setAttribute("aria-label", "File diff");
-  const chunks = new Map();
-  for (const chunk of (runData.patch || "").split(/(?=^diff --git )/m)) {
-    const name = chunk.match(/^diff --git a\/.* b\/(.*)$/m)?.[1];
-    if (name) chunks.set(name, chunk);
-  }
   const patch = node("pre", runData.patch || "No written patch.");
-  function chooseFile(name) {
-    fileSelect.value = chunks.has(name) ? name : "";
-    patch.textContent = chunks.get(name) || runData.patch || "No written patch.";
-  }
+  function showPatch() { patch.textContent = files.get(fileSelect.value) || runData.patch || "No written patch."; }
   const all = node("option", "All changed files");
   all.value = "";
   fileSelect.append(all);
-  for (const name of chunks.keys()) fileSelect.append(node("option", name));
-  fileSelect.onchange = () => chooseFile(fileSelect.value);
+  for (const name of files.keys()) fileSelect.append(node("option", name));
+  fileSelect.onchange = showPatch;
   diff.append(node("summary", "Knowledge diff"), fileSelect, patch);
-  content.append(tabs, messages, explanation, diff);
-  const split = node("div", "", "split");
-  split.append(done, content);
-  block.append(split);
+  if (graphFilter === "files") diff.open = true;
+  if (files.size) body.append(diff);
+  panel.append(list, body);
+  block.append(graph, panel);
   if (runData.check) block.append(button("Open in Checks", () => selectPage("checks")));
   view.append(block);
-  messages.scrollTop = follow ? messages.scrollHeight : oldTop;
+  graphObserver = new ResizeObserver(() => drawEdges(graph, canvas, positions, edges, active));
+  graphObserver.observe(graph);
 }
+
 function renderChecks() {
   heading("Review Checks");
   const list = section("Application checks");
@@ -556,7 +742,13 @@ function drawCheck(run) {
 }
 
 document.querySelectorAll("nav button").forEach((tab) => tab.onclick = () => selectPage(tab.dataset.page));
-$("#add-project").onclick = () => { project = ""; selectPage("setup"); render(); };
+$("#add-project").onclick = () => { $("#project-menu").open = false; project = ""; selectPage("setup"); render(); };
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") $("#project-menu").open = false;
+});
+document.addEventListener("click", (event) => {
+  if (!$("#project-menu").contains(event.target)) $("#project-menu").open = false;
+});
 guarded(async () => {
   projects = (await api("projects")).projects;
   const saved = localStorage.getItem("contextops-project");

@@ -92,6 +92,11 @@ async def orchestrate(run_dir: Path) -> Path:
         elif review.accepted:
             outcome.publication, outcome.writer_output = await write_changes(ctx, config, review, ledger)
             committed = outcome.publication.committed
+            _dump(ctx.run_dir / "writer-result.json", {
+                "committed": committed,
+                "applied": (outcome.writer_output or {}).get("applied", []),
+                "skipped": (outcome.writer_output or {}).get("skipped", []),
+            })
 
         check_summary = ""
         if config.checks.automatic:

@@ -32,7 +32,8 @@ assert args[:2] == ["exec", "--ignore-user-config"]
 assert args[args.index("-s")+1] == "read-only"
 assert "--ignore-rules" in args and "--strict-config" in args
 assert json.loads(settings["forced_login_method"]) == "chatgpt"
-assert {"memories", "shell_tool", "unified_exec", "plugins", "hooks", "multi_agent"} <= set(args)
+assert {"memories", "shell_tool", "unified_exec", "plugins", "hooks", "multi_agent", "code_mode"} <= set(args)
+assert "code_mode_host" not in args
 assert not {"OPENAI_API_KEY", "CODEX_API_KEY", "CODEX_THREAD_ID"} & set(os.environ)
 assert Path(os.environ["CODEX_HOME"]).name == "fake-login"
 scope = json.loads(json.loads(settings["mcp_servers.contextops_files.args"])[-1])
@@ -50,7 +51,9 @@ if parent and scenario == "parent-id":
     sid = parent
 output = dict(records=[], findings=[], handoffs=[], unowned=[], unresolved=[], contradictions=[],
               coverage=dict(sessions_read=[], files_read=[], notes=""))
-if writer:
+if scenario == "blocked-tools":
+    output["coverage"]["notes"] = "The code-mode host is disabled; I could not inspect evidence."
+elif writer:
     assert "Write" in tools and "Edit" in tools
     accepted = json.loads((run / "accepted.json").read_text())
     assert len(accepted) == 1
@@ -117,6 +120,13 @@ class CodexTests(unittest.TestCase):
             self.assertEqual(error.exception.code, 1)
         states = list((self.root / "runs" / "codex" / strategy).glob("*/run.json"))
         return load_run(max(states, key=lambda p: p.stat().st_mtime_ns).parent)
+
+    def test_disabled_evidence_host_is_not_a_successful_empty_sweep(self):
+        self.scenario.write_text("blocked-tools")
+        ctx = self.sweep("sweeper-first", expect_failure=True)
+        metrics = json.loads((ctx.run_dir / "metrics.json").read_text())
+        self.assertEqual(metrics["agents"][0]["status"], "failed")
+        self.assertIn("tool host", metrics["agents"][0]["error"])
 
     def test_profile_and_check_proposer_use_codex_and_publish_visible_messages(self):
         from contextops import frontmatter
