@@ -1,11 +1,11 @@
 "use strict";
 const $ = (selector) => document.querySelector(selector);
 const main = $("#main");
-const pages = ["setup", "agents", "checks"];
+const pages = ["setup", "agents", "review"];
 let page = "setup", project = "", projects = {}, details = null;
 let currentRun = "", stream = null, runData = null, draftCategories = [];
 let graphFilter = "", selectedFinding = "", graphObserver;
-let openEvidence = new Set(), evidenceCache = new Map(), openDiff = false, fileFocus = "";
+let openEvidence = new Set(), evidenceCache = new Map(), reviewFile = "";
 let requestEpoch = 0, noticeTimer, navigationTimer;
 
 function node(tag, text = "", className = "") {
@@ -50,10 +50,10 @@ function selector(form, label, name, values, selected = "") {
   form.append(wrapper);
   return select;
 }
-function section(title) {
+function section(title, parent = main) {
   const container = node("section", "", "card");
   container.append(node("h2", title));
-  main.append(container);
+  parent.append(container);
   return container;
 }
 function notify(text) {
@@ -109,9 +109,7 @@ function chooseProject(key) {
   project = key;
   localStorage.setItem("contextops-project", key);
   $("#project-menu").open = false;
-  currentRun = "";
-  graphFilter = "";
-  selectedFinding = "";
+  setCurrentRun("");
   closeStream();
   render();
 }
@@ -183,7 +181,7 @@ async function render() {
   draftCategories = (details.categories || []).map((item) => ({...item}));
   if (page === "setup") renderSetup();
   if (page === "agents") renderAgents();
-  if (page === "checks") renderChecks();
+  if (page === "review") renderReview();
 }
 function renderConnect(reconnect = "") {
   heading("Connect a project");
@@ -488,9 +486,7 @@ function openSweep() {
       sessions: data.getAll("sessions"), preview: [preview.base, preview.head]});
     dialog.close();
     if (project === selected) {
-      currentRun = result.run;
-      graphFilter = "";
-      selectedFinding = "";
+      setCurrentRun(result.run);
       await render();
     }
   }, "Run sweep");
@@ -521,45 +517,59 @@ function openSweep() {
   dialog.showModal();
   update();
 }
+function setCurrentRun(id) {
+  if (currentRun === id) return;
+  currentRun = id;
+  runData = null;
+  graphFilter = "";
+  selectedFinding = "";
+  openEvidence.clear();
+  evidenceCache.clear();
+  reviewFile = "";
+}
+function runSelector(onSelect) {
+  const selected = details.runs.find((run) => run.id === currentRun) || details.runs[0];
+  const controls = node("div", "", "run-controls");
+  if (selected) {
+    const input = selector(controls, "Sweep run", "run", details.runs.map((run) => [
+      run.id, [run.id, run.backend, run.model].filter(Boolean).join(" · "),
+    ]), selected.id);
+    input.onchange = () => onSelect(input.value);
+  } else {
+    controls.append(node("p", "No sweeps for this project.", "muted"));
+  }
+  controls.append(button("Refresh", render));
+  main.append(controls);
+  return selected?.id;
+}
 function renderAgents() {
   heading("Acquire Knowledge").append(button("New sweep", openSweep, "primary"));
-  const history = section("Runs");
-  history.append(button("Refresh", render));
-  if (!details.runs.length) history.append(node("p", "No runs for this project.", "muted"));
-  for (const run of details.runs) {
-    const entry = button("", () => selectRun(run.id), "run-row");
-    entry.dataset.run = run.id;
-    entry.append(node("span", run.id + " · " + run.backend + (run.model ? " · " + run.model : ""), "meta"),
-                 node("span", run.status, "state"));
-    history.append(entry);
-  }
-  main.append(node("div", "", "run-detail"));
-  $(".run-detail").id = "run-detail";
-  const selected = currentRun || details.runs[0]?.id;
-  if (selected) selectRun(selected);
+  const selected = runSelector(selectRun);
+  if (!selected) return;
+  const view = node("div");
+  view.id = "run-detail";
+  main.append(view);
+  selectRun(selected);
 }
 function selectRun(id) {
-  if (currentRun !== id) {
-    graphFilter = "";
-    selectedFinding = "";
-    openEvidence = new Set();
-    evidenceCache = new Map();
-    openDiff = false;
-    fileFocus = "";
-  }
-  currentRun = id;
+  setCurrentRun(id);
   closeStream();
+  graphObserver?.disconnect();
   const selected = project;
+  const view = $("#run-detail");
+  const loading = node("p", "Loading run…", "muted");
+  view.replaceChildren(loading);
+  const isActive = () => view.isConnected && project === selected && currentRun === id && page === "agents";
   guarded(async () => {
     const data = await query("run", {project: selected, run: id});
-    if (project !== selected || currentRun !== id || page !== "agents") return;
+    if (!loading.isConnected || !isActive()) return;
     runData = data;
-    const status = document.querySelector("[data-run=\"" + CSS.escape(id) + "\"] .state");
-    if (status) status.textContent = data.status;
     drawRun();
     if (["failed", "complete"].includes(runData.status)) return;
-    stream = new EventSource("/api/events?" + new URLSearchParams({project: selected, run: id}));
-    stream.onmessage = (event) => {
+    const events = new EventSource("/api/events?" + new URLSearchParams({project: selected, run: id}));
+    stream = events;
+    events.onmessage = (event) => {
+      if (stream !== events || !isActive()) return;
       const item = JSON.parse(event.data);
       if (runData.events.some((previous) => previous.id === item.id)) return;
       runData.events.push(item);
@@ -567,7 +577,7 @@ function selectRun(id) {
       if (item.kind === "review_finished") {
         guarded(async () => {
           const updated = await query("run", {project: selected, run: id});
-          if (project === selected && currentRun === id && page === "agents") {
+          if (stream === events && isActive()) {
             runData.review = updated.review;
             runData.forks = updated.forks;
             runData.sweeper_findings = updated.sweeper_findings;
@@ -765,6 +775,23 @@ function drawRun() {
     || sources.includes(graphFilter) || (graphFilter === "writer" && status === "accepted")
     || (graphFilter === "files" && matched({status, record})));
   const focused = subset.find((item) => item.id === selectedFinding) || subset[0];
+  const summary = node("div", "", "run-summary");
+  const outcome = [runData.status];
+  for (const status of Object.keys(verdictNames)) {
+    const count = (runData.review[status] || []).length;
+    if (count) outcome.push(count + " " + verdictNames[status].toLowerCase());
+  }
+  if (files.size) outcome.push(files.size + (files.size === 1 ? " file changed" : " files changed"));
+  else if (runData.status === "complete") outcome.push("no knowledge changes");
+  summary.append(node("p", outcome.join(" · "), "muted"));
+  if (files.size || runData.status === "complete" || runData.check) {
+    const runId = runData.id;
+    summary.append(button(files.size ? "Review changes" : "Open review", () => {
+      setCurrentRun(runId);
+      if (files.has(focused?.record.target)) reviewFile = focused.record.target;
+      selectPage("review");
+    }, files.size ? "primary" : ""));
+  }
   const active = new Set(graphFilter ? [graphFilter] : []);
   if (focused) {
     for (const key of [...focused.sources, "agent:" + agentName(focused.record.agent), focused.status]) active.add(key);
@@ -846,7 +873,7 @@ function drawRun() {
   for (const item of subset) {
     const {record, status, id} = item;
     const copy = findingCopy(record);
-    const row = button("", () => { selectedFinding = id; fileFocus = record.target || ""; drawRun(); });
+    const row = button("", () => { selectedFinding = id; drawRun(); });
     row.setAttribute("aria-pressed", String(focused?.id === id));
     row.append(node("small", verdictNames[status] + (record.fact_id ? " · " + record.fact_id : "")),
                node("div", copy.title));
@@ -864,11 +891,11 @@ function drawRun() {
         : [source.session, source.message].filter(Boolean).join(" · ");
       const key = focused.id + ":" + i;
       const excerpt = node("pre", evidenceCache.get(key) || source.quote || "");
+      const runId = runData.id, runProject = project;
       async function read() {
         if (evidenceCache.has(key)) return;
-        const runId = runData.id;
-        const result = await query("evidence", {project, run: runId, status, index, evidence:i});
-        if (runData.id !== runId) return;
+        const result = await query("evidence", {project: runProject, run: runId, status, index, evidence:i});
+        if (project !== runProject || runData?.id !== runId) return;
         const content = result.heading + "\n\n" + result.text;
         evidenceCache.set(key, content);
         excerpt.textContent = content;
@@ -898,53 +925,72 @@ function drawRun() {
     messages.content.append(text);
     body.append(messages.wrapper);
   }
-  if (files.size) {
-    const diff = togglePanel("Knowledge diff", openDiff || graphFilter === "files", (open) => { openDiff = open; });
-    const fileSelect = selector(diff.content, "Changed file", "diff-file", [...files.keys()].map((name) => [name, name]),
-      files.has(fileFocus) ? fileFocus : files.has(focused?.record.target) ? focused.record.target : [...files.keys()][0]);
-    const patch = node("div", "", "diff-lines");
-    function showPatch() {
-      const lines = files.get(fileSelect.value) || [];
-      if (!lines.length) {
-        patch.replaceChildren(node("p", "No text additions or deletions in this file.", "muted"));
-        return;
-      }
-      patch.replaceChildren(...lines.map(({kind, text}) => {
-        const row = node("div", "", "diff-line " + kind);
-        row.append(node("span", kind === "addition" ? "+" : "−"), node("code", text));
-        return row;
-      }));
-    }
-    fileSelect.onchange = () => { fileFocus = fileSelect.value; showPatch(); };
-    showPatch();
-    diff.content.append(patch);
-    body.append(diff.wrapper);
-  }
   panel.append(list, body);
   const graphScroll = node("div", "", "graph-scroll");
   graphScroll.append(graph);
   block.append(graphScroll, panel);
-  if (runData.check) block.append(button("Open in Checks", () => selectPage("checks")));
-  view.append(block);
+  view.append(summary, block);
   graphObserver = new ResizeObserver(() => drawEdges(graph, canvas, positions, edges, active));
   graphObserver.observe(graph);
 }
 
-function renderChecks() {
-  heading("Review Checks");
-  const list = section("Application checks");
-  for (const run of details.runs) {
-    list.append(button(run.id, () => guarded(async () => {
-      const data = await query("run", {project, run: run.id});
-      drawCheck(data);
-    }), "run-row"));
+function renderReview() {
+  heading("Review Changes");
+  const view = node("div");
+  const runProject = project;
+  function load(id) {
+    setCurrentRun(id);
+    const loading = node("p", "Loading review…", "muted");
+    view.replaceChildren(loading);
+    guarded(async () => {
+      const run = await query("run", {project: runProject, run: id});
+      if (!loading.isConnected || project !== runProject || page !== "review") return;
+      view.replaceChildren();
+      drawKnowledgeDiff(view, run);
+      drawCheck(section("Application check proposal", view), run, runProject);
+    });
   }
-  if (currentRun) guarded(async () => drawCheck(await query("run", {project, run: currentRun})));
+  const selected = runSelector(load);
+  if (!selected) return;
+  main.append(view);
+  load(selected);
 }
-function drawCheck(run) {
-  $("#check-detail")?.remove();
-  const card = section(run.id);
-  card.id = "check-detail";
+function drawKnowledgeDiff(view, run) {
+  const card = section("Knowledge diff", view);
+  const files = patchFiles(run.patch);
+  if (!files.size) {
+    const message = run.status === "complete" ? "No knowledge changes for this run."
+      : run.status === "failed" ? "No knowledge diff was recorded."
+      : "Knowledge changes will appear here after the writer finishes. Refresh to check for updates.";
+    card.append(node("p", message, "muted"));
+    return;
+  }
+  const paths = [...files.keys()];
+  const input = selector(card, "Changed file", "diff-file", paths.map((name) => [name, name]),
+    files.has(reviewFile) ? reviewFile : paths[0]);
+  const patch = node("div", "", "diff-lines");
+  function showPatch() {
+    const lines = files.get(input.value);
+    if (!lines.length) {
+      patch.replaceChildren(node("p", "No text additions or deletions in this file.", "muted"));
+      return;
+    }
+    patch.replaceChildren(...lines.map(({kind, text}) => {
+      const row = node("div", "", "diff-line " + kind);
+      row.append(node("span", kind === "addition" ? "+" : "−"), node("code", text));
+      return row;
+    }));
+  }
+  input.onchange = () => { reviewFile = input.value; showPatch(); };
+  showPatch();
+  card.append(patch);
+}
+function drawCheck(card, run, runProject) {
+  card.replaceChildren(card.firstElementChild);
+  async function refresh() {
+    const updated = await query("run", {project: runProject, run: run.id});
+    if (card.isConnected && project === runProject && page === "review") drawCheck(card, updated, runProject);
+  }
   const check = run.check;
   if (!check) {
     card.append(node("p", "No check proposal for this run."));
@@ -952,8 +998,8 @@ function drawCheck(run) {
       const propose = button("Propose a check", () => guarded(async () => {
         propose.disabled = true;
         try {
-          await api("check-propose", {project, run: run.id});
-          drawCheck(await query("run", {project, run: run.id}));
+          await api("check-propose", {project: runProject, run: run.id});
+          await refresh();
         } finally { propose.disabled = false; }
       }));
       card.append(propose);
@@ -971,15 +1017,15 @@ function drawCheck(run) {
   field(form, "Verification argv as JSON", "argv").placeholder = '["python", "check_timeout.py"]';
   if (check.suggested_verification) form.append(node("small", "Suggested: " + check.suggested_verification));
   submit(form, async (data) => {
-    const result = await api("check-verify", {project, run: run.id, digest: check.patch_sha256,
+    const result = await api("check-verify", {project: runProject, run: run.id, digest: check.patch_sha256,
                                              argv: JSON.parse(data.get("argv"))});
     notify("Verification exit code: " + result.exit_code);
-    drawCheck(await query("run", {project, run: run.id}));
+    await refresh();
   }, "Verify in a temporary worktree");
   card.append(form, button("Stage reviewed patch", () => guarded(async () => {
-    await api("check-apply", {project, run: run.id, digest: check.patch_sha256});
+    await api("check-apply", {project: runProject, run: run.id, digest: check.patch_sha256});
     notify("Patch staged in application checkout");
-    drawCheck(await query("run", {project, run: run.id}));
+    await refresh();
   })));
 }
 

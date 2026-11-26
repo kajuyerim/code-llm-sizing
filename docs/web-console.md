@@ -36,14 +36,17 @@ in the selected knowledge checkout's history. **Sweep defaults** under
 **Setup** holds the strategy, backend and optional model override. Both maintenance backends still read selected
 Claude Code development sessions. The console records user-visible agent
 events in the run directory and replays them when a run is reopened. Raw
-provider logs and reasoning stay outside the browser stream. The review panel
-distinguishes accepted proposals, rejected or deferred records, and the actual
-knowledge patch. Browser-started sweeps retain output locally.
+provider logs and reasoning stay outside the browser stream. **Agents** shows
+the outcome and the evidence behind the decisions. Browser-started sweeps
+retain output locally.
 
-**Checks** shows the optional application lint or test proposal. Review its
-patch, pass the exact verification command as an argument array, and explicitly
-stage the reviewed patch. The command runs with your local permissions in a
-disposable worktree. See [application checks](application-checks.md).
+Use **Review changes** to open that sweep's knowledge diff in **Review**.
+Choose a changed file to see its additions and deletions. You can also select
+a sweep directly from **Review**. The optional application lint or test
+proposal has its own section. Review its patch, pass the exact verification
+command as an argument array, and explicitly stage the reviewed patch. The
+command runs with your local permissions in a disposable worktree. See
+[application checks](application-checks.md).
 
 ## Browser acceptance
 
@@ -64,5 +67,5 @@ record and to its review outcome. Select an agent, evidence type, or verdict
 to filter the findings. Open a finding to read its text, the decision reason,
 and the cited excerpt. The writer consumes accepted records. A written record
 is linked to a file diff when the writer receipt and the patch both support
-the link. Opening the file list also shows diffs from older runs without a
+the link. **Review** also shows recorded diffs from older runs without a
 writer receipt.
