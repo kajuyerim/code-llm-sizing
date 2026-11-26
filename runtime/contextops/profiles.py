@@ -61,6 +61,18 @@ def validate_profile(items: list[dict]) -> dict:
     return {"categories": categories}
 
 
+def limit_recommendations(candidates: list[dict]) -> list[dict]:
+    """Keep the highest-ranked recommendations and leave the rest available."""
+    limit = (len(candidates) + 1) // 2
+    used = 0
+    output = []
+    for item in candidates:
+        recommend = item["recommended"] and used < limit
+        used += int(recommend)
+        output.append({**item, "recommended": recommend, "enabled": recommend})
+    return output
+
+
 async def discover(app: Path, kb: Path, backend: str, model: str | None,
                    sessions: list[str] | None = None) -> dict:
     config = load_config(kb, backend or None)
@@ -99,7 +111,8 @@ async def discover(app: Path, kb: Path, backend: str, model: str | None,
                 if (not path.is_absolute() and ".." not in path.parts and not sensitive(path)
                         and (snapshot / path).resolve().is_relative_to(snapshot)
                         and (snapshot / path).is_file()):
-                    candidates.append({**item, "enabled": item["recommended"]})
+                    candidates.append(item)
+            candidates = limit_recommendations(candidates)
             validate_profile(candidates)
             return {"revision": head, "categories": candidates}
         finally:

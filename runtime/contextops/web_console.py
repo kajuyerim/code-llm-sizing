@@ -318,10 +318,11 @@ class Console:
             with self.lock:
                 if self.scans.get(key, {}).get("status") == "running":
                     raise ValueError("A category scan is already running")
-                self.scans[key] = {"status": "running"}
-            threading.Thread(target=self._scan, args=(key, app, kb, backend, model, data.get("sessions", [])),
+                scan_id = secrets.token_hex(8)
+                self.scans[key] = {"status": "running", "scan_id": scan_id}
+            threading.Thread(target=self._scan, args=(key, scan_id, app, kb, backend, model, data.get("sessions", [])),
                              daemon=True).start()
-            return {"status": "running"}
+            return {"status": "running", "scan_id": scan_id}
         if action == "run":
             with self.lock:
                 if any(run["status"] in ("queued", "running") for run in self.runs(key).values()):
@@ -364,10 +365,10 @@ class Console:
             return {"exit_code": checks.verify(path, data["digest"], argv)}
         raise ValueError("Unknown console action")
 
-    def _scan(self, key, app, kb, backend, model, sessions):
+    def _scan(self, key, scan_id, app, kb, backend, model, sessions):
         try:
             result = asyncio.run(profiles.discover(app, kb, backend, model, sessions))
-            self.scans[key] = {"status": "complete", **result}
+            self.scans[key] = {"status": "complete", "scan_id": scan_id, **result}
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
             self.scans[key] = {"status": "failed", "error": "Category scan failed. Check the configured provider, model and role."}
 

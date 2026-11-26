@@ -287,11 +287,15 @@ function renderCategories() {
   const draftKey = "contextops-category-draft:" + currentProject;
   const originalProfile = JSON.stringify(details.categories);
   const savedDraft = JSON.parse(sessionStorage.getItem(draftKey) || "null");
+  let renderedScanId;
   if (savedDraft?.profile === originalProfile && Array.isArray(savedDraft.categories)) {
     draftCategories = savedDraft.categories;
+    renderedScanId = savedDraft.scanId;
   }
   function rememberDraft() {
-    sessionStorage.setItem(draftKey, JSON.stringify({profile: originalProfile, categories: draftCategories}));
+    sessionStorage.setItem(draftKey, JSON.stringify({
+      profile: originalProfile, categories: draftCategories, scanId: renderedScanId,
+    }));
   }
   const categories = section("What should we track?");
   categories.classList.add("category-setup");
@@ -391,15 +395,25 @@ function renderCategories() {
     }
   }
   function showScan(result) {
+    const fresh = renderedScanId !== result.scan_id;
+    const saved = new Set(details.categories.map((item) => item.id));
     const previous = new Map(draftCategories.map((item) => [item.id, item]));
-    for (const item of result.categories || []) {
+    const candidates = (result.categories || []).map((item) => {
       const existing = previous.get(item.id);
-      previous.set(item.id, existing ? {...item, ...existing, reason:item.reason, path:item.path,
-                                          recommended:item.recommended} : item);
-    }
-    draftCategories = [...previous.values()];
-    scanState.textContent = result.categories?.length ? "Scanned " + result.revision.slice(0, 8)
+      if (!existing) return item;
+      if (!saved.has(item.id)) {
+        if (!("recommended" in existing)) return existing;
+        if (fresh) return item;
+      }
+      return {...item, ...existing, reason:item.reason, path:item.path, recommended:item.recommended};
+    });
+    const discovered = new Set(candidates.map((item) => item.id));
+    draftCategories = [...candidates, ...draftCategories.filter((item) => !discovered.has(item.id)
+      && (saved.has(item.id) || !("recommended" in item)))];
+    scanState.textContent = candidates.length ? "Scanned " + result.revision.slice(0, 8)
       : "No categories suggested. You can add one manually.";
+    renderedScanId = result.scan_id;
+    rememberDraft();
     draw();
   }
   async function waitForScan(result) {

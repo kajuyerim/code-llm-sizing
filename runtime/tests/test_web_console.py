@@ -115,6 +115,15 @@ class ConsoleTests(unittest.TestCase):
         self.assertEqual([entry["category"] for entry in review.rejected], ["ui"])
         self.assertEqual(len(review.deferred), 1)
 
+    def test_category_scan_keeps_optional_candidates_and_limits_defaults(self):
+        candidates = [{"id": str(i), "recommended": True} for i in range(9)]
+        output = profiles.limit_recommendations(candidates)
+        self.assertEqual(len(output), 9)
+        self.assertEqual([item["id"] for item in output if item["enabled"]], ["0", "1", "2", "3", "4"])
+        output = profiles.limit_recommendations(
+            [{"id": "a", "recommended": False}, {"id": "b", "recommended": False}])
+        self.assertFalse(any(item["enabled"] for item in output))
+
     def test_scan_records_distinct_suggestions_and_provider(self):
         rows = [{"id": "domain", "name": "Domain rules", "description": "Compatibility agreements",
                  "reason": "Existing behavior", "path": "README.md", "recommended": True}]

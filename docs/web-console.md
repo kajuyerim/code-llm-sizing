@@ -14,9 +14,10 @@ changes, and commit them from the page. The project list is stored locally
 under `~/.contextops`; the binding is read from the application's Git
 configuration. The default connection leaves the pre-push hook disabled.
 
-Scan the committed application snapshot for candidate knowledge categories.
-The scan can include selected Claude Code sessions. Choose the recommended
-categories, customize the list or add a category and collection description.
+Scan the committed application snapshot for broad knowledge categories. The
+scan can include selected Claude Code sessions. The strongest recommendations
+are selected by default. Open any category to see what it collects and why it
+was suggested, then adjust the selection or add a category of your own.
 Save the profile on the application or team scope and review and commit the
 configuration. An application override takes precedence over the team default.
 The sweep freezes its profile against the committed knowledge baseline. A
