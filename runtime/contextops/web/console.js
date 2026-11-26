@@ -118,10 +118,15 @@ function chooseProject(key) {
 function renderProjects() {
   const list = $("#projects");
   list.replaceChildren();
-  $("#project-toggle").textContent = projects[project]?.name || "Projects";
-  for (const [key, row] of Object.entries(projects)) {
-    list.append(button(row.name, () => chooseProject(key), key === project ? "active" : ""));
-  }
+  const name = projects[project]?.name || "Projects";
+  $("#project-name").textContent = name;
+  $("#project-toggle").title = name;
+  Object.entries(projects).forEach(([key, row], index) => {
+    const entry = button(row.name, () => chooseProject(key), key === project ? "active" : "");
+    entry.style.setProperty("--row", Math.min(index, 8));
+    list.append(entry);
+  });
+  $("#add-project").style.setProperty("--row", Math.min(list.childElementCount, 9));
 }
 function selectPage(next) {
   if (next === page) return;
@@ -468,11 +473,39 @@ function agentName(label) {
 
 function patchFiles(text) {
   const files = new Map();
-  for (const chunk of (text || "").split(/(?=^diff --git )/m)) {
-    const path = chunk.match(/^diff --git a\/.* b\/(.*)$/m)?.[1];
-    if (path) files.set(path, chunk);
+  let entry, inHunk = false;
+  for (const line of (text || "").split("\n")) {
+    if (line.startsWith("diff --git ")) {
+      const path = line.match(/^diff --git a\/.* b\/(.*)$/)?.[1];
+      entry = path ? [] : undefined;
+      if (entry) files.set(path, entry);
+      inHunk = false;
+    } else if (line.startsWith("@@ ") && entry) {
+      inHunk = true;
+    } else if (inHunk && (line[0] === "+" || line[0] === "-")) {
+      entry.push({kind: line[0] === "+" ? "addition" : "deletion", text: line.slice(1)});
+    }
   }
   return files;
+}
+
+function togglePanel(label, expanded, onToggle) {
+  const wrapper = node("div", "", "console-disclosure");
+  const content = node("div", "", "disclosure-content");
+  const trigger = button("", () => {
+    setOpen(content.hidden);
+    onToggle?.(!content.hidden);
+  }, "disclosure-trigger");
+  const action = node("span", "", "disclosure-action");
+  trigger.append(node("span", label), action);
+  function setOpen(open) {
+    trigger.setAttribute("aria-expanded", String(open));
+    action.textContent = open ? "Hide" : "Show";
+    content.hidden = !open;
+  }
+  wrapper.append(trigger, content);
+  setOpen(expanded);
+  return {wrapper, content};
 }
 
 function drawEdges(graph, canvas, positions, edges, active) {
@@ -484,24 +517,60 @@ function drawEdges(graph, canvas, positions, edges, active) {
   const context = canvas.getContext("2d");
   if (!context) return;
   context.scale(scale, scale);
+  const groups = new Map();
   for (const [from, to] of edges) {
-    const a = positions.get(from)?.getBoundingClientRect();
-    const b = positions.get(to)?.getBoundingClientRect();
-    if (!a || !b) continue;
-    const x1 = a.left + a.width / 2 - outer.left;
-    const y1 = a.bottom - outer.top;
-    const x2 = b.left + b.width / 2 - outer.left;
-    const y2 = b.top - outer.top - 2;
-    const middle = (y1 + y2) / 2;
-    context.strokeStyle = active.has(from) && active.has(to) ? "#deded9" : "#646664";
-    context.lineWidth = active.has(from) && active.has(to) ? 1.4 : 1;
+    const a = positions.get(from);
+    const b = positions.get(to);
+    if (!a || !b || a.closest(".graph-lane") === b.closest(".graph-lane")) continue;
+    const groupKey = a.closest(".graph-lane").dataset.lane + ":" + b.closest(".graph-lane").dataset.lane;
+    if (!groups.has(groupKey)) groups.set(groupKey, new Map());
+    const group = groups.get(groupKey);
+    if (!group.has(from)) group.set(from, []);
+    group.get(from).push(to);
+  }
+  const snap = (n) => Math.round(n * scale) / scale + .5 / scale;
+  const lines = [], arrows = [];
+  for (const group of groups.values()) {
+    const origins = [...group.keys()];
+    origins.forEach((from, index) => {
+      const a = positions.get(from).getBoundingClientRect();
+      const targets = group.get(from).map((to) => [to, positions.get(to).getBoundingClientRect()]);
+      const x1 = snap(a.left + a.width / 2 - outer.left);
+      const y1 = snap(a.bottom - outer.top);
+      const top = Math.min(...targets.map(([, rect]) => rect.top - outer.top));
+      if (top <= y1 + 8) return;
+      const rail = snap(y1 + (top - y1) * (.28 + .44 * (index + 1) / (origins.length + 1)));
+      for (const [to, b] of targets) {
+        const x2 = snap(b.left + b.width / 2 - outer.left);
+        const y2 = snap(b.top - outer.top - 3);
+        const highlighted = active.has(from) && active.has(to);
+        lines.push({highlighted, points:[[x1,y1],[x1,rail],[x2,rail],[x2,y2]]});
+        arrows.push({x:x2, y:y2, highlighted});
+      }
+    });
+  }
+  lines.sort((a,b) => Number(a.highlighted) - Number(b.highlighted));
+  for (const line of lines) {
+    context.strokeStyle = line.highlighted ? "#e2e2d9" : "#686b66";
+    context.lineWidth = 1;
+    context.setLineDash(line.highlighted ? [] : [3, 3]);
     context.beginPath();
-    context.moveTo(x1, y1);
-    context.bezierCurveTo(x1, middle, x2, middle, x2, y2);
-    context.lineTo(x2 - 3, y2 - 5);
-    context.moveTo(x2, y2);
-    context.lineTo(x2 + 3, y2 - 5);
+    context.moveTo(...line.points[0]);
+    for (const point of line.points.slice(1)) context.lineTo(...point);
     context.stroke();
+    if (line.highlighted) {
+      context.fillStyle = "#e2e2d9";
+      context.fillRect(line.points[1][0] - 1, line.points[1][1] - 1, 2, 2);
+    }
+  }
+  context.setLineDash([]);
+  for (const arrow of arrows) {
+    context.fillStyle = arrow.highlighted ? "#e2e2d9" : "#888a82";
+    context.beginPath();
+    context.moveTo(arrow.x - 3, arrow.y - 4);
+    context.lineTo(arrow.x + 3, arrow.y - 4);
+    context.lineTo(arrow.x, arrow.y);
+    context.fill();
   }
 }
 
@@ -561,6 +630,7 @@ function drawRun() {
   function lane(title, entries) {
     if (!entries.length) return;
     const row = node("div", "", "graph-lane");
+    row.dataset.lane = title;
     const nodes = node("div", "", "graph-nodes");
     row.append(node("h3", title), nodes);
     for (const [key, title, meta, running] of entries) {
@@ -578,15 +648,17 @@ function drawRun() {
     graph.append(row);
   }
   const sourceKeys = Array.from(new Set(findings.flatMap((finding) => finding.sources)));
-  lane("Cited evidence", sourceKeys.map((kind) => [
+  const inputNodes = sourceKeys.map((kind) => [
     kind, sourceNames[kind] || kind, findings.filter((item) => item.sources.includes(kind)).length + " findings",
-  ]));
+  ]);
   const sweeper = agents.get("sweeper");
-  if (sweeper) lane("Survey", [["agent:sweeper", "Sweeper", sweeper.status, sweeper.status === "running"]]);
+  if (sweeper) inputNodes.push(["agent:sweeper", "Sweeper", sweeper.status, sweeper.status === "running"]);
+  lane("Inputs", inputNodes);
   lane("Specialists", [...agents].filter(([name]) => !["sweeper", "writer", "cartographer", "check-proposer"].includes(name))
     .map(([name, agent]) => {
       const count = findings.filter((item) => agentName(item.record.agent) === name && item.status !== "no_change").length;
-      return ["agent:" + name, name, agent.status === "running" ? "working" : agent.status && agent.status !== "success"
+      const short = name.replace(/-maintainer(?=:|$)/, "").replace(/^./, (letter) => letter.toUpperCase());
+      return ["agent:" + name, short, agent.status === "running" ? "working" : agent.status && agent.status !== "success"
         ? agent.status : (count + (count === 1 ? " proposal" : " proposals")),
               agent.status === "running"];
     }));
@@ -622,7 +694,7 @@ function drawRun() {
   for (const item of subset) {
     const {record, status, id} = item;
     const copy = findingCopy(record);
-    const row = button("", () => { selectedFinding = id; drawRun(); });
+    const row = button("", () => { selectedFinding = id; fileFocus = record.target || ""; drawRun(); });
     row.setAttribute("aria-pressed", String(focused?.id === id));
     row.append(node("small", verdictNames[status] + (record.fact_id ? " · " + record.fact_id : "")),
                node("div", copy.title));
@@ -636,38 +708,28 @@ function drawRun() {
     const reason = record.rejected_because || record.policy_reason || record.reason;
     if (reason && reason !== copy.title) body.append(node("p", reason));
     (record.evidence || []).forEach((source, i) => {
-      const disclosure = node("details", "", "evidence-detail");
       const citation = source.path ? source.path + (source.line ? ":" + source.line : "")
         : [source.session, source.message].filter(Boolean).join(" · ");
-      disclosure.append(node("summary", (sourceNames[source.kind] || "Evidence") + (citation ? " · " + citation : "")));
       const key = focused.id + ":" + i;
       const excerpt = node("pre", evidenceCache.get(key) || source.quote || "");
-      disclosure.append(excerpt);
-      disclosure.open = openEvidence.has(key);
-      disclosure.addEventListener("toggle", () => {
-        if (!disclosure.isConnected) return;
-        if (!disclosure.open) { openEvidence.delete(key); return; }
-        openEvidence.add(key);
-        if (evidenceCache.has(key) || disclosure.dataset.loaded) return;
-        disclosure.dataset.loaded = "true";
+      async function read() {
+        if (evidenceCache.has(key)) return;
         const runId = runData.id;
-        guarded(async () => {
-          const result = await query("evidence", {project, run: runId, status, index, evidence:i});
-          if (runData.id !== runId) return;
-          const content = result.heading + "\n\n" + result.text;
-          evidenceCache.set(key, content);
-          excerpt.textContent = content;
+        const result = await query("evidence", {project, run: runId, status, index, evidence:i});
+        if (runData.id !== runId) return;
+        const content = result.heading + "\n\n" + result.text;
+        evidenceCache.set(key, content);
+        excerpt.textContent = content;
+      }
+      const display = togglePanel((sourceNames[source.kind] || "Evidence") + (citation ? " · " + citation : ""),
+        openEvidence.has(key), (open) => {
+          if (open) { openEvidence.add(key); guarded(read); }
+          else openEvidence.delete(key);
         });
-      });
-      body.append(disclosure);
+      display.content.append(excerpt);
+      if (openEvidence.has(key)) guarded(read);
+      body.append(display.wrapper);
     });
-    if (matched(focused)) body.append(button("View written file diff", () => {
-      fileFocus = record.target;
-      fileSelect.value = fileFocus;
-      showPatch();
-      diff.open = true;
-      openDiff = true;
-    }));
   } else {
     body.append(node("p", graphFilter === "agent:sweeper" && runData.sweeper_findings?.length
       ? "These are leads the sweeper passed to the specialists." :
@@ -678,32 +740,38 @@ function drawRun() {
     body.append(node("h3", "Coverage"), node("p", coverage));
   }
   if (selectedAgent?.messages.length) {
-    const messages = node("details");
-    messages.append(node("summary", "Agent messages"));
+    const messages = togglePanel("Agent messages", false);
     const text = node("div", "", "messages");
     selectedAgent.messages.forEach((line) => text.append(node("p", line)));
-    messages.append(text);
-    body.append(messages);
+    messages.content.append(text);
+    body.append(messages.wrapper);
   }
-
-  const diff = node("details");
-  const fileSelect = document.createElement("select");
-  fileSelect.setAttribute("aria-label", "File diff");
-  const patch = node("pre", runData.patch || "No written patch.");
-  function showPatch() { patch.textContent = files.get(fileSelect.value) || runData.patch || "No written patch."; }
-  const all = node("option", "All changed files");
-  all.value = "";
-  fileSelect.append(all);
-  for (const name of files.keys()) fileSelect.append(node("option", name));
-  fileSelect.value = files.has(fileFocus) ? fileFocus : "";
-  showPatch();
-  fileSelect.onchange = () => { fileFocus = fileSelect.value; showPatch(); };
-  diff.append(node("summary", "Knowledge diff"), fileSelect, patch);
-  diff.open = openDiff || graphFilter === "files";
-  diff.addEventListener("toggle", () => { if (diff.isConnected) openDiff = diff.open; });
-  if (files.size) body.append(diff);
+  if (files.size) {
+    const diff = togglePanel("Knowledge diff", openDiff || graphFilter === "files", (open) => { openDiff = open; });
+    const fileSelect = selector(diff.content, "Changed file", "diff-file", [...files.keys()].map((name) => [name, name]),
+      files.has(fileFocus) ? fileFocus : files.has(focused?.record.target) ? focused.record.target : [...files.keys()][0]);
+    const patch = node("div", "", "diff-lines");
+    function showPatch() {
+      const lines = files.get(fileSelect.value) || [];
+      if (!lines.length) {
+        patch.replaceChildren(node("p", "No text additions or deletions in this file.", "muted"));
+        return;
+      }
+      patch.replaceChildren(...lines.map(({kind, text}) => {
+        const row = node("div", "", "diff-line " + kind);
+        row.append(node("span", kind === "addition" ? "+" : "−"), node("code", text));
+        return row;
+      }));
+    }
+    fileSelect.onchange = () => { fileFocus = fileSelect.value; showPatch(); };
+    showPatch();
+    diff.content.append(patch);
+    body.append(diff.wrapper);
+  }
   panel.append(list, body);
-  block.append(graph, panel);
+  const graphScroll = node("div", "", "graph-scroll");
+  graphScroll.append(graph);
+  block.append(graphScroll, panel);
   if (runData.check) block.append(button("Open in Checks", () => selectPage("checks")));
   view.append(block);
   graphObserver = new ResizeObserver(() => drawEdges(graph, canvas, positions, edges, active));
