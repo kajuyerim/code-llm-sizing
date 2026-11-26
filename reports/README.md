@@ -10,6 +10,7 @@ Project reports in date order. Earlier reports are kept unchanged when a newer o
 | 14 November 2026 | [First-run acceptance](../docs/first-run-acceptance.md) | Live run of the public demo from empty knowledge to a populated branch. |
 | 15 November 2026 | [Results and usage](2026-11-15-results/context-ops-results.html) (HTML) | The v2 report brought up to date. It explains how a team uses the repository and covers the maintenance rerun on the v2 inputs, four development studies, and selectable development chats and learning conversations. |
 | 18 November 2026 | [Midterm report](2026-11-18-midterm/context-ops-midterm.pdf) (PDF, [LaTeX source](2026-11-18-midterm/main.tex), [evidence supplement](2026-11-18-midterm/context-ops-supplement.pdf)) | CMPE 492 midterm: problem, design, implementation, the pilot, v2, the downstream comparison with and without knowledge, the feature-sequence experiment with team and repository knowledge, the maintenance rerun and persona-driven development, the demo, and next steps. |
+| 21 November 2026 | [Hindsight and Context Ops](hindsight-comparison/index.html) (HTML) | An illustrated workflow comparison, an archived Context Ops case, and notes on the two independent studies. |
 
 The written summary of every evaluation, with denominators and limits, is [docs/evaluation.md](../docs/evaluation.md).
 
